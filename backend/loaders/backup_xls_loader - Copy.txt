@@ -1,0 +1,55 @@
+import re,olefile,xlrd
+from datetime import datetime
+import pandas as pd
+from backend.calculations.constants import *
+from backend.calculations.component_category import build_component_category
+from backend.validators.values import clean_numeric_value,normalize_header
+DT=re.compile(r'S1_\d+_(\d{4}-\d{2}-\d{2})\s+(\d{2})-(\d{2})-(\d{2})'); UID=re.compile(r'([A-Za-z0-9]+_C\d+_S\d+_\d+)_\d{4}-\d{2}-\d{2}')
+def open_xls(path):
+ with olefile.OleFileIO(str(path)) as ole:
+  stream='Workbook' if ole.exists('Workbook') else ('Book' if ole.exists('Book') else None)
+  if not stream: raise ValueError('Workbook/Book OLE stream not found')
+  raw=ole.openstream(stream).read()
+ return xlrd.open_workbook(file_contents=raw,ignore_workbook_corruption=True)
+def metadata(wb):
+ if HEADER_SHEET not in wb.sheet_names(): raise ValueError('HEADER worksheet not found')
+ hs=wb.sheet_by_name(HEADER_SHEET); text=str(hs.cell_value(5,1)).strip() if hs.nrows>5 and hs.ncols>1 else ''
+ dm=DT.search(text); um=UID.search(text)
+ if not dm or not um: raise ValueError('UID or DateTime pattern not found in HEADER!B6')
+ ds,h,m,s=dm.groups(); return um.group(1),datetime.strptime(f'{ds} {h}:{m}:{s}','%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M')
+def canonical_header(value):
+ h=normalize_header(value); key=str(h).strip().upper().replace(' ','').replace('_','').replace('-','')
+ aliases={'UNKNOWN':'Unknown','UNKNOWNS':'Unknown','UNIDENTIFIED':'Unknown','IPARAFFINS':'I-Paraffins','ISOPARAFFINS':'I-Paraffins','PARAFFIN':'Paraffin','PARAFFINS':'Paraffin','AROMATIC':'Aromatics','AROMATICS':'Aromatics','NAPHTHENE':'Naphthenes','NAPHTHENES':'Naphthenes','OLEFIN':'Olefins','OLEFINS':'Olefins','CARBON#':'CARBON#','CARBON':'CARBON#'}
+ return aliases.get(key,h)
+def extract(path):
+ wb=open_xls(path); uid,dt=metadata(wb)
+ if CARBON_SHEET not in wb.sheet_names(): raise ValueError(f'{CARBON_SHEET} worksheet not found')
+ sh=wb.sheet_by_name(CARBON_SHEET); header_row=None; idx=None
+ for r in range(min(sh.nrows,12)):
+  hs=[canonical_header(sh.cell_value(r,c)) for c in range(sh.ncols)]; current={h:c for c,h in enumerate(hs) if h}
+  if 'CARBON#' in current and any(c in current for c in COMPONENTS): header_row=r; idx=current; break
+ if header_row is None: raise ValueError('Carbon table header row was not found')
+ required=['CARBON#']+COMPONENTS[:-1]; missing=[x for x in required if x not in idx]
+ if missing: raise ValueError(f'Missing required carbon headers: {missing}')
+ result=[]
+ for comp in COMPONENTS:
+  row={'File Name':path.name,'UID':uid,'DateTime':dt,'Component':comp,**{f'C{n}':None for n in CARBON_NUMBERS}}
+  if comp in idx:
+   for r in range(header_row+1,sh.nrows):
+    cn=clean_numeric_value(sh.cell_value(r,idx['CARBON#']))
+    if cn is not None and int(cn) in CARBON_NUMBERS: row[f'C{int(cn)}']=clean_numeric_value(sh.cell_value(r,idx[comp]))
+  result.append(row)
+ return result
+def extract_component_list(path):
+ wb=open_xls(path); uid,dt=metadata(wb)
+ if COMPONENT_LIST_SHEET not in wb.sheet_names(): raise ValueError('COMPONENT_LIST worksheet not found')
+ sh=wb.sheet_by_name(COMPONENT_LIST_SHEET); found=None
+ for r in range(min(sh.nrows,30)):
+  m={str(sh.cell_value(r,c)).strip():c for c in range(sh.ncols)}
+  if {'COMPONENT','%WGT','CARBON#'}.issubset(m): found=(r,m); break
+ if not found: raise ValueError('COMPONENT_LIST headers COMPONENT, %WGT and CARBON# were not found')
+ r0,m=found; records=[]
+ for r in range(r0+1,sh.nrows):
+  comp=str(sh.cell_value(r,m['COMPONENT'])).strip()
+  if comp: records.append({'COMPONENT':comp,'%WGT':sh.cell_value(r,m['%WGT']),'CARBON#':sh.cell_value(r,m['CARBON#'])})
+ return {'File Name':path.name,'UID':uid,'DateTime':dt,**build_component_category(pd.DataFrame(records,columns=['COMPONENT','%WGT','CARBON#']))}

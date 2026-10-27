@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Sign in | DHA Data Dashboard</title>
+    <style>
+        :root {
+            --c-ink: #071a2d;
+            --c-slate: #344253;
+            --c-ivory: #f4ead8;
+            --c-paper: #fbf5e9;
+            --c-burnt: #c95512;
+            --c-sand: #d8c9b3;
+            --accent-rose: #a63f32;
+            --font-sans: "Fira Code", "Segoe UI", Consolas, monospace;
+            --font-heading: Georgia, "Times New Roman", serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: var(--font-sans);
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--c-ink);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .blob {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(60px);
+            opacity: 0.35;
+            animation: float 14s ease-in-out infinite;
+        }
+
+        .blob--one {
+            width: 420px;
+            height: 420px;
+            background: var(--c-burnt);
+            top: -120px;
+            left: -100px;
+            animation-delay: 0s;
+        }
+
+        .blob--two {
+            width: 360px;
+            height: 360px;
+            background: var(--c-slate);
+            bottom: -140px;
+            right: -80px;
+            animation-delay: 3s;
+        }
+
+        .blob--three {
+            width: 260px;
+            height: 260px;
+            background: var(--c-sand);
+            bottom: 10%;
+            left: 8%;
+            opacity: 0.18;
+            animation-delay: 6s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -24px) scale(1.08); }
+        }
+
+        .login-card {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 380px;
+            margin: 24px;
+            background: var(--c-paper);
+            border-radius: 14px;
+            padding: 40px 36px 32px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+            animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes rise {
+            from { opacity: 0; transform: translateY(24px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+
+        .brand-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            background: var(--c-burnt);
+            color: var(--c-paper);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-heading);
+            font-weight: 700;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .brand-text h1 {
+            margin: 0;
+            font-family: var(--font-heading);
+            font-size: 18px;
+            color: var(--c-ink);
+            letter-spacing: -0.01em;
+        }
+
+        .brand-text span {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--c-slate);
+        }
+
+        h2 {
+            font-family: var(--font-heading);
+            font-size: 22px;
+            margin: 0 0 6px;
+            color: var(--c-ink);
+        }
+
+        .subtitle {
+            margin: 0 0 24px;
+            color: var(--c-slate);
+            font-size: 13px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--c-slate);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .field {
+            margin-bottom: 18px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 11px 13px;
+            border: 1px solid rgba(7, 26, 45, 0.18);
+            border-radius: 7px;
+            background: #fffaf0;
+            color: var(--c-ink);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: var(--c-burnt);
+            box-shadow: 0 0 0 3px rgba(201, 85, 18, 0.18);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 12px;
+            margin-top: 6px;
+            border: 1px solid #ad450c;
+            border-radius: 7px;
+            background: var(--c-burnt);
+            color: var(--c-paper);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 5px 14px rgba(201, 85, 18, 0.25);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+
+        .btn-submit:hover {
+            background: #ad450c;
+            box-shadow: 0 7px 18px rgba(201, 85, 18, 0.32);
+            transform: translateY(-1px);
+        }
+
+        .btn-submit:active {
+            transform: translateY(0);
+        }
+
+        .error-banner {
+            display: none;
+            background: rgba(166, 63, 50, 0.1);
+            border: 1px solid rgba(166, 63, 50, 0.35);
+            color: var(--accent-rose);
+            font-size: 12.5px;
+            padding: 10px 12px;
+            border-radius: 7px;
+            margin-bottom: 18px;
+            animation: shake 0.4s ease;
+        }
+
+        .error-banner.visible { display: block; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-6px); }
+            40% { transform: translateX(6px); }
+            60% { transform: translateX(-4px); }
+            80% { transform: translateX(4px); }
+        }
+
+        .footer-note {
+            margin-top: 22px;
+            text-align: center;
+            font-size: 11px;
+            color: var(--c-slate);
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="blob blob--one"></div>
+    <div class="blob blob--two"></div>
+    <div class="blob blob--three"></div>
+
+    <div class="login-card">
+        <div class="brand">
+            <div class="brand-icon">D</div>
+            <div class="brand-text">
+                <h1>DHA Data Dashboard</h1>
+                <span id="appVersion">v5.0</span>
+            </div>
+        </div>
+
+        <h2>Welcome back</h2>
+        <p class="subtitle">Sign in to continue to your dashboard.</p>
+
+        <div class="error-banner" id="errorBanner">Invalid username or password. Please try again.</div>
+
+        <form method="post" action="/login" id="loginForm">
+            <input type="hidden" name="next" id="nextField" value="">
+            <div class="field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" autocomplete="username" required autofocus>
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" required>
+            </div>
+            <button type="submit" class="btn-submit">Sign In</button>
+        </form>
+
+        <p class="footer-note">Protected access &middot; authorized personnel only</p>
+    </div>
+
+    <script>
+        var params = new URLSearchParams(window.location.search);
+        if (params.get("error")) {
+            document.getElementById("errorBanner").classList.add("visible");
+        }
+        var next = params.get("next");
+        if (next) {
+            document.getElementById("nextField").value = next;
+        }
+    </script>
+</body>
+
+</html>

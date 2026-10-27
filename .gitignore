@@ -1,0 +1,22 @@
+.venv/
+.venv-local/
+.python-runtime/
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Local data, source workbooks, exports, and historical snapshots
+DHA/
+Historian/*.sqlite
+RunData/*
+!RunData/.gitignore
+Needs changes/
+backups/
+*.xls
+*.xlsx
+*.csv
+*.dat1dat-Back
+
+# Local editor and runtime files
+.vscode/
+*.log

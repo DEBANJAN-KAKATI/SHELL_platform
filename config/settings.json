@@ -1,0 +1,9 @@
+{
+  "default_source_directory": "C:\\Users\\sanka\\Desktop\\ILS_App\\Data\\DHA",
+  "host": "127.0.0.1",
+  "port": 5001,
+  "open_browser": true,
+  "default_reactor_source_directory": "C:\\Users\\sanka\\Desktop\\ILS_App\\Data\\ValveOpening",
+  "default_run_plan_file": "C:\\Users\\sanka\\Desktop\\Python_Playground\\RunPlan.xlsx",
+  "run_number": ""
+}

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Calculation Table | DHA Data Dashboard</title>
+    <link href="/frontend/css/dashboard.css?v=64" rel="stylesheet">
+    <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+    <script src="/frontend/js/navigation.js" defer></script>
+    <script src="/frontend/js/calculation_table.js?v=9" defer></script>
+    <script src="/frontend/js/reforming_carbon_table.js?v=8" defer></script>
+</head>
+
+<body>
+    <div class="app-layout">
+        <main>
+            <header>
+                <div>
+                    <div class="eyebrow">CALCULATION WORKSPACE</div>
+                    <h2>Calculation Table Management</h2>
+                </div>
+                <div class="header-actions">
+                    <div class="run-number-group">
+                        <span class="run-number-label">Run Number</span>
+                        <input type="text" class="input run-number-input run-number-readonly" id="runNumberDisplay" readonly disabled title="Run Number configured on Run Plan page" placeholder="—" />
+                    </div>
+                    <div class="readiness-indicator" title="System readiness status">
+                        <span class="ready-dot" aria-hidden="true"></span>
+                        <svg class="hourglass-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M5 2h14M5 22h14M6 2v4a6 6 0 0 0 6 6 6 6 0 0 0 6-6V2M6 22v-4a6 6 0 0 1 6-6 6 6 0 0 1 6 6v4" class="hourglass-frame" />
+                            <path d="M8 5h8a4 4 0 0 1-4 4 4 4 0 0 1-4-4z" class="sand-top" fill="currentColor" />
+                            <line x1="12" y1="11" x2="12" y2="16" class="sand-flow" stroke-dasharray="2 2" />
+                            <path d="M9 19a3 3 0 0 0 6 0H9z" class="sand-bottom" fill="currentColor" />
+                        </svg>
+                        <span class="pill" id="calcStatus">Ready</span>
+                    </div>
+                    <button aria-label="Reset dashboard and Run Number" class="page-refresh" id="pageRefresh" title="Reset dashboard and Run Number" type="button">↻</button>
+                </div>
+            </header>
+            <section class="content calculation-content">
+                <div class="hero">
+                    <div class="eyebrow">CALCULATION WORKSPACE</div>
+                    <h1>Reactor conditions & calculation tables.</h1>
+                    <p>Review base reactor conditions and derived calculation tables synchronized with Online Analysis.</p>
+                </div>
+                <div class="error" id="calcError"></div>
+
+                <!-- KPI Cards -->
+                <div class="kpis" id="calcKpis">
+                    <div class="kpi"><span>Base Table Records</span><b id="kpiRecords">0</b></div>
+                    <div class="kpi"><span>Active Parameters</span><b id="kpiActiveParams">0</b></div>
+                    <div class="kpi"><span>Excluded FIC Streams</span><b id="kpiExcludedParams">0</b></div>
+                    <div class="kpi"><span>Sync Source</span><b id="kpiSource">—</b></div>
+                </div>
+
+                <!-- Sub-tabs -->
+                <div class="table-tabs" role="tablist">
+                    <button aria-controls="baseTablePanel" aria-selected="true" class="table-tab active" data-subtab="base_table" id="tabBaseTable" role="tab" type="button">Base table</button>
+                    <button aria-controls="yieldTablePanel" aria-selected="false" class="table-tab" data-subtab="yield_table" id="tabYieldTable" role="tab" type="button">Yield Table (wof%)</button>
+                    <button aria-controls="reformingCarbonPanel" aria-selected="false" class="table-tab" data-subtab="reforming_carbon" id="tabReformingCarbon" role="tab" type="button" hidden>Reforming CARBON_TABULAR(%WGT)</button>
+                    <button aria-controls="reformingSummaryPanel" aria-selected="false" class="table-tab" data-subtab="reforming_summary" id="tabReformingSummary" role="tab" type="button" hidden>Reforming Component Summary</button>
+                </div>
+
+                <!-- Base Table Panel -->
+                <div class="card run-plan-panel" id="baseTablePanel">
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">ONLINE DATA · BASE CONDITIONS</div>
+                            <h3>Base Table (Reactor Conditions)</h3>
+                        </div>
+                        <div class="table-actions online-table-actions">
+                            <select class="input online-filter" id="calcReactorFilter" aria-label="Filter by reactor">
+                                <option value="">All reactors</option>
+                            </select>
+                            <input class="input search" id="calcSearch" placeholder="Search base table..." type="search">
+                            <div class="decimal-control" role="group" aria-label="Base Table decimal places">
+                                <button type="button" class="btn secondary decimal-btn" id="calcDecDecrease" title="Decrease decimal places">.0&larr;</button>
+                                <span class="decimal-count" id="calcDecCount" title="Decimal places shown">2 dp</span>
+                                <button type="button" class="btn secondary decimal-btn" id="calcDecIncrease" title="Increase decimal places">.00&rarr;</button>
+                            </div>
+                            <button type="button" class="btn secondary" id="calcExportCsv" title="Export Base Table as CSV">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="reactor-filters online-datetime-filters">
+                        <label>From<input id="calcFrom" type="datetime-local" step="1"></label>
+                        <label>To<input id="calcTo" type="datetime-local" step="1"></label>
+                        <button type="button" class="btn secondary online-clear-dates-btn" id="calcClearDates" title="Clear date range">Clear dates</button>
+                        <div class="calc-feed-strip" id="calcFeedStrip" title="Synthetic Feed Analysis properties (Carbon, Hydrogen, Molecular Weight)">
+                            <div class="calc-feed-item" id="calcFeedCarbonItem">
+                                <span class="calc-feed-label">Carbon:</span>
+                                <span class="calc-feed-value" id="calcFeedCarbonVal">—</span>
+                                <span class="calc-feed-unit" id="calcFeedCarbonUnit">wt%</span>
+                            </div>
+                            <span class="calc-feed-divider" aria-hidden="true"></span>
+                            <div class="calc-feed-item" id="calcFeedHydrogenItem">
+                                <span class="calc-feed-label">Hydrogen:</span>
+                                <span class="calc-feed-value" id="calcFeedHydrogenVal">—</span>
+                                <span class="calc-feed-unit" id="calcFeedHydrogenUnit">wt%</span>
+                            </div>
+                            <span class="calc-feed-divider" aria-hidden="true"></span>
+                            <div class="calc-feed-item" id="calcFeedMWItem">
+                                <span class="calc-feed-label">Molecular Weight:</span>
+                                <span class="calc-feed-value" id="calcFeedMWVal">—</span>
+                                <span class="calc-feed-unit" id="calcFeedMWUnit">wt%</span>
+                            </div>
+                        </div>
+                        <div class="online-filter-badge" id="calcDateBadge"></div>
+                    </div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table" id="calcTable">
+                            <thead>
+                                <tr id="calcThead"></tr>
+                            </thead>
+                            <tbody id="calcTbody"></tbody>
+                        </table>
+                        <div class="empty" id="calcEmpty">No Online Analysis data loaded yet. Please import or load data on the Online Analysis page.</div>
+                    </div>
+                    <div class="filter-summary" style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--slate);">
+                        <span id="calcSummary">No Online Analysis data loaded yet. Please import or load data in Online Analysis.</span>
+                        <button type="button" class="btn secondary" id="calcSyncBtn" style="padding: 4px 12px; font-size: 12px;">Sync from Online Analysis</button>
+                    </div>
+                </div>
+
+                <div class="card run-plan-panel" id="yieldTablePanel" hidden>
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">OFFLINE DATA · TABLE-2 COMPONENT LIST</div>
+                            <h3>Yield Table (wof%)</h3>
+                        </div>
+                        <div class="table-actions online-table-actions">
+                            <select class="input online-filter" id="yieldReactorFilter" aria-label="Filter by reactor">
+                                <option value="">All reactors</option>
+                            </select>
+                            <input class="input search" id="yieldSearch" placeholder="Search yield table..." type="search">
+                            <div class="decimal-control" role="group" aria-label="Yield Table decimal places">
+                                <button type="button" class="btn secondary decimal-btn" id="yieldDecDecrease" title="Decrease decimal places">.0&larr;</button>
+                                <span class="decimal-count" id="yieldDecCount" title="Decimal places shown">2 dp</span>
+                                <button type="button" class="btn secondary decimal-btn" id="yieldDecIncrease" title="Increase decimal places">.00&rarr;</button>
+                            </div>
+                            <button type="button" class="btn secondary" id="yieldExportCsv" title="Export the Yield Table as CSV">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="reactor-filters online-datetime-filters">
+                        <label>From<input id="yieldFrom" type="datetime-local" step="1"></label>
+                        <label>To<input id="yieldTo" type="datetime-local" step="1"></label>
+                        <button type="button" class="btn secondary online-clear-dates-btn" id="yieldClearDates" title="Clear date range">Clear dates</button>
+                        <div class="online-filter-badge" id="yieldDateBadge"></div>
+                    </div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table yield-table" id="yieldTable">
+                            <thead><tr id="yieldThead"></tr></thead>
+                            <tbody id="yieldTbody"></tbody>
+                        </table>
+                        <div class="empty" id="yieldEmpty">No Table-2 Component List data loaded yet. Please process data on the Offline Analysis page.</div>
+                    </div>
+                    <div class="filter-summary" style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 13px; color: var(--slate);">
+                        <span id="yieldSummary">Yield Table (wof%) is calculated from Table-2 Component List and Base Table data.</span>
+                        <button type="button" class="btn secondary" id="yieldExportXlsx" title="Export an Excel (.xlsx) file with two tabs: Yield Table and Online Analysis">Export XLSX</button>
+                    </div>
+                </div>
+
+                <div class="card run-plan-panel" id="reformingCarbonPanel" hidden>
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">OFFLINE DATA · REFORMING DHA</div>
+                            <h3>Reforming CARBON_TABULAR (%WGT)</h3>
+                        </div>
+
+                        <div class="table-actions online-table-actions">
+                            <input class="input search" id="reformingSearch" placeholder="Search samples..." type="search">
+                            <div class="decimal-control" role="group" aria-label="Reforming table decimal places">
+                                <button type="button" class="btn secondary decimal-btn" id="reformingDecDecrease" title="Decrease decimal places">.0&larr;</button>
+                                <span class="decimal-count" id="reformingDecCount" title="Decimal places shown">4 dp</span>
+                                <button type="button" class="btn secondary decimal-btn" id="reformingDecIncrease" title="Increase decimal places">.00&rarr;</button>
+                            </div>
+                            <button type="button" class="btn secondary" id="reformingExportCsv" title="Export the Reforming CARBON_TABULAR table as CSV">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="reactor-filters online-datetime-filters">
+                        <label>From<input id="reformingFrom" type="datetime-local" step="1"></label>
+                        <label>To<input id="reformingTo" type="datetime-local" step="1"></label>
+                        <button type="button" class="btn secondary online-clear-dates-btn" id="reformingClearDates" title="Clear date range">Clear dates</button>
+                        <div class="online-filter-badge" id="reformingDateBadge"></div>
+                    </div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table reforming-carbon-table" id="reformingTable">
+                            <thead id="reformingThead"></thead>
+                            <tbody id="reformingTbody"></tbody>
+                        </table>
+                        <div class="empty" id="reformingEmpty">No reforming DHA data yet. Process the DHA folder on the Offline Analysis page (process: Reforming).</div>
+                    </div>
+                    <div class="filter-summary" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--slate);">
+                        <span id="reformingSummary">Unknowns are split by Carbon# using COMPONENT_LIST (given C#, else the neighbouring identified peaks).</span>
+                        <button type="button" class="btn secondary" id="reformingExportComplete" style="padding: 4px 12px; font-size: 12px;" title="CSV with the operating data (valid columns of the Online Analysis file) and this table">Export Complete</button>
+                    </div>
+                </div>
+
+                <div class="card run-plan-panel" id="reformingSummaryPanel" hidden>
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">OFFLINE DATA · REFORMING DHA</div>
+                            <h3>Reforming Component Summary (wt%)</h3>
+                        </div>
+                        <div class="table-actions online-table-actions">
+                            <input class="input search" id="reformingSummarySearch" placeholder="Search samples..." type="search">
+                            <div class="decimal-control" role="group" aria-label="Reforming summary decimal places">
+                                <button type="button" class="btn secondary decimal-btn" id="reformingSummaryDecDecrease" title="Decrease decimal places">.0&larr;</button>
+                                <span class="decimal-count" id="reformingSummaryDecCount" title="Decimal places shown">2 dp</span>
+                                <button type="button" class="btn secondary decimal-btn" id="reformingSummaryDecIncrease" title="Increase decimal places">.00&rarr;</button>
+                            </div>
+                            <button type="button" class="btn secondary" id="reformingSummaryExportCsv" title="Export the Reforming Component Summary as CSV">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="reactor-filters online-datetime-filters">
+                        <label>From<input id="reformingSummaryFrom" type="datetime-local" step="1"></label>
+                        <label>To<input id="reformingSummaryTo" type="datetime-local" step="1"></label>
+                        <button type="button" class="btn secondary online-clear-dates-btn" id="reformingSummaryClearDates" title="Clear date range">Clear dates</button>
+                        <div class="online-filter-badge" id="reformingSummaryDateBadge"></div>
+                    </div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table reforming-carbon-table" id="reformingSummaryTable">
+                            <thead><tr id="reformingSummaryThead"></tr></thead>
+                            <tbody id="reformingSummaryTbody"></tbody>
+                        </table>
+                        <div class="empty" id="reformingSummaryEmpty">No reforming DHA data yet. Process the DHA folder on the Offline Analysis page (process: Reforming).</div>
+                    </div>
+                    <div class="filter-summary" style="margin-top: 12px; font-size: 13px; color: var(--slate);">
+                        <span id="reformingSummaryNote">Each component is the date-wise sum of its C1-C15 carbon columns. This table is also used by Reforming plots.</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+
+</html>

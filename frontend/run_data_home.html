@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Run Workspace | DHA Data Dashboard</title>
+    <link href="/frontend/css/historian.css" rel="stylesheet">
+    <link href="/frontend/css/run_data_home.css" rel="stylesheet">
+    <script src="/frontend/js/historian_save.js" defer></script>
+    <script src="/frontend/js/run_data.js" defer></script>
+</head>
+<body>
+    <div class="run-home">
+        <header class="run-home-header">
+            <nav class="run-home-controls" aria-label="Run actions">
+                <button type="button" class="run-home-command" id="startFreshBtn">Start Fresh</button>
+                <select id="savedRunSelect" class="run-home-select" aria-label="Populate Run" disabled>
+                    <button type="button"><selectedcontent></selectedcontent></button>
+                    <option value="">Populate Run</option>
+                </select>
+                <button type="button" class="run-home-command load-command" id="loadRunBtn" disabled>Load Run</button>
+            </nav>
+            <a class="run-home-brand" href="/" aria-label="DataAnalysis Dashboard run workspace">
+                <span>DataAnalysis <b>Dashboard</b></span>
+                <span class="brand-mark" aria-hidden="true">D</span>
+            </a>
+        </header>
+
+        <main class="run-home-main">
+            <section class="run-home-title" aria-labelledby="workspaceTitle">
+                <div class="run-home-eyebrow">RUN WORKSPACE / DATA SESSIONS</div>
+                <h1 id="workspaceTitle">Pick up where you left off.</h1>
+            </section>
+
+            <section class="run-home-detail" aria-labelledby="metadataTitle" aria-busy="false" hidden>
+                <h2 id="metadataTitle">Metadata</h2>
+                <span id="runDataStatus" class="run-home-status" role="status">Checking RunData...</span>
+                <div class="run-meta-grid" id="runMetadata" aria-live="polite" hidden></div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

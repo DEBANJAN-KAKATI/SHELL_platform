@@ -1,0 +1,21 @@
+Reactor Map layout fix
+======================
+
+Issue
+-----
+The Reactor Map panel was placed before the KPI/tab row in frontend/index.html. When
+unhidden, the large iframe therefore pushed the tab buttons down the page. In addition,
+the normal DHA table card was not hidden while Reactor Map was active, so Reactor Map
+behaved like an extra panel rather than an exclusive tab.
+
+Fix
+---
+1. Moved #reactorMapPanel to the normal tab-content position: immediately after the
+   .table-tabs row.
+2. Added id="dataTablePanel" to the standard DHA table card.
+3. Updated activate() so Reactor Map and the DHA table panel are mutually exclusive.
+4. Kept the source-folder controls and KPIs in their normal location so the tab bar stays
+   where it is on the landing page.
+5. Added hidden-state CSS for #dataTablePanel.
+
+No DHA processing or valve-state calculation logic was changed.

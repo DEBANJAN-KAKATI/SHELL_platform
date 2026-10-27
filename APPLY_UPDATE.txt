@@ -1,0 +1,5 @@
+1. Stop the v3.2.0 dashboard.
+2. Back up the existing dashboard_app folder.
+3. Copy the dashboard_app folder from this package over the existing folder, preserving relative paths.
+4. Restart run_dashboard.bat.
+5. Process the XLS folder again and use the Table-3 · Octane Table tab.

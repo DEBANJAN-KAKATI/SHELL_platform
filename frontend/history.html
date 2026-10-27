@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>History | DHA Data Dashboard</title>
+    <link href="/frontend/css/dashboard.css" rel="stylesheet">
+    <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+    <link href="/frontend/css/historian.css" rel="stylesheet" id="historianCss">
+    <script src="/frontend/js/navigation.js" defer></script>
+    <script src="/frontend/js/history.js" defer></script>
+</head>
+
+<body>
+    <div class="app-layout">
+        <main>
+            <header>
+                <div>
+                    <div class="eyebrow">HISTORIAN · RUN COMPARISON</div>
+                    <h2>Run History</h2>
+                </div>
+                <div class="header-actions">
+                    <div class="run-number-group">
+                        <span class="run-number-label">Run Number</span>
+                        <input type="text" class="input run-number-input run-number-readonly" id="runNumberDisplay" readonly disabled title="Run Number configured on Run Plan page" placeholder="—" />
+                    </div>
+                    <div class="readiness-indicator" title="System readiness status">
+                        <span class="ready-dot" aria-hidden="true"></span>
+                        <svg class="hourglass-svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M5 2h14M5 22h14M6 2v4a6 6 0 0 0 6 6 6 6 0 0 0 6-6V2M6 22v-4a6 6 0 0 1 6-6 6 6 0 0 1 6 6v4" class="hourglass-frame" />
+                            <path d="M8 5h8a4 4 0 0 1-4 4 4 4 0 0 1-4-4z" class="sand-top" fill="currentColor" />
+                            <line x1="12" y1="11" x2="12" y2="16" class="sand-flow" stroke-dasharray="2 2" />
+                            <path d="M9 19a3 3 0 0 0 6 0H9z" class="sand-bottom" fill="currentColor" />
+                        </svg>
+                        <span class="pill" id="historyStatus">Ready</span>
+                    </div>
+                    <button aria-label="Reset dashboard and Run Number" class="page-refresh" id="pageRefresh" title="Reset dashboard and Run Number" type="button">↻</button>
+                </div>
+            </header>
+            <section class="content history-content">
+                <div class="hero">
+                    <div class="eyebrow">HISTORIAN WORKSPACE</div>
+                    <h1>Compare saved Runs.</h1>
+                    <p>Compare the Run Plan <b>Plan</b>, the <b>Base Table</b> and the <b>Yield Table</b> between the current session and a saved Run, or between two saved Runs.</p>
+                </div>
+                <div class="error" id="historyError"></div>
+
+                <!-- Step 1: datasets -->
+                <div class="card history-section">
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">STEP 1</div>
+                            <h3>Select datasets</h3>
+                        </div>
+                        <button class="btn secondary" id="histRefresh" type="button">Refresh Run list</button>
+                    </div>
+                    <div class="history-grid">
+                        <div>
+                            <label for="histMode">Comparison mode</label>
+                            <select class="input" id="histMode">
+                                <option value="hist">Historical Run A vs Historical Run B</option>
+                                <option value="current">Current Run vs Historical Run</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="histRunA">Dataset A</label>
+                            <select class="input" id="histRunA"></select>
+                        </div>
+                        <div>
+                            <label for="histRunB">Dataset B</label>
+                            <select class="input" id="histRunB"></select>
+                        </div>
+                        <div class="history-actions">
+                            <button class="btn primary" id="histCompare" type="button">Compare</button>
+                            <button class="btn secondary" id="histLoadA" type="button" title="Load saved Dataset A results into the dashboard pages">Load A into dashboard</button>
+                        </div>
+                    </div>
+                    <div class="history-runs-list" id="histRuns"></div>
+                </div>
+
+                <!-- Step 2: filters -->
+                <div class="card history-section">
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">STEP 2</div>
+                            <h3>Reactor &amp; condition filter</h3>
+                        </div>
+                        <button class="btn secondary" id="histResetFilters" type="button">Reset filters</button>
+                    </div>
+                    <div class="history-grid hist-filter-grid">
+                        <div>
+                            <label for="histReactor">Reactor</label>
+                            <select class="input" id="histReactor">
+                                <option value="">All reactors</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="histCondition">Condition</label>
+                            <select class="input" id="histCondition">
+                                <option value="">All conditions</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="history-check"><input type="checkbox" id="histRowDiffOnly"> Only differing rows</label>
+                        </div>
+                    </div>
+                    <div class="history-note">Reactor filters rows in Base / Yield Table and shows only that reactor column in Plan. Condition selects a specific condition number in Base / Yield Table.</div>
+                </div>
+
+                <!-- Step 3: results -->
+                <div id="histResults" hidden>
+                    <!-- Comparison header banner -->
+                    <div class="hist-compare-header" id="histCompareHeader">
+                        <span class="hist-compare-title" id="histCompareTitle">—</span>
+                    </div>
+
+                    <!-- Table tabs -->
+                    <div class="table-tabs" id="histTabs" role="tablist">
+                        <button class="table-tab" data-table="run_plan.plan" role="tab" type="button">Plan</button>
+                        <button class="table-tab" data-table="calculation.base_table" role="tab" type="button">Base Table</button>
+                        <button class="table-tab" data-table="calculation.yield_table" role="tab" type="button">Yield Table</button>
+                    </div>
+
+                    <div class="card history-section">
+                        <div class="card-head">
+                            <div>
+                                <div class="eyebrow" id="histTableEyebrow">STEP 3 · COMPARISON</div>
+                                <h3 id="histTableTitle">—</h3>
+                            </div>
+                        </div>
+                        <div class="kpis history-kpis" id="histSummary"></div>
+                        <div class="history-note" id="histDetailNote"></div>
+
+                        <!-- Primary comparison table (new layout: Parameter | Units | A | B) -->
+                        <div class="history-table-wrap" id="histDetail"></div>
+
+                        <!-- Column averages (collapsible) -->
+                        <details class="history-options" id="histColStatsDetails">
+                            <summary>Column averages</summary>
+                            <div class="history-table-wrap" id="histColStats"></div>
+                        </details>
+                    </div>
+
+                    <details class="card history-section history-options">
+                        <summary>Run metadata</summary>
+                        <div class="history-table-wrap" id="histMeta"></div>
+                    </details>
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+
+</html>

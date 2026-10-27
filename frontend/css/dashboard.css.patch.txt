@@ -1,0 +1,2 @@
+/* v1.1.1 Fira Code patch */
+body,.brand h1,header h2,.hero h1,.card-head h3,.kpi b,table,input,button,select,textarea{font-family:"Fira Code","Segoe UI",Consolas,monospace!important;}

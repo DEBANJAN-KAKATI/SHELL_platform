@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Data Integrity | DHA Data Dashboard</title>
+    <link href="/frontend/css/dashboard.css" rel="stylesheet">
+    <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+    <link href="/frontend/css/plot_dashboard.css" rel="stylesheet">
+    <link href="/data-integrity/assets/styles.css" rel="stylesheet">
+    <script src="/frontend/js/lucide.min.js" defer></script>
+    <script src="/frontend/js/chart.umd.min.js" defer></script>
+    <script src="/frontend/js/plot_dashboard_store.js" defer></script>
+    <script src="/frontend/js/plot_dashboard.js" defer></script>
+    <script src="/frontend/js/navigation.js" defer></script>
+    <script src="/data-integrity/assets/app.js" defer></script>
+</head>
+<body class="dashboard-page integrity-page">
+    <div class="app-layout">
+    <main>
+        <header class="board-header">
+            <div><div class="eyebrow">DATA INTEGRITY WORKSPACE</div><h2>Data Integrity Review</h2></div>
+            <div class="header-actions"><span class="integrity-badge">LOCAL / READ-ONLY</span><button class="board-icon-button" id="pageRefresh" type="button" title="Reload source data" aria-label="Reload source data"><i data-lucide="refresh-cw" aria-hidden="true"></i></button></div>
+        </header>
+        <div class="board-content">
+            <section class="board-heading"><div><div class="board-eyebrow">RUN WORKSPACE / QUALITY REVIEW</div><h1>Data Integrity</h1><p id="integrityRun"></p></div><span class="integrity-badge">Optional feature</span></section>
+            <form class="integrity-controls" id="integrityForm">
+                <label>Source table<select id="integritySource"><option value="ils_base_table_state">Base table</option><option value="ils_yield_table_state">Yield table</option><option value="ils_reforming_carbon_state">Reforming CARBON_TABULAR</option><option value="dhaOnlineState">Online Analysis</option></select></label>
+                <label>Parameter<select id="integrityParameters" disabled><option value="">No numeric parameters</option></select></label>
+                <label>Reactor<select id="integrityReactor"><option value="">All reactors</option></select></label>
+                <label>Condition<select id="integrityCondition"><option value="">All conditions</option></select></label>
+                <label>MAD threshold<input id="integrityThreshold" type="number" min="1" max="10" step="0.1" value="3.5" required></label>
+                <button class="board-button board-primary" id="integrityAnalyze" type="submit"><i data-lucide="scan-search" aria-hidden="true"></i>Analyse</button>
+            </form>
+            <p class="board-status" id="integrityStatus" role="status" aria-live="polite"></p>
+            <section class="integrity-kpis" aria-label="Analysis overview">
+                <div><span>Source rows</span><strong id="integrityRows">-</strong></div><div><span>Assigned / unassigned</span><strong id="integrityAssigned">-</strong></div><div><span>Missing / invalid values</span><strong id="integrityMissing">-</strong></div><div><span>Potential outlier values</span><strong id="integrityOutliers">-</strong></div><div><span>Duplicate rows</span><strong id="integrityDuplicates">-</strong></div><div><span>Unscored groups</span><strong id="integrityUnscored">-</strong></div>
+            </section>
+            <section class="integrity-section" aria-labelledby="integritySummaryHeading">
+                <div class="integrity-section-head"><h2 id="integritySummaryHeading">Review summary</h2><button class="board-icon-button" id="integrityHelp" type="button" title="Method and limitations" aria-label="Method and limitations"><i data-lucide="info" aria-hidden="true"></i></button></div>
+                <p id="integrityNarrative">No analysis run.</p>
+            </section>
+            <section class="integrity-section" aria-labelledby="integrityStatsHeading">
+                <div class="integrity-section-head"><h2 id="integrityStatsHeading">Group statistics</h2><div class="board-toolbar"><button class="board-button" id="integrityStatsDashboard" type="button" disabled><i data-lucide="table-2" aria-hidden="true"></i>Add table to dashboard</button><button class="board-icon-button" id="integrityExportStats" type="button" title="Export statistics CSV" aria-label="Export statistics CSV" disabled><i data-lucide="download" aria-hidden="true"></i></button></div></div>
+                <div class="board-table-wrap"><table class="board-data-table" id="integrityStats"><thead></thead><tbody></tbody></table></div>
+            </section>
+            <section class="integrity-section" aria-labelledby="integrityMatrixHeading">
+                <div class="integrity-section-head"><h2 id="integrityMatrixHeading">Reactor comparison / RSD (%)</h2><div class="board-toolbar"><button class="board-button" id="integrityMatrixDashboard" type="button" disabled><i data-lucide="table-2" aria-hidden="true"></i>Add matrix to dashboard</button><button class="board-icon-button" id="integrityExportMatrix" type="button" title="Export RSD matrix CSV" aria-label="Export RSD matrix CSV" disabled><i data-lucide="download" aria-hidden="true"></i></button></div></div>
+                <div class="integrity-matrix-controls">
+                    <label for="integrityMatrixCondition">Condition<select id="integrityMatrixCondition" disabled><option value="">No conditions</option></select></label>
+                    <label for="integrityMatrixParameter">Parameter<select id="integrityMatrixParameter" disabled><option value="">No numeric parameters</option></select></label>
+                </div>
+                <p id="integrityMatrixStatus" role="status" aria-live="polite">No comparisons.</p>
+                <div class="board-table-wrap integrity-matrix-wrap"><table class="board-data-table integrity-matrix" id="integrityMatrix"><thead></thead><tbody></tbody></table></div>
+            </section>
+            <section class="integrity-section" aria-labelledby="integrityChartHeading">
+                <div class="integrity-section-head"><h2 id="integrityChartHeading">Group measurements</h2></div>
+                <div class="integrity-chart-heading"><h3 id="plotChartTitle">No measurements</h3><button class="board-button" id="plotAddDashboard" type="button" disabled><i data-lucide="plus" aria-hidden="true"></i>Add plot to dashboard</button></div>
+                <div id="plotLegend" class="integrity-legend"><span class="legend-chip"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="#397655"/></svg>Measurements</span><span class="legend-chip"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 1 15 8 8 15 1 8Z" fill="#bf452c"/></svg>Potential outliers</span></div>
+                <div class="integrity-chart"><canvas id="integrityCanvas"></canvas></div>
+                <p id="plotDashboardStatus" role="status" aria-live="polite"></p>
+            </section>
+            <section class="integrity-section" aria-labelledby="integrityFlagsHeading">
+                <div class="integrity-section-head"><h2 id="integrityFlagsHeading">Flagged records</h2><div class="board-toolbar"><span id="integrityFlagCount"></span><button class="board-icon-button" id="integrityExportFlags" type="button" title="Export all flagged records CSV" aria-label="Export all flagged records CSV" disabled><i data-lucide="download" aria-hidden="true"></i></button></div></div>
+                <div class="board-table-wrap"><table class="board-data-table" id="integrityFlags"><thead></thead><tbody></tbody></table></div>
+            </section>
+        </div>
+    </main>
+    </div>
+    <dialog class="board-dialog" id="integrityMethod"><form method="dialog">
+        <h2>Method and limitations</h2>
+        <p>Statistics and modified Z scores are calculated independently for each Run / Condition / Reactor / Parameter group. The modified Z score uses 0.67449 times the deviation from the group median divided by median absolute deviation (MAD). A value is flagged when its absolute score exceeds the selected threshold.</p>
+        <p>The minimum valid sample count is fixed at 3. Groups with fewer than 3 valid samples or zero MAD are not scored. Duplicate selected measurements at the same timestamp are excluded from statistics. Missing and invalid values are reported, not imputed.</p>
+        <p>Conditions come directly from the selected source table's Condition column. DOE date ranges are not checked again. Blank, Unassigned, and error-valued conditions are flagged rather than inferred. Valid reactors and timestamps are still required for grouping, duplicate detection, and chronological charts. Naive timestamps share the same local clock; offset timestamps are normalized to UTC.</p>
+        <p>The RSD matrix compares two equally weighted reactor means within each condition using 100 times sample standard deviation divided by absolute pair mean. Missing reactor data or zero pair mean is undefined. Values above 2% are orange comparison warnings, separate from potential-outlier flags. Valid outlier values remain included in means and RSD.</p>
+        <p>Potential outliers are review prompts, not proof of errors. Drift, startup, stabilization, and changing catalyst performance can produce legitimate variation. This feature does not automatically identify steady state or change source records.</p>
+        <div class="board-dialog-actions"><button class="board-button" type="submit">Close</button></div>
+    </form></dialog>
+</body>
+</html>
