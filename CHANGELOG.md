@@ -4,6 +4,9 @@
 - Fixed the private runtime: the get-pip URL was always empty (variable set and used in one block), an existing runtime
   without pip was never repaired, and `python312._pth` did not include the application folder, so `import app` failed.
 - Packages are installed only when missing or when `requirements.txt` changes; downloads fall back from curl to PowerShell (TLS 1.2).
+- Exit codes are checked with `neq 0`, so a Python that crashes (negative exit code) is no longer treated as success;
+  install folders are scanned with `dir` and `python312._pth` is written line by line.
+- Tested under Wine: Python installed but not on PATH, no Python (runtime left by the old launcher), and a broken copied `.venv`.
 - `.gitattributes` keeps `.bat`/`.cmd`/`.ps1` files in CRLF (cmd.exe misreads labels in LF-only batch files).
 - Folder/file Browse falls back to the PowerShell dialog when the tkinter picker cannot start (the private runtime has no tkinter).
 
