@@ -3,6 +3,7 @@
   proxies block with 403 Forbidden. Any installed Python 3.9+ is now used, including the Python Install Manager folder
   `%LOCALAPPDATA%\Python\pythoncore-*`; an installed Python that already has the packages is used directly with no downloads;
   if a venv cannot be created the installed Python is used directly instead of downloading one.
+  Python on PATH is also found with the built-in `%~$PATH:` search, not only `where`.
 - `requirements.txt`: pandas 3 on Python 3.15+ (pandas 2 has no Windows packages for it); pandas 2 otherwise.
 - Base table TOS/sorting: ISO timestamps are parsed as ISO (pandas 3 applied dayfirst to them: 2026-10-09 became 10 September).
   Online/Base/Yield/Run Plan/Reactor Map/operating-data results are identical on pandas 2.3.3 and 3.1.0.

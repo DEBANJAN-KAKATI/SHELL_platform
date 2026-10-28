@@ -157,6 +157,8 @@ for %%V in (3.12 3.13 3.11 3.14 3.15 3.16 3.10 3.9) do call :try_py_launcher -%%
 :find_on_path
 rem python.exe on PATH. The Microsoft Store placeholder does not report a version and is skipped.
 for /f "delims=" %%P in ('where python.exe 2^>nul') do call :consider "%%~P"
+rem Built-in PATH search as well, in case "where" is unavailable or restricted.
+for %%P in (python.exe python3.exe) do if not "%%~$PATH:P"=="" call :consider "%%~$PATH:P"
 rem Standard install folders, for installations that were not added to PATH.
 call :scan_folder "%LOCALAPPDATA%\Programs\Python" "Python3*"
 call :scan_folder "%LOCALAPPDATA%\Python" "pythoncore-3*"
