@@ -1,3 +1,12 @@
+## Unreleased — Windows launcher fixes
+- `run_dashboard.bat` now uses an installed Python 3.9-3.14 to create `.venv` (or `.venv-local` beside a copied/broken `.venv`)
+  instead of always downloading Python; the private runtime is downloaded only when no usable Python is installed.
+- Fixed the private runtime: the get-pip URL was always empty (variable set and used in one block), an existing runtime
+  without pip was never repaired, and `python312._pth` did not include the application folder, so `import app` failed.
+- Packages are installed only when missing or when `requirements.txt` changes; downloads fall back from curl to PowerShell (TLS 1.2).
+- `.gitattributes` keeps `.bat`/`.cmd`/`.ps1` files in CRLF (cmd.exe misreads labels in LF-only batch files).
+- Folder/file Browse falls back to the PowerShell dialog when the tkinter picker cannot start (the private runtime has no tkinter).
+
 ## 6.4.0 (2026-10-14) — Reforming process
 - Process selector (Isomerization / Reforming) on the Run Plan page; reforming Run Plan page, Offline hooks,
   Calculation tab "Reforming CARBON_TABULAR(%WGT)" with CSV export. Isomerization behaviour unchanged.

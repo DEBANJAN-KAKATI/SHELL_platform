@@ -54,7 +54,7 @@ def _run_picker(cmd, timeout=180):
         _active_proc = proc
 
     try:
-        stdout, _ = proc.communicate(timeout=timeout)
+        stdout, stderr = proc.communicate(timeout=timeout)
         out = stdout.strip()
         if out:
             lines = [line for line in out.splitlines() if line.strip().startswith("{")]
@@ -63,6 +63,9 @@ def _run_picker(cmd, timeout=180):
                 if "error" in data:
                     raise RuntimeError(data["error"])
                 return data.get("path", ""), data.get("cancelled", False)
+        # The picker crashed (e.g. no tkinter in the embeddable Python runtime): let the caller fall back.
+        if proc.returncode:
+            raise RuntimeError((stderr or "").strip() or f"Picker exited with code {proc.returncode}")
     except subprocess.TimeoutExpired:
         try:
             proc.kill()
