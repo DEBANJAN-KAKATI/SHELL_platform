@@ -1,5 +1,7 @@
 Flask>=3.0,<4
-pandas>=2.2,<3
+# pandas 2.x has no Windows packages for Python 3.15+; pandas 3 gives identical results there.
+pandas>=2.2,<3; python_version < "3.15"
+pandas>=3.0,<4; python_version >= "3.15"
 olefile>=0.47,<1
 xlrd>=2.0,<3
 openpyxl>=3.1,<4

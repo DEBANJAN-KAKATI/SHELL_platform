@@ -8,12 +8,18 @@ Two processes: **Isomerization** (original, reactors R1–R8) and **Reforming** 
 
 ## Run / stack
 - Python 3, Flask 3, pandas 2, olefile + xlrd (legacy `.XLS` read via the OLE `Workbook`/`Book` stream), openpyxl.
-- Windows-first: `run_dashboard.bat` picks Python in order: working `.venv` / `.venv-local` → new venv from an installed
-  Python 3.9-3.14 (`py`, PATH, standard folders) → downloaded embeddable 3.12 in `.python-runtime` (its `python312._pth`
-  is rewritten each start and includes `..` so `import app` works). pip runs only when packages are missing or
-  `requirements.txt` differs from the stamp `ils-requirements.txt` next to python.exe; then `run_app.py` →
-  http://127.0.0.1:5001. Keep `.bat` files CRLF (`.gitattributes`); avoid set-and-use of a variable inside one `( )` block.
-  The embeddable runtime has no tkinter, so Browse uses the PowerShell dialog fallback in `dialog_service.py`.
+- Windows-first: `run_dashboard.bat` picks Python in order: working `.venv` / `.venv-local` → installed Python 3.9+
+  (`py`, PATH, `%LOCALAPPDATA%\Programs\Python\Python3*`, `%LOCALAPPDATA%\Python\pythoncore-*`, Program Files) that already
+  imports the app (used directly, no downloads) → new venv (`--system-site-packages`) from an installed Python, or that Python
+  directly if venv fails → downloaded embeddable 3.12 in `.python-runtime` only when no Python is installed (its
+  `python312._pth` includes `..` so `import app` works). pip runs only when packages are missing or `requirements.txt`
+  differs from the stamp `ils-requirements.txt` next to python.exe; a `wheels` folder enables offline install; a failed pip
+  is tolerated when the app still imports. Company networks may answer 403 for python.org / pypi.org.
+  `run_app.py` moves to the next free port when 5001 is busy/reserved and reuses an already running dashboard.
+  Keep `.bat` files CRLF (`.gitattributes`); test exit codes with `neq 0`; avoid set-and-use of a variable inside one
+  `( )` block. The embeddable runtime has no tkinter, so Browse uses the PowerShell dialog fallback in `dialog_service.py`.
+- pandas: 2.x on Python ≤3.14, 3.x on 3.15+ (requirements markers). Parse ISO timestamps with `format="ISO8601"` —
+  pandas 3 applies `dayfirst=True` to ISO dates.
 - `config/settings.json`: host, port, `open_browser`, default DHA folder, valve-opening (reactor map) folder,
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;

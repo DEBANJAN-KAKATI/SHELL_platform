@@ -1,4 +1,15 @@
 ## Unreleased — Windows launcher fixes
+- Python 3.15+ was rejected (only 3.9-3.14 were accepted), so the launcher downloaded Python from python.org, which company
+  proxies block with 403 Forbidden. Any installed Python 3.9+ is now used, including the Python Install Manager folder
+  `%LOCALAPPDATA%\Python\pythoncore-*`; an installed Python that already has the packages is used directly with no downloads;
+  if a venv cannot be created the installed Python is used directly instead of downloading one.
+- `requirements.txt`: pandas 3 on Python 3.15+ (pandas 2 has no Windows packages for it); pandas 2 otherwise.
+- Base table TOS/sorting: ISO timestamps are parsed as ISO (pandas 3 applied dayfirst to them: 2026-10-09 became 10 September).
+  Online/Base/Yield/Run Plan/Reactor Map/operating-data results are identical on pandas 2.3.3 and 3.1.0.
+- A failed package update no longer stops the dashboard when the installed packages work; offline install from a `wheels`
+  folder; clear guidance when pypi.org or python.org answer 403.
+- `run_app.py`: if port 5001 is in use or reserved by Windows it uses the next free port; if the dashboard is already running it
+  opens it instead of failing.
 - `run_dashboard.bat` now uses an installed Python 3.9-3.14 to create `.venv` (or `.venv-local` beside a copied/broken `.venv`)
   instead of always downloading Python; the private runtime is downloaded only when no usable Python is installed.
 - Fixed the private runtime: the get-pip URL was always empty (variable set and used in one block), an existing runtime
