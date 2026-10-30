@@ -1,3 +1,14 @@
+## 6.5.0 (2026-10-30) — Mass Balance process
+- Third process **Mass Balance** on the Run Plan process selector; nav tab **Mass Balance** (`/mass-balance`) replaces
+  Analysis / Calculation / Plots for this process. Isomerization and Reforming pages are unchanged.
+- Imports the ZMB and run GC exports (.txt, read by column name; `ÿ`, shifted C6 Above and GC-total quirks handled) and,
+  optionally, a filled MassBal workbook (blue cells and GC tables).
+- Engine `backend/mass_balance/` reproduces MassBal Ver2.2: ZMB (verified liquid flow, GC blocks), Run_Plan mixed gas,
+  Liq, Gas, R1-R8 mass balance (Ar internal standard), C-Balance (carbon balance, C4+ yield, acetylene conversion,
+  ethylene selectivity) and Summary (per reactor and per GC rep). Several samples per run, sample windows, rep
+  exclusion, outlier shading, editable inputs, plots, .xlsx export, RunData/Historian keys.
+- Tests: 19 pytest tests, including 1 811 Excel-calculated cells of R6-C1-S1-MassBal_Ver2.2.xlsx. See MASS_BALANCE_PROGRESS.md.
+
 ## Next — Unified Run Plan
 - Unified Isomerization and Reforming on the shared `RunPlan.xlsx` format (`Plan`, `DOE`, `Feed`).
 - Added optional Plan metadata (`Feed SL ID`, `Feed Cut-In`, and `Feed molecular weight`), optional DOE column N `Catalyst`, and `summary.active_reactors`.

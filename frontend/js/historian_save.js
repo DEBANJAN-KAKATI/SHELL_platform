@@ -5,7 +5,8 @@
         'runPlanDashboardState', 'ils_feed_properties', 'dhaDashboardState', 'dhaOnlineState',
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
-        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state'
+        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state',
+        'ils_mb_inputs', 'ils_mb_imports', 'ils_mb_results'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.
     const LOCAL_FALLBACK_KEYS = ['dhaDashboardState', 'dhaOnlineState'];
@@ -93,6 +94,10 @@
         addTable('calculation.reforming_carbon', 'Calculation · Reforming CARBON_TABULAR(%WGT)', 'Calculation table', reforming.rows, reforming.columns);
         const reformingSummary = readJson('ils_reforming_summary_state') || {};
         addTable('calculation.reforming_summary', 'Calculation · Reforming Component Summary', 'Calculation table', reformingSummary.rows, reformingSummary.columns);
+
+        const massBalance = readJson('ils_mb_results') || {};
+        addTable('mass_balance.summary', 'Mass Balance · Summary (all samples)', 'Mass Balance', massBalance.trend,
+            ['sample', 'reactor', 'carbon_balance', 'mass_balance', 'tos_h', 'acetylene_conversion', 'ethylene_selectivity', 'carbon_gas', 'c4_yield', 'rep_count']);
 
         // Custom table computed rows only exist in memory while the Custom table page is open.
         if (typeof customState !== 'undefined' && Array.isArray(customState.computedRows) && customState.computedRows.length) {

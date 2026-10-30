@@ -1,0 +1,61 @@
+.mb-content{max-width:none}
+.mb-process-warning{margin:0 0 14px;padding:11px 15px;border:1px solid rgba(201,85,18,.35);border-left:4px solid var(--burnt);border-radius:6px;background:#fff4e7;font-size:13px}
+.mb-process-warning[hidden]{display:none}
+.mb-kpis{grid-template-columns:repeat(4,1fr)}
+.mb-kpis .kpi small{display:block;color:var(--slate);font-size:11px;margin-top:4px}
+.mb-tabs{flex-wrap:wrap}
+.mb-toolbar{display:flex;align-items:end;gap:14px;padding:12px 15px;margin:0 0 14px;flex-wrap:wrap}
+.mb-toolbar .input{height:38px;padding:0 10px;min-width:150px}
+.mb-field{display:grid;gap:5px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--slate)}
+.mb-field[hidden]{display:none}
+.mb-spacer{flex:1}
+.mb-legend{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--slate)}
+.mb-swatch{display:inline-block;width:14px;height:14px;border-radius:3px;border:1px solid var(--border);margin-left:8px}
+.mb-swatch.sw-input,td.mb-input{background:#dbeafe}
+.mb-swatch.outlier,td.mb-outlier{background:#f8cbad}
+.mb-swatch.excluded{background:repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 3px,#fff 3px,#fff 6px)}
+.mb-panel[hidden]{display:none}
+.mb-import-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.mb-card{margin-bottom:14px;overflow:hidden}
+.mb-source-row{display:flex;gap:10px;padding:14px 17px}
+.mb-source-row .input{min-width:0}
+.mb-import-summary{padding:10px 17px 15px;font-size:12px;color:var(--slate);line-height:1.6}
+.mb-import-summary b{color:var(--ink)}
+.mb-import-summary .warn{color:#8b2d22}
+.mb-options{display:flex;gap:24px;align-items:end;flex-wrap:wrap;padding:15px 17px}
+.mb-options .input{height:38px;min-width:280px}
+.mb-check{display:flex;align-items:center;gap:8px;font-size:13px}
+.mb-ar-suggestion{font-size:12px;color:var(--slate)}
+.mb-gcmap{border-top:1px solid var(--border)}
+.mb-gcmap summary{padding:12px 17px;cursor:pointer;font-weight:700}
+.mb-table-wrap{max-height:none}
+.mb-table{width:auto;min-width:100%;font-size:12px}
+.mb-table th{text-align:center;white-space:nowrap;padding:9px 10px}
+.mb-table td{white-space:nowrap;padding:6px 10px;text-align:right}
+.mb-table.mb-narrow{width:auto;min-width:720px}
+.mb-table th:first-child,.mb-table td:first-child{position:sticky;left:0;text-align:left;z-index:1;background:var(--paper);min-width:260px}
+.mb-table th:first-child{z-index:3;background:var(--ink)}
+.mb-table td.mb-unit{text-align:left;color:var(--slate);font-size:11px}
+.mb-table td.mb-text{text-align:left}
+.mb-table td.mb-kpi{font-weight:800}
+.mb-table td.mb-pass{color:#166534;font-weight:800}
+.mb-table td.mb-fail{color:#8b2d22;font-weight:800}
+.mb-table td.mb-excluded,.mb-table th.mb-excluded{background:repeating-linear-gradient(45deg,#eef0f3,#eef0f3 4px,#fff 4px,#fff 8px);color:#9ca3af;text-decoration:line-through}
+.mb-table th.mb-rep{cursor:pointer}
+.mb-table th.mb-rep:hover{background:var(--burnt)}
+.mb-table input.mb-edit,.mb-table select.mb-edit{width:100%;min-width:92px;padding:4px 6px;border:1px solid rgba(37,99,235,.35);border-radius:4px;background:#eff6ff;font:inherit;text-align:right;color:var(--ink)}
+.mb-table input.mb-edit.date{min-width:150px;text-align:left}
+.mb-table input.mb-edit.text{min-width:160px;text-align:left}
+.mb-table input.mb-edit:focus{outline:2px solid rgba(201,85,18,.35);border-color:var(--burnt)}
+.mb-section{margin-bottom:16px;overflow:hidden}
+.mb-section .card-head h3{font-size:18px}
+.mb-section-note{padding:8px 17px;font-size:12px;color:var(--slate);background:rgba(216,201,179,.18);border-bottom:1px solid var(--border)}
+.mb-section-empty{padding:20px 17px;color:var(--slate);font-size:13px}
+.mb-plot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.mb-plot{padding:14px 16px}
+.mb-plot h3{font:700 17px Georgia,serif;margin:0 0 10px}
+.mb-plot .reactor-filter{margin-bottom:10px}
+.mb-plot canvas{width:100%!important;height:320px!important}
+.mb-delete{padding:3px 8px;border:1px solid #b94a3d;border-radius:4px;background:#fff0ed;color:#8b2d22;cursor:pointer;font:inherit}
+.mb-active-row td{background:#fff0df}
+@media(max-width:1100px){.mb-import-grid{grid-template-columns:1fr}.mb-plot-grid{grid-template-columns:1fr}.mb-kpis{grid-template-columns:repeat(2,1fr)}}

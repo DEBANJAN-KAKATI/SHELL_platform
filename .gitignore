@@ -16,6 +16,8 @@ backups/
 *.xlsx
 *.csv
 *.dat1dat-Back
+# Reference files of the golden tests are kept
+!tests/fixtures/**
 
 # Local editor and runtime files
 .vscode/

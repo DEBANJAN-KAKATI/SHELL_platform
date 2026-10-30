@@ -17,18 +17,20 @@ function sortDateTimeRows(rows, column = 'DateTime') {
     })).sort((left, right) => left.time === right.time ? 0 : left.time - right.time).map(entry => entry.row);
 }
 
-// Process of the current run (Isomerization or Reforming), chosen on the Run Plan page.
+// Process of the current run (Isomerization, Reforming or Mass Balance), chosen on the Run Plan page.
 // Kept per browser tab like the Run Number; cleared by the reset button.
 window.ILSProcess = {
     KEY: 'ils_process',
-    LABELS: { isomerization: 'Isomerization', reforming: 'Reforming' },
+    LABELS: { isomerization: 'Isomerization', reforming: 'Reforming', massbalance: 'Mass Balance' },
+    normalize(value) { return Object.prototype.hasOwnProperty.call(this.LABELS, value) ? value : 'isomerization'; },
     get() {
-        try { return sessionStorage.getItem(this.KEY) === 'reforming' ? 'reforming' : 'isomerization'; } catch { return 'isomerization'; }
+        try { return this.normalize(sessionStorage.getItem(this.KEY)); } catch { return 'isomerization'; }
     },
     set(value) {
-        try { sessionStorage.setItem(this.KEY, value === 'reforming' ? 'reforming' : 'isomerization'); } catch {}
+        try { sessionStorage.setItem(this.KEY, this.normalize(value)); } catch {}
     },
     isReforming() { return this.get() === 'reforming'; },
+    isMassBalance() { return this.get() === 'massbalance'; },
     label() { return this.LABELS[this.get()]; },
     runPlanUrl() { return '/frontend/run_plan.html'; }
 };
@@ -46,13 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const isRunPlan = path.endsWith('/run_plan.html') || path.endsWith('/run-plan') || path.endsWith('/run_plan') || path.includes('/frontend/run_plan.html');
     const isOnline = path.endsWith('/online_analysis.html') || path.endsWith('/online-analysis') || path.endsWith('/online_analysis');
     const isHistory = path.endsWith('/history.html') || path.endsWith('/history');
-    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
-
-    header.insertAdjacentHTML(
-        'afterend',
-        `<nav aria-label="Analysis mode" class="analysis-tabs">` +
-        `<a class="analysis-tab" href="/">Runs</a>` +
-        `<a aria-current="${isRunPlan ? 'page' : 'false'}" class="analysis-tab${isRunPlan ? ' active' : ''}" href="${window.ILSProcess.runPlanUrl()}">Run Plan</a>` +
+    const isMassBalancePage = path.endsWith('/mass_balance.html') || path.endsWith('/mass-balance') || path.endsWith('/mass_balance');
+    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity && !isMassBalancePage;
+    // Mass Balance has its own Import / Calculation / Plots page; the DHA pages belong to Isomerization and Reforming.
+    const massBalance = window.ILSProcess.isMassBalance();
+    const dhaMenus = massBalance ? '' :
         `<div class="analysis-menu${isOffline || isOnline ? ' active' : ''}">` +
         `<button type="button" class="analysis-tab${isOffline || isOnline ? ' active' : ''}" aria-label="Analysis pages" aria-expanded="false" aria-haspopup="true">Analysis <span aria-hidden="true">▾</span></button>` +
         `<div class="analysis-menu-items">` +
@@ -65,7 +65,17 @@ document.addEventListener('DOMContentLoaded', () => {
         `<a aria-current="${isCalculation ? 'page' : 'false'}" href="/frontend/calculation_table.html">Calculation table</a>` +
         `<a aria-current="${isCustom ? 'page' : 'false'}" href="/frontend/custom_table.html">Custom table</a>` +
         `</div></div>` +
-        `<a aria-current="${isPlots ? 'page' : 'false'}" class="analysis-tab${isPlots ? ' active' : ''}" href="/frontend/plots.html">Plots</a>` +
+        `<a aria-current="${isPlots ? 'page' : 'false'}" class="analysis-tab${isPlots ? ' active' : ''}" href="/frontend/plots.html">Plots</a>`;
+    const massBalanceTab = massBalance || isMassBalancePage
+        ? `<a aria-current="${isMassBalancePage ? 'page' : 'false'}" class="analysis-tab${isMassBalancePage ? ' active' : ''}" href="/frontend/mass_balance.html">Mass Balance</a>`
+        : '';
+
+    header.insertAdjacentHTML(
+        'afterend',
+        `<nav aria-label="Analysis mode" class="analysis-tabs">` +
+        `<a class="analysis-tab" href="/">Runs</a>` +
+        `<a aria-current="${isRunPlan ? 'page' : 'false'}" class="analysis-tab${isRunPlan ? ' active' : ''}" href="${window.ILSProcess.runPlanUrl()}">Run Plan</a>` +
+        massBalanceTab + dhaMenus +
         `<a aria-current="${isPlotDashboard ? 'page' : 'false'}" class="analysis-tab${isPlotDashboard ? ' active' : ''}" href="/frontend/plot_dashboard.html">Summary Dashboard</a>` +
         `<a aria-current="${isHistory ? 'page' : 'false'}" class="analysis-tab${isHistory ? ' active' : ''}" href="/frontend/history.html">History</a>` +
         `</nav>`
@@ -82,6 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
             link.href = '/data-integrity';
             link.textContent = 'Data Integrity';
             link.setAttribute('aria-current', active ? 'page' : 'false');
+            if (massBalance) return;
             tabs.querySelector('a[href="/frontend/plots.html"]').before(link);
         } catch (error) { }
     }
@@ -119,10 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js';
+        historianScript.src = '/frontend/js/historian_save.js?v=2';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
-            runDataScript.src = '/frontend/js/run_data.js';
+            runDataScript.src = '/frontend/js/run_data.js?v=2';
             document.head.appendChild(runDataScript);
         };
         document.head.appendChild(historianScript);
@@ -238,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 '<label for="processSelect" class="run-number-label">Process</label>' +
                 '<select class="input run-number-input process-select" id="processSelect" title="Process of this run">' +
                 '<option value="isomerization">Isomerization</option><option value="reforming">Reforming</option>' +
+                '<option value="massbalance">Mass Balance</option>' +
                 '</select></div>');
             const processSelect = document.getElementById('processSelect');
             const runField = document.getElementById('runNumberInput');
