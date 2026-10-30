@@ -1,7 +1,42 @@
+## 6.5.0 (2026-10-30) — Mass Balance process
+- Third process **Mass Balance** on the Run Plan process selector; nav tab **Mass Balance** (`/mass-balance`) replaces
+  Analysis / Calculation / Plots for this process. Isomerization and Reforming pages are unchanged.
+- Imports the ZMB and run GC exports (.txt, read by column name; `ÿ`, shifted C6 Above and GC-total quirks handled) and,
+  optionally, a filled MassBal workbook (blue cells and GC tables).
+- Engine `backend/mass_balance/` reproduces MassBal Ver2.2: ZMB (verified liquid flow, GC blocks), Run_Plan mixed gas,
+  Liq, Gas, R1-R8 mass balance (Ar internal standard), C-Balance (carbon balance, C4+ yield, acetylene conversion,
+  ethylene selectivity) and Summary (per reactor and per GC rep). Several samples per run, sample windows, rep
+  exclusion, outlier shading, editable inputs, plots, .xlsx export, RunData/Historian keys.
+- Tests: 19 pytest tests, including 1 811 Excel-calculated cells of R6-C1-S1-MassBal_Ver2.2.xlsx. See MASS_BALANCE_PROGRESS.md.
+
 ## Next — Unified Run Plan
 - Unified Isomerization and Reforming on the shared `RunPlan.xlsx` format (`Plan`, `DOE`, `Feed`).
 - Added optional Plan metadata (`Feed SL ID`, `Feed Cut-In`, and `Feed molecular weight`), optional DOE column N `Catalyst`, and `summary.active_reactors`.
 - Removed the legacy Reforming Run Plan page and reject legacy Reforming workbooks with a migration message.
+
+## Unreleased — Windows launcher fixes
+- Python 3.15+ was rejected (only 3.9-3.14 were accepted), so the launcher downloaded Python from python.org, which company
+  proxies block with 403 Forbidden. Any installed Python 3.9+ is now used, including the Python Install Manager folder
+  `%LOCALAPPDATA%\Python\pythoncore-*`; an installed Python that already has the packages is used directly with no downloads;
+  if a venv cannot be created the installed Python is used directly instead of downloading one.
+  Python on PATH is also found with the built-in `%~$PATH:` search, not only `where`.
+- `requirements.txt`: pandas 3 on Python 3.15+ (pandas 2 has no Windows packages for it); pandas 2 otherwise.
+- Base table TOS/sorting: ISO timestamps are parsed as ISO (pandas 3 applied dayfirst to them: 2026-10-09 became 10 September).
+  Online/Base/Yield/Run Plan/Reactor Map/operating-data results are identical on pandas 2.3.3 and 3.1.0.
+- A failed package update no longer stops the dashboard when the installed packages work; offline install from a `wheels`
+  folder; clear guidance when pypi.org or python.org answer 403.
+- `run_app.py`: if port 5001 is in use or reserved by Windows it uses the next free port; if the dashboard is already running it
+  opens it instead of failing.
+- `run_dashboard.bat` now uses an installed Python 3.9-3.14 to create `.venv` (or `.venv-local` beside a copied/broken `.venv`)
+  instead of always downloading Python; the private runtime is downloaded only when no usable Python is installed.
+- Fixed the private runtime: the get-pip URL was always empty (variable set and used in one block), an existing runtime
+  without pip was never repaired, and `python312._pth` did not include the application folder, so `import app` failed.
+- Packages are installed only when missing or when `requirements.txt` changes; downloads fall back from curl to PowerShell (TLS 1.2).
+- Exit codes are checked with `neq 0`, so a Python that crashes (negative exit code) is no longer treated as success;
+  install folders are scanned with `dir` and `python312._pth` is written line by line.
+- Tested under Wine: Python installed but not on PATH, no Python (runtime left by the old launcher), and a broken copied `.venv`.
+- `.gitattributes` keeps `.bat`/`.cmd`/`.ps1` files in CRLF (cmd.exe misreads labels in LF-only batch files).
+- Folder/file Browse falls back to the PowerShell dialog when the tkinter picker cannot start (the private runtime has no tkinter).
 
 ## 6.4.0 (2026-10-14) — Reforming process
 - Process selector (Isomerization / Reforming) on the Run Plan page; reforming Run Plan page, Offline hooks,

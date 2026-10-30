@@ -123,6 +123,17 @@ def get_default_feed_carbon_and_mw():
     return 83.61, 88.55
 
 
+def _parse_datetimes(values):
+    """Parse ISO timestamps (YYYY-MM-DD ...) as ISO and anything else day-first.
+
+    pandas 3 applies dayfirst=True to ISO dates too (2026-10-09 -> 10 September),
+    so ISO values must not go through the day-first parser.
+    """
+    iso = pd.to_datetime(values, format="ISO8601", errors="coerce")
+    other = pd.to_datetime(values, format="mixed", dayfirst=True, errors="coerce")
+    return iso.fillna(other)
+
+
 def reconstruct_base_table(df, carbon=None, molecular_weight=None):
     """
     Reconstructs the Base Table (Reactor Conditions) from the current online analysis dataframe.
@@ -181,9 +192,7 @@ def reconstruct_base_table(df, carbon=None, molecular_weight=None):
     if date_col in df.columns:
         df = df.sort_values(
             date_col,
-            key=lambda values: pd.to_datetime(
-                values, format="mixed", dayfirst=True, errors="coerce"
-            ),
+            key=_parse_datetimes,
             kind="stable",
             na_position="last",
         ).reset_index(drop=True)
@@ -243,7 +252,7 @@ def reconstruct_base_table(df, carbon=None, molecular_weight=None):
 
     # 5. Calculate derived columns
     date_times = (
-        pd.to_datetime(df[date_col], format="mixed", dayfirst=True, errors="coerce")
+        _parse_datetimes(df[date_col])
         if date_col in df.columns
         else pd.Series(index=df.index, dtype="datetime64[ns]")
     )
