@@ -2,7 +2,7 @@
 Double-click `run_dashboard.bat`. Table-1 accepts Unknown, Unknowns, or Unidentified as the Unknown component. If the optional Unknown source column is absent, the other five Table-1 components still process and an empty Unknown row is retained.
 
 ### Reforming process (v6.4)
-On the **Run Plan** page, enter the Run Number and choose **Process: Reforming** (default is Isomerization). The Reforming Run Plan page loads `data/RunPlan_Reforming.xlsx` by default and shows Feed, Feed DHA, Catalysts (tested one after the other in Reactor 1), Conditions and DOE. Other pages show the selected process as a badge; switching the process clears the loaded Run Plan.
+On the single **Run Plan** page, enter the Run Number and choose **Process: Reforming** (default is Isomerization). Both processes use the same `RunPlan.xlsx` workbook format with `Plan`, `DOE`, and `Feed` sheets; the process selector, not the workbook, controls the process. The optional Plan labels `Feed SL ID` and `Feed Cut-In` identify reforming feed samples and TOS. Other pages show the selected process as a badge; switching the process clears the loaded Run Plan.
 
 In Reforming mode, **Offline Analysis** reads the reforming DHA (.XLS) folder: Table-1 is CARBON_TABULAR(%WGT) with the Unknown row split by Carbon#, Table-2 lists every unknown COMPONENT_LIST row with its assigned Carbon# and the reason, and Table-3 holds RON, Molecular Weight, Carbon, Hydrogen and Specific Gravity. Unknown Carbon#:
 - rows that carry a Carbon# (`C8 Unknowns`, `C7-Unknowns`, ...) keep it;
@@ -45,3 +45,24 @@ The first save creates a RunData snapshot. Saving the same Run Number again asks
 
 ### Run v6.4 on Windows
 Double-click `run_dashboard.bat` (or run `./run_dashboard.ps1` in PowerShell). The launcher creates `.venv` when needed, installs the packages in `requirements.txt` and opens http://127.0.0.1:5001 (host/port in `config/settings.json`). Close any older dashboard window first, since it uses the same port. To start it directly from the v6.4 folder, use `.\.venv\Scripts\python.exe .\run_app.py` in PowerShell.
+
+### Run v6.4 with Docker
+Docker packages the Flask application and its frontend, calculation services, feature modules, and Python dependencies into one image. From the v6.4 folder, build and start it with:
+
+```powershell
+$env:DASHBOARD_SECRET_KEY = "replace-with-a-long-random-secret"
+docker compose up --build
+```
+
+Open http://localhost:5001. The Compose setup mounts the local `data/` folder at `/app/data` so source files and Run Plan workbooks are available to the container, while saved RunData is retained in the named `dashboard-rundata` volume. Set `DASHBOARD_USER` and `DASHBOARD_PASS` before `docker compose up` to enable login protection. The direct image command is:
+
+```powershell
+docker build -t dha-data-dashboard:6.4 .
+docker run --rm -p 5001:5001 `
+  -e DASHBOARD_SECRET_KEY="replace-with-a-long-random-secret" `
+  -v dashboard-rundata:/app/RunData `
+  -v "${PWD}\data:/app/data" `
+  dha-data-dashboard:6.4
+```
+
+The container listens on `0.0.0.0:5001`, disables browser auto-opening, and uses `/app/data/input` and `/app/data/RunPlan.xlsx` as its default source locations. Override these with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY`, or `DASHBOARD_RUN_PLAN_FILE` when needed.

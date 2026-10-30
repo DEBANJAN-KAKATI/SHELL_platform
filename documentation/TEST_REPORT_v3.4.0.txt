@@ -1,0 +1,20 @@
+DHA Data Dashboard v3.4.0 - Test and Validation Report
+Date: 2026-09-10
+
+Passed
+- Baseline ZIP integrity check
+- Python syntax compilation for app/backend and ValveOpening.py
+- JavaScript syntax check for frontend/js/dashboard.js
+- Flask frontend route check, including /frontend/reactor_map.html
+- Automated regression suite: 8 passed
+- Reactor Map tab/link and R1-R8 content checks
+- DOCX technical documentation rendered successfully to 3 pages and visually reviewed
+
+Not Run / Environment dependent
+- Live Windows tkinter folder browser
+- Live processing of production XLS files
+- Regeneration from source valve CSV files, because the source CSV directory was not included
+
+Calculation impact
+- No DHA equations, units, constants, setpoints, correction factors, or octane mappings changed.
+- Existing five-minute valve aggregation and equality-to-1 display rule preserved.

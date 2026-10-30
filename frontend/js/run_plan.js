@@ -25,6 +25,8 @@ const fmt = v => {
     return String(v);
 };
 
+const doeValue = (row, label) => row[label] ?? row[Object.keys(row).find(key => key.replace(/\n/g, ' ').trim() === label)] ?? '';
+
 async function getJson(r) {
     const t = await r.text();
     try {
@@ -39,7 +41,7 @@ function updateKpis(s) {
     if ($('#kpiFeed')) $('#kpiFeed').textContent = s.feed_count ?? feedRows.length;
     if ($('#kpiPlan')) $('#kpiPlan').textContent = s.plan_count ?? planData.rows.length;
     if ($('#kpiDoe')) $('#kpiDoe').textContent = s.doe_count ?? doeData.rows.length;
-    if ($('#kpiReactors')) $('#kpiReactors').textContent = s.reactor_count ?? 8;
+    if ($('#kpiReactors')) $('#kpiReactors').textContent = s.active_reactors?.length ?? s.reactor_count ?? 8;
 }
 
 function updateReactorFilterOptions(reactors) {
@@ -55,7 +57,7 @@ function updateConditionFilterOptions() {
     const sel = $('#doeConditionFilter');
     if (!sel) return;
     const current = sel.value;
-    const conditions = [...new Set(doeData.rows.map(row => String(row['Condition No.'] ?? '').trim()).filter(Boolean))]
+    const conditions = [...new Set(doeData.rows.map(row => String(doeValue(row, 'Condition No.') ?? '').trim()).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
     sel.replaceChildren(new Option('All Conditions', ''));
     conditions.forEach(condition => sel.add(new Option(`Condition ${condition}`, condition)));
@@ -161,10 +163,10 @@ function renderDoe() {
     let rows = doeData.rows;
 
     if (reactorFilter) {
-        rows = rows.filter(r => String(r['Reactor ID'] || '').trim() === reactorFilter);
+        rows = rows.filter(r => String(doeValue(r, 'Reactor ID') || '').trim() === reactorFilter);
     }
     if (conditionFilter) {
-        rows = rows.filter(r => String(r['Condition No.'] ?? '').trim() === conditionFilter);
+        rows = rows.filter(r => String(doeValue(r, 'Condition No.') ?? '').trim() === conditionFilter);
     }
 
     const thead = $('#doeThead');
@@ -227,6 +229,7 @@ function saveState() {
             planData,
             doeData,
             summary,
+            process: window.ILSProcess?.get?.() || 'isomerization',
             feedSearch: $('#feedSearch')?.value || '',
             planSearch: $('#planSearch')?.value || '',
             doeCondition: $('#doeConditionFilter')?.value || '',
@@ -244,7 +247,7 @@ function restoreState() {
         const raw = sessionStorage.getItem('runPlanDashboardState');
         if (!raw) return false;
         const saved = JSON.parse(raw);
-        if (saved) {
+        if (saved && (!saved.process || saved.process === (window.ILSProcess?.get?.() || 'isomerization'))) {
             if (saved.filePath && $('#runPlanFile')) $('#runPlanFile').value = saved.filePath;
             if (Array.isArray(saved.feedRows)) feedRows = saved.feedRows;
             if (saved.planData) planData = saved.planData;
@@ -306,6 +309,7 @@ async function processFile(path) {
         feedRows = d.feed?.rows || [];
         planData = {
             objective: d.plan?.objective || '',
+            info: d.plan?.info || [],
             rows: d.plan?.rows || [],
         };
         doeData = {
@@ -337,7 +341,6 @@ async function processFile(path) {
 }
 
 async function init() {
-    if (window.ILSProcess?.isReforming()) return; // navigation.js redirects to run_plan_reforming.html
     const hasRestored = restoreState();
     try {
         const r = await fetch('/api/settings');

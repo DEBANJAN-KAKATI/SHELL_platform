@@ -1,3 +1,8 @@
+## Next — Unified Run Plan
+- Unified Isomerization and Reforming on the shared `RunPlan.xlsx` format (`Plan`, `DOE`, `Feed`).
+- Added optional Plan metadata (`Feed SL ID`, `Feed Cut-In`, and `Feed molecular weight`), optional DOE column N `Catalyst`, and `summary.active_reactors`.
+- Removed the legacy Reforming Run Plan page and reject legacy Reforming workbooks with a migration message.
+
 ## 6.4.0 (2026-10-14) — Reforming process
 - Process selector (Isomerization / Reforming) on the Run Plan page; reforming Run Plan page, Offline hooks,
   Calculation tab "Reforming CARBON_TABULAR(%WGT)" with CSV export. Isomerization behaviour unchanged.

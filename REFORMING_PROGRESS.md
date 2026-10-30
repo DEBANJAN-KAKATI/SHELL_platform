@@ -36,26 +36,22 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   - `service.py`: `process_reforming_directory` → isomerization-shaped response (Table-1 with the Unknown row
     filled per Carbon#, Table-2 = unknown-peak audit, Table-3 = properties + TOS) + `reforming_rows`/`reforming_columns`
     (96 cols, keys like `Paraffins C6`, `Unknowns C8`, `Total`, ...).
-  - `run_plan.py`: parses the reforming Run Plan workbook (label-driven; computes derived flows if formulas lack cached values).
-  - `routes.py`: `POST /api/reforming/process`, `POST /api/reforming/process-run-plan`, `GET /api/reforming/settings`.
-- `scripts/build_reforming_run_plan.py` → `data/RunPlan_Reforming.xlsx` (built from ILS_Chemical Validation_Reforming.xlsx):
-  Plan (objective, run info, Feed Cut-In 08/10/2026 12:00, catalyst loading PS-210 / R-434), Conditions (1-3: 25 barg,
-  210/220/230 °C, LHSV 1.5, H2/Naphtha 2, 72 h), DOE (6 rows, R1: cond 1-3 PS-210 dated Cut-In + 72 h each =
-  ASSUMPTION; cond 4-6 R-434 dates blank), Feed (Carbon 85.33, Hydrogen 14.89, MW 102.2 first; density 0.7264 ...),
-  Feed DHA, Feed SimTBP.
+- `run_plan_service.py` now parses the shared `RunPlan.xlsx` format for both processes. Reforming uses
+  optional Plan labels (`Feed SL ID`, `Feed Cut-In`, `Feed molecular weight`) and DOE column N (`Catalyst`).
+- `data/RunPlan_Reforming.xlsx` is a reforming example copied from the shared three-sheet template:
+  R1 is PS-210, R2-R8 are X, Feed SL ID is B00010852001, Feed Cut-In is 08/10/2026 12:00,
+  DOE conditions 1-3 are PS-210 and 4-6 are R-434, and Feed E2/E3/E4 are 85.33 / 14.89 / 102.2.
 - Verified: reference `02_B00010852001_Ndat-Front Signal.XLS` reproduces image-2 exactly; Unknowns sum 8.7756 =
   sheet UNKNOWNS; row Total 100.00004. 88 unknown peaks, 44 with differing neighbours (largest 2.97 wt% at RI 666.94 → C6).
   The 43 isomerization DHA files also load through the reforming loader (all totals 100.00). Isomerization `/api/process` unchanged (43/43).
 
 ## DONE (frontend, 2026-10-14, verified in headless Edge on port 5002)
-1. `navigation.js`: `window.ILSProcess` (sessionStorage `ils_process`, default isomerization). Run Plan pages get a
-   Process `<select>` after Run Number (disabled until a run number exists); switching clears the loaded Run Plan
-   (`runPlanDashboardState`, `ils_feed_properties`) and goes to the matching page. Other pages show a read-only Process
-   badge. "Run Plan" nav link follows the process; opening the wrong Run Plan page redirects. Reset clears the process.
-2. `run_plan_reforming.html` + `js/run_plan_reforming.js`: tabs Feed / Feed DHA / Catalysts (objective + run info) /
-   Conditions / DOE; default file from `/api/reforming/settings`; writes `runPlanDashboardState` (same keys +
-   `process:'reforming'` + full response in `reforming`) and `ils_feed_properties`.
-   `run_plan.js` got one guard line (returns when the process is reforming).
+1. `navigation.js`: `window.ILSProcess` (sessionStorage `ils_process`, default isomerization). The shared Run Plan
+   page gets a Process `<select>` after Run Number (disabled until a run number exists); switching clears the loaded
+   Run Plan (`runPlanDashboardState`, `ils_feed_properties`) and stays on `run_plan.html`. Other pages show a
+   read-only Process badge.
+2. `run_plan.js`: loads the same backend payload for both processes and stores `planData.info`, the DOE Catalyst
+   column, `summary.active_reactors`, and the selected process without a reforming-only state object.
 3. Offline: `js/reforming_offline.js` (before dashboard.js) + 5 gated hooks in dashboard.js (Table-3 columns, process
    URL, store `ils_reforming_offline`, table titles, `process` saved in dhaDashboardState). Tabs renamed in reforming
    (Table-2 · Unknown Peaks, Table-3 · Properties). Warning when the saved tables were processed under the other process.
@@ -64,7 +60,7 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
    decimals (default 4), date filter, search, Export CSV with 2 header rows; state `ils_reforming_carbon_state`
    ({rows, columns, groups}). The sample whose UID contains the Run Plan "Feed SL ID" is labelled Condition "Feed".
    Gated edits in calculation_table.js: temperature tag 10i2TIC01, refreshYieldTable returns in reforming, Yield tab
-   hidden, switchSubtab shows the new panel. Cache-busters: calculation_table.js?v=9, dashboard.js?v=9.
+   hidden, switchSubtab shows the new panel. Cache-busters: calculation_table.js?v=10, reforming_carbon_table.js?v=10.
 5. Data Integrity: source `ils_reforming_carbon_state` in index.html + app.js.
 6. historian_save.js STATE_KEYS + `ils_process`, `ils_reforming_offline`, `ils_reforming_carbon_state`; Historian
    tables add "Calculation · Reforming CARBON_TABULAR(%WGT)"; run_data.js sourceKeys + the two data keys.
@@ -135,3 +131,8 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
 - Verified (Edge, port 5002): Offline auto-processed 41 files (~1 s), Online 48 records, reopen does not reprocess,
   changed signature reprocesses, auto-sync off shows "New data available", Calculation reforming tab 41 rows,
   isomerization page has no bar. Backups: `backups/2026-10-15_sharepoint_sync/`. 5001 restarted.
+# Unified Run Plan update (2026-10-28)
+
+Reforming now uses the same `RunPlan.xlsx` workbook format as Isomerization. The workbook contains only `Plan`, `DOE`, and `Feed`; the process is selected in the application and is never inferred from the workbook. Optional Plan labels provide `Feed SL ID` and `Feed Cut-In` for reforming sample labelling and TOS. DOE column N can provide `Catalyst`; blank values are filled from the Plan Catalyst row for the row's Reactor ID.
+
+The former Reforming-only Run Plan parser and page were retired after being backed up under `backups/2026-10-28_unified_run_plan/`. Legacy workbooks containing `Run Information` or `Feed DHA` are rejected with instructions to use the shared template.

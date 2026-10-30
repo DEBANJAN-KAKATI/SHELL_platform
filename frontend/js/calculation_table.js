@@ -22,6 +22,10 @@ const calcState = {
     yieldColumns: []
 };
 
+function doeValue(row, label) {
+    return row[label] ?? row[Object.keys(row).find(key => key.replace(/\n/g, ' ').trim() === label)] ?? '';
+}
+
 function getActiveFeedCarbonAndMw() {
     let carbon = 83.61;
     let mw = 88.55;
@@ -170,9 +174,9 @@ function assignBaseConditions(rows, columns, flagAmbiguous = false) {
     });
     const doeRows = states.find(state => state?.doeData?.rows?.length)?.doeData.rows || [];
     const ranges = doeRows.map(row => ({
-        condition: String(row['Condition No.'] ?? row.Condition ?? '').trim(),
-        start: parseDoeBoundary(row['Start Date'], false),
-        end: parseDoeBoundary(row['End Date'], true)
+        condition: String(doeValue(row, 'Condition No.') || row.Condition || '').trim(),
+        start: parseDoeBoundary(doeValue(row, 'Start Date'), false),
+        end: parseDoeBoundary(doeValue(row, 'End Date'), true)
     })).filter(range => range.condition && range.start && range.end && range.start <= range.end);
 
     rows.forEach(row => {

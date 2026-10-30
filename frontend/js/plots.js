@@ -311,11 +311,12 @@
 
         const ranges = new Map();
         rows.forEach(row => {
-            const condition = String(row['Condition No.'] ?? '').trim();
+            const doeValue = label => row[label] ?? row[Object.keys(row).find(key => key.replace(/\n/g, ' ').trim() === label)] ?? '';
+            const condition = String(doeValue('Condition No.') ?? '').trim();
             if (!condition) return;
             if (!ranges.has(condition)) ranges.set(condition, []);
-            const start = parseConditionBoundary(row['Start Date'], false);
-            const end = parseConditionBoundary(row['End Date'], true);
+            const start = parseConditionBoundary(doeValue('Start Date'), false);
+            const end = parseConditionBoundary(doeValue('End Date'), true);
             if (start && end && start <= end) ranges.get(condition).push({ start, end });
         });
         const validConditions = [...ranges].filter(([, intervals]) => intervals.length).map(([condition]) => condition);

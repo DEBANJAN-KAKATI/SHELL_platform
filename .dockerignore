@@ -1,0 +1,18 @@
+.git
+.gitignore
+.venv
+.venv-local
+.python-runtime
+__pycache__
+*.py[cod]
+.pytest_cache
+.vscode
+RunData/*
+!RunData/.gitignore
+*.log
+backups
+Needs changes
+README_APPLY.txt
+APPLY_UPDATE.txt
+LAYOUT_FIX_NOTES.txt
+REFORMING_PROGRESS.md
