@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.5.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.5.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (v6.4, Reactor 1 only) and
@@ -16,7 +16,8 @@ Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (
   `python312._pth` includes `..` so `import app` works). pip runs only when packages are missing or `requirements.txt`
   differs from the stamp `ils-requirements.txt` next to python.exe; a `wheels` folder enables offline install; a failed pip
   is tolerated when the app still imports. Company networks may answer 403 for python.org / pypi.org.
-  `run_app.py` moves to the next free port when 5001 is busy/reserved and reuses an already running dashboard.
+  `run_app.py` moves to the next free port when 5001 is busy/reserved and reuses an already running dashboard only
+  when `/api/health` `root` is the same folder (another copy/version on the port → next free port). Nav shows `vX.Y.Z`.
   Keep `.bat` files CRLF (`.gitattributes`); test exit codes with `neq 0`; avoid set-and-use of a variable inside one
   `( )` block. The embeddable runtime has no tkinter, so Browse uses the PowerShell dialog fallback in `dialog_service.py`.
 - pandas: 2.x on Python ≤3.14, 3.x on 3.15+ (requirements markers). Parse ISO timestamps with `format="ISO8601"` —

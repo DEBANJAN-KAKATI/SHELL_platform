@@ -1,3 +1,9 @@
+## 6.5.2 (2026-10-30) — launcher opens the right copy
+- `run_app.py` reuses a dashboard that is already running only when it is this folder (`/api/health` now reports
+  `root`). When another copy, such as the previous version in its old folder, holds port 5001, it says so and
+  starts this copy on the next free port, instead of opening the old dashboard.
+- The tab bar shows the running version (e.g. `v6.5.2`, folder in the tooltip).
+
 ## 6.5.1 (2026-10-30) — Mass Balance inside the standard tabs
 - The main tabs are the same for every process. Mass Balance: Run Plan has tabs Plan / Liq / Gas; Analysis has
   Online Analysis (run export, unchanged page) and **ZMB** (replaces Offline Analysis); Calculation table has tabs
