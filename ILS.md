@@ -44,16 +44,19 @@ Two processes: **Isomerization** (original, reactors R1–R8) and **Reforming** 
   (Base table), `custom_table_service.py` (safe AST formula engine), `excel_export_service.py`, `run_data.py`
   (RunData snapshots), `historian.py` (SQLite per run).
 - `backend/reforming/` — self-contained Reforming package (does not import isomerization code): `dha_loader.py`,
-  `unknowns.py`, `service.py`, `run_plan.py`, `operating.py`, `sync_source.py`, `routes.py`.
+  `unknowns.py`, `service.py`, `operating.py`, `sync_source.py`, `routes.py` (its own Run Plan parser was retired;
+  the shared `run_plan_service.py` parses the Run Plan for both processes).
 - `features/data_integrity/` — removable plug-in (own blueprint, HTML/JS/CSS, README).
 - `frontend/` — static HTML pages + vanilla JS (Chart.js, Lucide icons, no build step). `navigation.js` builds the
   top nav, Run Number box, Process selector/badge (`window.ILSProcess`), reset button.
   `reactor_map.html` is a large self-contained page.
-- `scripts/` — `build_reforming_run_plan.py` (→ `data/RunPlan_Reforming.xlsx`), `ValveOpening.py`,
-  `build_static_snapshot.py`.
+- `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`.
+- Docker: `Dockerfile` + `docker-compose.yml` (gunicorn `app:app` on 0.0.0.0:5001, `data/` mounted at `/app/data`,
+  RunData in volume `dashboard-rundata`); env overrides `DASHBOARD_HOST/PORT/OPEN_BROWSER`,
+  `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY`, `DASHBOARD_RUN_PLAN_FILE`.
 
 ## Pages (nav order)
-Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html` or `run_plan_reforming.html`) → Analysis: Offline
+Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
 (`index.html`), Online (`online_analysis.html`) → Calculation: Calculation table, Custom table → Data Integrity
 (`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
 
@@ -98,9 +101,14 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Data Integrity: per Run/Condition/Reactor/Parameter stats and MAD-based outlier flags; never modifies data.
 
 ## Reforming (v6.4) — details in `REFORMING_PROGRESS.md`
-- Process selector after Run Number on the Run Plan page; switching clears the loaded Run Plan.
-- Default Run Plan `data/RunPlan_Reforming.xlsx` (tabs Feed / Feed DHA / Catalysts / Conditions / DOE);
-  catalysts PS-210 then R-434, both in R1.
+- Process selector after Run Number on the shared Run Plan page; switching clears the loaded Run Plan and stays on
+  `run_plan.html`. The process is never inferred from the workbook.
+- **Unified Run Plan** (2026-10-28): both processes use one `RunPlan.xlsx` format — `Plan` (objective, R1–R8 Catalyst
+  Loading Plan, optional column-A labels with values in column C: `Feed SL ID`, `Feed Cut-In`, `Feed molecular weight`),
+  `DOE` (header row 10, data from row 11, optional column N `Catalyst`; blank inherits the Plan catalyst of that reactor),
+  `Feed` (`E2` Carbon, `E3` Hydrogen, `E4` MW). Payload has `planData.info` and `summary.active_reactors`. Legacy
+  reforming workbooks (`Run Information` row or `Feed DHA` sheet) are rejected with a migration message.
+  `data/RunPlan_Reforming.xlsx` is a reforming example in this format (R1 PS-210, DOE 1-3 PS-210, 4-6 R-434).
 - DHA: Table-1 = CARBON_TABULAR with the Unknown row split by Carbon#; Table-2 = unknown-peak audit; Table-3 =
   RON, MW, Carbon, Hydrogen, SG. Unknown Carbon# rule: lumped `Cn Unknowns` rows keep n; `Unidentified` rows take
   the neighbours' Carbon# if equal, else the previous identified peak's (leading → next; none → round(RI/100));

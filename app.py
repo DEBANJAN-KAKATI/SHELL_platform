@@ -20,9 +20,16 @@ def create_app(test_config=None):
     app = Flask(__name__, static_folder=None)
     app.config.update(
         APP_VERSION=(BASE / "VERSION").read_text(encoding="utf-8").strip(),
-        DEFAULT_SOURCE_DIRECTORY=s.get("default_source_directory", ""),
-        DEFAULT_REACTOR_SOURCE_DIRECTORY=s.get("default_reactor_source_directory", ""),
-        DEFAULT_RUN_PLAN_FILE=s.get("default_run_plan_file", ""),
+        DEFAULT_SOURCE_DIRECTORY=os.environ.get(
+            "DASHBOARD_SOURCE_DIRECTORY", s.get("default_source_directory", "")
+        ),
+        DEFAULT_REACTOR_SOURCE_DIRECTORY=os.environ.get(
+            "DASHBOARD_REACTOR_SOURCE_DIRECTORY",
+            s.get("default_reactor_source_directory", ""),
+        ),
+        DEFAULT_RUN_PLAN_FILE=os.environ.get(
+            "DASHBOARD_RUN_PLAN_FILE", s.get("default_run_plan_file", "")
+        ),
         RUN_NUMBER="",
         SECRET_KEY=os.environ.get("DASHBOARD_SECRET_KEY", secrets.token_hex(32)),
     )

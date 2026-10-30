@@ -5,13 +5,11 @@ from pathlib import Path
 from flask import Blueprint, jsonify, request
 
 from backend.reforming.operating import read_operating_file
-from backend.reforming.run_plan import process_reforming_run_plan
+from backend.services.run_plan_service import process_run_plan_file
 from backend.reforming.service import process_reforming_directory
 from backend.reforming.sync_source import save_folder, sync_status
 
 BASE = Path(__file__).resolve().parents[2]
-DEFAULT_RUN_PLAN = BASE / "data" / "RunPlan_Reforming.xlsx"
-
 reforming_api = Blueprint("reforming_api", __name__, url_prefix="/api/reforming")
 
 
@@ -28,7 +26,9 @@ def process():
 
 @reforming_api.get("/settings")
 def settings():
-    return jsonify({"default_run_plan_file": str(DEFAULT_RUN_PLAN) if DEFAULT_RUN_PLAN.exists() else ""})
+    from flask import current_app
+    path = current_app.config.get("DEFAULT_RUN_PLAN_FILE", "")
+    return jsonify({"default_run_plan_file": path})
 
 
 @reforming_api.get("/sync-source")
@@ -55,7 +55,23 @@ def process_run_plan():
     if not file_path:
         return jsonify({"error": "Run Plan file path is required."}), 400
     try:
-        return jsonify(process_reforming_run_plan(file_path))
+        from openpyxl import load_workbook
+        workbook = load_workbook(file_path, read_only=True, data_only=True)
+        try:
+            plan_values = [
+                row[0] for row in workbook["Plan"].iter_rows(
+                    min_col=1, max_col=1, values_only=True
+                ) if row[0] is not None
+            ]
+            if "Feed DHA" in workbook.sheetnames or any(
+                str(value).strip().lower() == "run information" for value in plan_values
+            ):
+                return jsonify({
+                    "error": "This is the legacy reforming Run Plan format. Use the shared RunPlan.xlsx template with Plan, DOE and Feed sheets."
+                }), 400
+        finally:
+            workbook.close()
+        return jsonify(process_run_plan_file(file_path))
     except Exception as error:
         return jsonify({"error": str(error)}), 400
 

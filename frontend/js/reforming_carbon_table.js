@@ -35,8 +35,11 @@ window.ILSReformingCarbon = (() => {
     function runPlanInfo() {
         const plan = readJson(sessionStorage, 'runPlanDashboardState');
         const info = {};
-        (plan?.reforming?.plan?.info || []).forEach(item => { info[String(item.parameter).trim().toLowerCase()] = item.value; });
-        return { info, reactor: plan?.reforming?.summary?.reactors?.[0] || info.reactor || 'R1' };
+        (plan?.planData?.info || []).forEach(item => { info[String(item.parameter).trim().toLowerCase()] = item.value; });
+        const reactor = plan?.summary?.active_reactors?.[0]
+            || plan?.doeData?.rows?.map(row => String(row['Reactor ID'] || row[Object.keys(row).find(key => key.replace(/\n/g, ' ').trim() === 'Reactor ID')] || '').trim()).find(Boolean)
+            || 'R1';
+        return { info, reactor };
     }
 
     // Column groups for the two-row header: [{label, keys:[...], carbon:true|false}]

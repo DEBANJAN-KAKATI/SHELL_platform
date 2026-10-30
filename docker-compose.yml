@@ -1,0 +1,19 @@
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dha-data-dashboard:6.4
+    ports:
+      - "5001:5001"
+    environment:
+      DASHBOARD_SECRET_KEY: ${DASHBOARD_SECRET_KEY:?Set DASHBOARD_SECRET_KEY before starting}
+      DASHBOARD_USER: ${DASHBOARD_USER:-}
+      DASHBOARD_PASS: ${DASHBOARD_PASS:-}
+    volumes:
+      - dashboard-rundata:/app/RunData
+      - ./data:/app/data
+    restart: unless-stopped
+
+volumes:
+  dashboard-rundata:

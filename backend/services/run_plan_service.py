@@ -21,6 +21,17 @@ def _clean_val(val):
     return str(val).strip()
 
 
+def _row_value(row, label, default=""):
+    value = row.get(label)
+    if value is not None:
+        return value
+    normalized = label.replace("\n", " ").strip().lower()
+    for key, candidate in row.items():
+        if str(key).replace("\n", " ").strip().lower() == normalized:
+            return candidate
+    return default
+
+
 def process_run_plan_file(file_path):
     """
     Processes a RunPlan Excel workbook and returns structured JSON for the frontend.
@@ -36,6 +47,7 @@ def process_run_plan_file(file_path):
     df_loading = data["df_Loading_plan"]
     df_doe = data["df_DOE"]
     df_feed = data["df_feed"]
+    plan_info = data.get("plan_info", [])
 
     # 1. Process Feed
     feed_columns = ["Component / Parameter", "Carbon No.", "Group", "Unit / Method", "Value (wt%)"]
@@ -100,9 +112,27 @@ def process_run_plan_file(file_path):
                 clean_row.append("")
             row_dict = {doe_columns[i]: clean_row[i] for i in range(len(doe_columns))}
             # Check reactor ID
-            if "Reactor ID" in row_dict and row_dict["Reactor ID"]:
-                doe_reactors.add(str(row_dict["Reactor ID"]).strip())
+            reactor = _row_value(row_dict, "Reactor ID")
+            if reactor:
+                doe_reactors.add(str(reactor).strip())
             doe_rows.append(row_dict)
+
+    catalyst_by_reactor = {}
+    for row in loading_rows:
+        if str(row["parameter"]).strip().lower() == "catalyst":
+            catalyst_by_reactor = {
+                f"R{i}": row.get(f"r{i}", "") for i in range(1, 9)
+            }
+            break
+    for row in doe_rows:
+        if not str(row.get("Catalyst", "")).strip():
+            reactor = str(_row_value(row, "Reactor ID")).strip()
+            row["Catalyst"] = catalyst_by_reactor.get(reactor, "")
+
+    active_reactors = [
+        reactor for reactor, catalyst in catalyst_by_reactor.items()
+        if str(catalyst).strip() and str(catalyst).strip().upper() != "X"
+    ]
 
     summary = {
         "file_name": path.name,
@@ -111,6 +141,7 @@ def process_run_plan_file(file_path):
         "doe_count": len(doe_rows),
         "reactor_count": len(doe_reactors) or 8,
         "reactors": sorted(list(doe_reactors)) if doe_reactors else [f"R{i}" for i in range(1, 9)],
+        "active_reactors": active_reactors,
     }
 
     return {
@@ -121,6 +152,7 @@ def process_run_plan_file(file_path):
         },
         "plan": {
             "objective": objective_text,
+            "info": plan_info,
             "columns": loading_columns,
             "rows": loading_rows,
             "count": len(loading_rows),

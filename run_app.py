@@ -1,4 +1,4 @@
-import json, socket, sys, urllib.request, webbrowser
+import json, os, socket, sys, urllib.request, webbrowser
 from pathlib import Path
 from app import create_app
 
@@ -23,13 +23,16 @@ def dashboard_running(url):
 
 
 if __name__ == '__main__':
-    b = Path(__file__).resolve().parent; s = json.loads((b / 'config/settings.json').read_text())
-    host, port = s['host'], int(s['port'])
+    b = Path(__file__).resolve().parent
+    s = json.loads((b / 'config/settings.json').read_text(encoding="utf-8"))
+    host = os.environ.get("DASHBOARD_HOST", s['host'])
+    port = int(os.environ.get("DASHBOARD_PORT", s['port']))
+    open_browser = s.get('open_browser') and os.environ.get("DASHBOARD_OPEN_BROWSER", "1") != "0"
     if not port_free(host, port):
         url = f"http://{host}:{port}"
         if dashboard_running(url):
             print(f"The dashboard is already running at {url}")
-            if s.get('open_browser'): webbrowser.open(url)
+            if open_browser: webbrowser.open(url)
             sys.exit(0)
         free = next((p for p in range(port + 1, port + 50) if port_free(host, p)), None)
         if free is None:
@@ -38,5 +41,5 @@ if __name__ == '__main__':
         port = free
     url = f"http://{host}:{port}"
     print(f"Dashboard address: {url}")
-    if s.get('open_browser'): webbrowser.open(url)
+    if open_browser: webbrowser.open(url)
     create_app().run(host=host, port=port, debug=False)

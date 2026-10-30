@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 DEFAULT_RUN_PLAN_PATH = os.environ.get(
     "RUN_PLAN_FILE",
@@ -46,6 +47,30 @@ def read_excel_range(file_path, sheet_name, range_string):
     )
 
 
+def get_plan_info(file_path, labels=None):
+    """Return optional label rows from column A of the Plan sheet."""
+    wanted = {" ".join(str(label).split()).lower() for label in (labels or (
+        "Feed SL ID", "Feed Cut-In", "Feed molecular weight"
+    ))}
+    path = Path(file_path)
+    if path.suffix.lower() != ".xlsx":
+        return []
+    workbook = load_workbook(path, data_only=True, read_only=True)
+    try:
+        rows = []
+        for row in workbook["Plan"].iter_rows(values_only=True):
+            label = " ".join(str(row[0]).split()) if row and row[0] is not None else ""
+            if label.lower() in wanted:
+                rows.append({
+                    "parameter": label,
+                    "units": row[1] if len(row) > 1 and row[1] is not None else "",
+                    "value": row[2] if len(row) > 2 and row[2] is not None else "",
+                })
+        return rows
+    finally:
+        workbook.close()
+
+
 def load_run_plan_data(file_path=None):
     """
     Loads df_plan, df_Loading_plan, df_DOE, and df_synFeed/df_feed from the Excel workbook.
@@ -58,8 +83,20 @@ def load_run_plan_data(file_path=None):
     df_plan_local = read_excel_range(path, sheet_name="Plan", range_string="A2:B2")
     df_loading_local = read_excel_range(path, sheet_name="Plan", range_string="A4:j14")
 
+    doe_usecols = "A:M"
+    if Path(path).suffix.lower() == ".xlsx":
+        workbook = load_workbook(path, data_only=True, read_only=True)
+        try:
+            headers = next(workbook["DOE"].iter_rows(min_row=10, max_row=10, values_only=True))
+            last_header = max(
+                (index for index, value in enumerate(headers) if value is not None and str(value).strip()),
+                default=12,
+            )
+            doe_usecols = f"A:{get_column_letter(last_header + 1)}"
+        finally:
+            workbook.close()
     df_doe_local = pd.read_excel(
-        path, sheet_name="DOE", skiprows=9, usecols="A:M", header=None
+        path, sheet_name="DOE", skiprows=9, usecols=doe_usecols, header=None
     )
     filled_rows = df_doe_local.replace(r"^\s*$", pd.NA, regex=True).notna().any(axis=1)
     if filled_rows.any():
@@ -95,6 +132,7 @@ def load_run_plan_data(file_path=None):
         "df_DOE": df_doe_local,
         "df_synFeed": df_feed_local,
         "df_feed": df_feed_local,
+        "plan_info": get_plan_info(path),
     }
 
 

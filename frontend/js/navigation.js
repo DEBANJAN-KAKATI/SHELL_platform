@@ -30,7 +30,7 @@ window.ILSProcess = {
     },
     isReforming() { return this.get() === 'reforming'; },
     label() { return this.LABELS[this.get()]; },
-    runPlanUrl() { return this.isReforming() ? '/frontend/run_plan_reforming.html' : '/frontend/run_plan.html'; }
+    runPlanUrl() { return '/frontend/run_plan.html'; }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -43,8 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isPlots = path.endsWith('/plots.html') || path.endsWith('/plots') || path.includes('/frontend/plots.html');
     const isPlotDashboard = path.endsWith('/plot_dashboard.html');
     const isIntegrity = path.endsWith('/data-integrity');
-    const isReformingRunPlan = path.endsWith('/run_plan_reforming.html');
-    const isRunPlan = isReformingRunPlan || path.endsWith('/run_plan.html') || path.endsWith('/run-plan') || path.endsWith('/run_plan') || path.includes('/frontend/run_plan.html');
+    const isRunPlan = path.endsWith('/run_plan.html') || path.endsWith('/run-plan') || path.endsWith('/run_plan') || path.includes('/frontend/run_plan.html');
     const isOnline = path.endsWith('/online_analysis.html') || path.endsWith('/online-analysis') || path.endsWith('/online_analysis');
     const isHistory = path.endsWith('/history.html') || path.endsWith('/history');
     const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
@@ -233,10 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let refreshProcessLock = () => {};
     const processHost = (document.getElementById('runNumberInput') || document.getElementById('runNumberDisplay'))?.closest('.run-number-group');
     if (isRunPlan) {
-        if (isReformingRunPlan !== window.ILSProcess.isReforming()) {
-            window.location.replace(window.ILSProcess.runPlanUrl());
-            return;
-        }
         if (processHost) {
             processHost.insertAdjacentHTML('afterend',
                 '<div class="run-number-group process-group">' +
@@ -424,4 +419,3 @@ document.addEventListener('DOMContentLoaded', () => {
         obs.observe(statusTextEl, { characterData: true, childList: true, subtree: true });
     }
 });
-

@@ -1,4 +1,5 @@
 Flask>=3.0,<4
+gunicorn>=23,<24; sys_platform != "win32"
 # pandas 2.x has no Windows packages for Python 3.15+; pandas 3 gives identical results there.
 pandas>=2.2,<3; python_version < "3.15"
 pandas>=3.0,<4; python_version >= "3.15"

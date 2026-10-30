@@ -1,3 +1,8 @@
+## Next — Unified Run Plan
+- Unified Isomerization and Reforming on the shared `RunPlan.xlsx` format (`Plan`, `DOE`, `Feed`).
+- Added optional Plan metadata (`Feed SL ID`, `Feed Cut-In`, and `Feed molecular weight`), optional DOE column N `Catalyst`, and `summary.active_reactors`.
+- Removed the legacy Reforming Run Plan page and reject legacy Reforming workbooks with a migration message.
+
 ## Unreleased — Windows launcher fixes
 - Python 3.15+ was rejected (only 3.9-3.14 were accepted), so the launcher downloaded Python from python.org, which company
   proxies block with 403 Forbidden. Any installed Python 3.9+ is now used, including the Python Install Manager folder
