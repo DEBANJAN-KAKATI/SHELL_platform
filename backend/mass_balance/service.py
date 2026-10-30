@@ -171,7 +171,9 @@ def run_calculation(payload):
         results.append(result)
 
     trend = [{"sample": res["sample"], **row} for res in results for row in res["summary"]["rows"]]
-    return {"results": results, "trend": trend, "gc_map": gc_map, "info": info, "warnings": warnings,
+    run_number = (common.get("run") or {}).get("run_number")
+    return {"results": results, "trend": trend, "tables": flat_tables(results, run_number), "gc_map": gc_map, "info": info,
+            "warnings": warnings,
             "zmb_suggestion": _zmb_argon_suggestion(imports), "calculated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 
@@ -182,3 +184,52 @@ def _zmb_argon_suggestion(imports):
     export = load_export(imports["zmb_path"])
     values = [r["estd"].get("Argon") for r in export["rows"] if r["estd"] and r["stream"] not in (None, 0)]
     return avg(values)
+
+
+# ---------------------------------------------------------------- flat tables for Plots, Data Integrity, Custom table, History
+REP_METRICS = ["Gas C'Bal [%]", "Acetylene conversion [%]", "Carbon in gas product [g/h]", "HC gases [g/h]", "COx gases [g/h]"]
+SAMPLE_METRICS = ["C'Bal [%]", "M'Bal [%]", "Ethylene selectivity [%]", "C4+ yield [%]", "Acetylene conversion (sample) [%]",
+                  "Gas feed [g/h]", "Liquid feed [g/h]", "Gas product [g/h]", "HC TLP [g/h]", "GC reps"]
+
+
+def condition_of(sample_name):
+    import re
+    match = re.search(r"C(\d+)", str(sample_name or ""), re.I)
+    return match.group(1) if match else str(sample_name or "")
+
+
+def flat_tables(results, run_number=None):
+    """{reps, summary}: one row per GC rep / per sample and reactor, with DateTime, Reactor, Condition and TOS(h)."""
+    present = [n for n in MB_NAMES if any((rep["y"] or {}).get(n) for res in results for R in res["reactors"].values() for rep in R["reps"])]
+    mol_cols = [f"{n} [mol%]" for n in present]
+    mass_cols = [f"{n} [g/h]" for n in present if n != "Argon"]
+    base = ["DateTime", "Run", "Sample", "Condition", "Reactor", "TOS(h)", "GC rep", "Excluded"]
+    rep_rows, summary_rows = [], []
+    for res in results:
+        cond = condition_of(res["sample"])
+        for r in REACTORS:
+            k = str(r)
+            R, C = res["reactors"][k], res["c_balance"][k]
+            cbal, acet = res["summary"]["carbon_balance_by_rep"][k], res["summary"]["acetylene_conversion_by_rep"][k]
+            for j, rep in enumerate(R["reps"]):
+                if rep["m"] is None:
+                    continue
+                row = {"DateTime": rep["time"], "Run": run_number, "Sample": res["sample"], "Condition": cond, "Reactor": f"R{r}",
+                       "TOS(h)": rep["tos_h"], "GC rep": rep["index"], "Excluded": "yes" if rep["excluded"] else "",
+                       "Gas C'Bal [%]": cbal[j], "Acetylene conversion [%]": acet[j], "Carbon in gas product [g/h]": rep["carbon_total"],
+                       "HC gases [g/h]": rep["hc"], "COx gases [g/h]": rep["cox"]}
+                row.update({f"{n} [mol%]": rep["y"].get(n) for n in present})
+                row.update({f"{n} [g/h]": rep["m"].get(n) for n in present if n != "Argon"})
+                rep_rows.append(row)
+            if not R["has_data"]:
+                continue
+            liq = res["liq"][k]
+            summary_rows.append({
+                "DateTime": liq["finish"], "Run": run_number, "Sample": res["sample"], "Condition": cond, "Reactor": f"R{r}",
+                "TOS(h)": liq["tos_h"], "C'Bal [%]": C["carbon_balance"], "M'Bal [%]": R["header"]["closure"],
+                "Ethylene selectivity [%]": C["ethylene_selectivity"], "C4+ yield [%]": C["c4_yield"],
+                "Acetylene conversion (sample) [%]": C["acetylene_conversion"], "Gas feed [g/h]": R["header"]["gas_feed"],
+                "Liquid feed [g/h]": R["header"]["liq_feed"], "Gas product [g/h]": R["header"]["gas_product"],
+                "HC TLP [g/h]": R["header"]["hc_flow"], "GC reps": R["rep_count"]})
+    return {"reps": {"columns": base + REP_METRICS + mol_cols + mass_cols, "rows": rep_rows},
+            "summary": {"columns": ["DateTime", "Run", "Sample", "Condition", "Reactor", "TOS(h)"] + SAMPLE_METRICS, "rows": summary_rows}}

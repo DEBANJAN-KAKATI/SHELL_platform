@@ -805,6 +805,31 @@
             }
         }
 
+        // Mass Balance plots use the GC-rep and sample tables published by mb_core.js.
+        if (window.ILSProcess?.isMassBalance?.()) {
+            try {
+                const reps = JSON.parse(sessionStorage.getItem('ils_mb_rep_table') || 'null');
+                const samples = JSON.parse(sessionStorage.getItem('ils_mb_summary_table') || 'null');
+                const hidden = new Set(['Run', 'Sample', 'Condition', 'Excluded']);
+                const strip = row => Object.fromEntries(Object.entries(row).filter(([key]) => !hidden.has(key)));
+                const rows = [...(reps?.rows || []).filter(row => row.Excluded !== 'yes'), ...(samples?.rows || [])].map(strip);
+                if (rows.length) {
+                    plotState.rows = rows;
+                    plotState.columns = [...new Set([...(reps?.columns || []), ...(samples?.columns || [])])].filter(c => !hidden.has(c));
+                    // GC reps typed into a workbook have no time: plot them against the rep number.
+                    const repsHaveTime = rows.some(row => row['GC rep'] !== undefined && isValidNumber(row['TOS(h)']));
+                    if (!repsHaveTime && (!plotState.selectedX || plotState.selectedX === 'TOS(h)')) plotState.selectedX = 'GC rep';
+                    onDataLoaded();
+                    return;
+                }
+            } catch (error) {
+                console.warn('Failed to read the Mass Balance tables:', error);
+            }
+            showEmptyNotice(true);
+            setStatus('No Data', true);
+            return;
+        }
+
         // 1. Try reading from cached ils_yield_table_state
         try {
             const rawCached = sessionStorage.getItem('ils_yield_table_state');
@@ -996,7 +1021,7 @@
         }
 
         if (!plotState.selectedY || !cols.includes(plotState.selectedY) || plotState.selectedY === plotState.selectedX) {
-            const preferred = ['Lin-RON', 'Cal-RON', 'n-Hexane', 'C5+', 'Gas', 'H2_Consumption', 'Propane', 'Temperature', 'Pressure'];
+            const preferred = ['Lin-RON', 'Cal-RON', 'n-Hexane', 'C5+', 'Gas', 'H2_Consumption', 'Propane', 'Temperature', 'Pressure', "Gas C'Bal [%]"];
             const foundPref = preferred.find(p => cols.includes(p) && p !== plotState.selectedX);
             plotState.selectedY = foundPref || cols.find(c => c !== plotState.selectedX) || cols[0];
         }

@@ -7,8 +7,11 @@
     <title>Run Plan | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=3" defer></script>
-    <script src="/frontend/js/run_plan.js?v=2" defer></script>
+    <script src="/frontend/js/navigation.js?v=4" defer></script>
+    <link href="/frontend/css/mass_balance.css?v=3" rel="stylesheet">
+    <script src="/frontend/js/run_plan.js?v=3" defer></script>
+    <script src="/frontend/js/mb_core.js?v=1" defer></script>
+    <script src="/frontend/js/mb_run_plan.js?v=2" defer></script>
 </head>
 
 <body>
@@ -44,6 +47,24 @@
                     <p>Load an experimental Run Plan workbook (.xlsx) to configure Feed composition, Catalyst Loading, and Design of Experiments (DOE).</p>
                 </div>
                 <div class="error" id="runPlanError"></div>
+
+                <!-- Mass Balance process: Plan / Liq / Gas (mb_run_plan.js) -->
+                <div id="mbRunPlan" hidden>
+                    <div class="card run-plan-source-row mb-source-card">
+                        <input class="input" id="mbRpPath" placeholder="Path to a filled MassBal workbook (.xlsx) – optional" type="text">
+                        <button class="btn secondary" id="mbRpBrowse" type="button">Browse</button>
+                        <button class="btn primary" id="mbRpLoad" type="button">Load Run Plan</button>
+                    </div>
+                    <div class="mb-import-summary" id="mbRpSummary">The workbook's blue cells (Run_Plan, Liq, Gas, ZMB liquid reps, C-Balance N34) are read; everything can also be typed below.</div>
+                    <div class="kpis" id="mbRpKpis"></div>
+                    <div class="table-tabs mb-tabs" id="mbRpTabs" role="tablist">
+                        <button class="table-tab active" data-tab="plan" role="tab" type="button">Plan</button>
+                        <button class="table-tab" data-tab="liq" role="tab" type="button">Liq</button>
+                        <button class="table-tab" data-tab="gas" role="tab" type="button">Gas</button>
+                    </div>
+                    <div class="card mb-toolbar" id="mbRpSampleBar" hidden></div>
+                    <div id="mbRpView"></div>
+                </div>
 
                 <!-- File Selection Card -->
                 <div class="card run-plan-source-row">

@@ -39,10 +39,16 @@ def process_online_file(file_path):
     if path.suffix.lower() != ".txt":
         raise ValueError("Online Analysis requires a tab-delimited .txt file.")
 
-    try:
-        frame = pd.read_csv(path, delimiter="\t", encoding="mbcs")
-    except (LookupError, UnicodeDecodeError):
-        frame = pd.read_csv(path, delimiter="\t", encoding="utf-8-sig")
+    # 'ÿ' (0xFF) is the export's "no value" marker; mbcs exists only on Windows, cp1252 reads the same bytes elsewhere.
+    frame = None
+    for encoding in ("mbcs", "cp1252", "utf-8-sig"):
+        try:
+            frame = pd.read_csv(path, delimiter="\t", encoding=encoding, na_values=["\xff"])
+            break
+        except (LookupError, UnicodeDecodeError):
+            continue
+    if frame is None:
+        raise ValueError("Online Analysis file could not be decoded.")
 
     if "Date/Time" not in frame.columns:
         raise ValueError("Online Analysis file is missing column: Date/Time")

@@ -60,7 +60,7 @@ Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (
 Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
 (`index.html`), Online (`online_analysis.html`) → Calculation: Calculation table, Custom table → Data Integrity
 (`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
-Mass Balance process: Runs → Run Plan → Mass Balance (`mass_balance.html`) → Summary Dashboard → History.
+Mass Balance uses the same tabs (Offline Analysis → ZMB, Calculation table → `mb_calculation.html`).
 
 ## API
 - `/api`: `health`, `settings`, `run-number` (GET/POST), `browse-folder`, `process` (DHA folder),
@@ -69,7 +69,8 @@ Mass Balance process: Runs → Run Plan → Mass Balance (`mass_balance.html`) �
   `process-calculation-base`, `calculate-yield-table`, `custom-table/{validate-formula,calculate,inspect-cell}`,
   `export-xlsx`.
 - `/api/reforming`: `process`, `settings`, `sync-source` (GET/POST), `process-run-plan`, `operating-data`.
-- `/api/mass-balance`: `browse-file`, `import-txt`, `import-workbook`, `gc-map` (GET/POST), `calculate`, `export-xlsx`.
+- `/api/mass-balance`: `browse-file`, `import-txt`, `import-workbook`, `gc-map` (GET/POST), `calculate` (results, views,
+  flat `tables`), `export-xlsx`.
 - `/api/run-data/runs` (GET list, POST save), `/api/run-data/runs/<run_id>` (GET).
 - `/api/historian`: `runs`, `runs/<n>/exists`, `runs/<n>`, `save`, `compare`.
 - `/api/data-integrity/{config,analyze}`.
@@ -127,8 +128,11 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   (Reactor1 sheet) not done; History / Summary Dashboard plan tables assume R1–R8 columns.
 
 ## Mass Balance (v6.5) — details in `MASS_BALANCE_PROGRESS.md`
-- `window.ILSProcess` values `isomerization | reforming | massbalance`; for massbalance the nav shows a **Mass Balance**
-  tab (`frontend/mass_balance.html`) instead of Analysis/Calculation/Plots.
+- `window.ILSProcess` values `isomerization | reforming | massbalance`. Same main tabs for every process; for
+  massbalance: Run Plan → Plan/Liq/Gas (`mb_run_plan.js`), Analysis → ZMB (`zmb.html`, replaces Offline) + Online
+  Analysis (run export), Calculation table → `mb_calculation.html` (R#_MB / C-Balance / Summary). `mb_core.js` keeps
+  `ils_mb_inputs` and publishes `ils_mb_rep_table` / `ils_mb_summary_table` for Plots, Data Integrity, Custom table,
+  Summary Dashboard and History. navigation.js redirects index↔zmb and calculation_table↔mb_calculation by process.
 - `backend/mass_balance/` (self-contained): `txt_loader` (ZMB export 152 cols, run export 161 cols; by header name;
   `ÿ` = none; C6 Above raw ESTD in `Area_`; `Conc_C8 Unknowns` = GC total), `workbook` (blue cells + GC tables of a
   MassBal Ver2.x .xlsx), `engine` (formulas, workbook cell refs in comments), `service`, `views`, `export`, `routes`
@@ -136,7 +140,7 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Key formulas: m_i = y_i·MW_i/(y_Ar·39.948)·Ar_r with y = ESTD mol%; Ar_r = FI01·V_r/ΣV·w_Ar; MB closure
   = 100·(gas product w/o Ar + aq + HC)/(gas feed w/o Ar + liquid feed); C in gas feed from C2H2/CH4/C2H6/C2H4 only;
   mixed gas = ZMB R1 block (ESTD, not normalised). Golden tests: `tests/test_mass_balance_*.py` (Ver2.2, 1 811 cells).
-- State keys `ils_mb_inputs`, `ils_mb_imports`, `ils_mb_results`.
+- State keys `ils_mb_inputs`, `ils_mb_imports`, `ils_mb_results`, `ils_mb_rep_table`, `ils_mb_summary_table`.
 
 ## Working conventions seen in this codebase
 - Keep isomerization behaviour unchanged when adding reforming work; gate reforming code on

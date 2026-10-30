@@ -555,6 +555,19 @@ function syncAllDataSources() {
         customState.table2Columns = [...STANDARD_TABLE2_COLUMNS];
     }
 
+    // 3. Mass Balance process: the primary table is the GC-rep table published by mb_core.js.
+    if (window.ILSProcess?.isMassBalance?.()) {
+        const mb = readSavedState('ils_mb_rep_table', ['rows']);
+        if (mb && Array.isArray(mb.rows) && mb.rows.length) {
+            customState.baseRows = sortDateTimeRows(mb.rows.filter(row => row.Excluded !== 'yes'));
+            customState.baseColumns = (mb.columns || Object.keys(mb.rows[0])).filter(col => col !== 'Excluded');
+            customState.sourceFile = 'Mass Balance · GC reps';
+            recalculateTable();
+            updateUI();
+            return;
+        }
+    }
+
     // 3. Reconstruct Base Table (Primary Table)
     if (customState.onlineRows.length) {
         // Reconstruct from online rows

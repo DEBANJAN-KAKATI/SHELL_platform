@@ -1,3 +1,12 @@
+## 6.5.1 (2026-10-30) — Mass Balance inside the standard tabs
+- The main tabs are the same for every process. Mass Balance: Run Plan has tabs Plan / Liq / Gas; Analysis has
+  Online Analysis (run export, unchanged page) and **ZMB** (replaces Offline Analysis); Calculation table has tabs
+  R#_MB (all reactors by default, or one reactor) / C-Balance / Summary. One table at a time (reactor, group and rep
+  selectors, zero rows hidden). The separate Mass Balance page was removed.
+- Plots, Summary Dashboard, Data Integrity, Custom table and History read the Mass Balance GC-rep and summary tables.
+- Online Analysis reads the export on every OS (cp1252 when the Windows-only `mbcs` codec is missing, e.g. Docker) and
+  shows `ÿ` cells as empty.
+
 ## 6.5.0 (2026-10-30) — Mass Balance process
 - Third process **Mass Balance** on the Run Plan process selector; nav tab **Mass Balance** (`/mass-balance`) replaces
   Analysis / Calculation / Plots for this process. Isomerization and Reforming pages are unchanged.

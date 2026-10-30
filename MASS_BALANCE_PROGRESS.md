@@ -4,22 +4,25 @@ Third process next to Isomerization and Reforming. It reproduces the MassBal wor
 (`R6-C1-S1-MassBal_Ver2.2.xlsx`: ZMB → Run_Plan → Liq → Gas → R1_MB…R8_MB → C-Balance → Summary) from the online GC
 exports plus the values entered by hand. `HC_SIMDIS` and `HC_DHA` are not part of it.
 
-## How to use
-1. **Run Plan** page: enter the Run Number and choose **Process: Mass Balance**. The shared `RunPlan.xlsx` can still be
-   loaded; its `Feed Cut-In` becomes the default Run Start and Feed `E2` Carbon the default liquid-feed carbon.
-2. **Mass Balance** page (`/mass-balance`, nav tab shown for this process instead of Analysis/Calculation/Plots):
-   - **Import**: the ZMB export (.txt), the run export (.txt) and, optionally, a filled MassBal workbook (.xlsx) whose
-     blue cells (Run_Plan, ZMB liquid reps, Gas, Liq, C-Balance N34) are read; while no run export is imported the
-     workbook's GC tables are used. Samples (C1-S1, C1-S2, …) are added here; options: mixed-gas source block,
-     workbook-compatible mode, GC map editor (export gas → R*_MB row, `+` sums gases), ZMB Argon suggestion.
-   - **ZMB · Run Plan · Liq & Gas · R1-R8 MB · C-Balance · Summary**: the workbook tabs. Blue cells are editable and
-     recalculate on change; click a rep header (`#n`) to exclude/include that GC injection. Outliers
-     (value > mean + 2·sd of reps 2…n, as in Rx_MB AC:AE) are shaded.
-   - **Plots**: balance closure per reactor, gas-phase C'Bal and acetylene conversion by GC rep (vs TOS, or rep number
-     when the reps have no time), run trend across samples.
-   - **Export .xlsx**: every tab per sample with the workbook's labels, a Run trend sheet and a Formulas sheet.
-3. Save Run Details / Save to Historian include `ils_mb_inputs`, `ils_mb_imports`, `ils_mb_results`; History lists the
-   table "Mass Balance · Summary (all samples)".
+## How to use (v6.5.1: same main tabs for every process)
+The navigation is the same as for Isomerization: Runs · Run Plan · Analysis ▾ · Calculation ▾ · Data Integrity · Plots ·
+Summary Dashboard · History. With **Process: Mass Balance** (Run Plan page) the pages show the mass balance:
+
+| Tab | Mass Balance content |
+|---|---|
+| Run Plan | tabs **Plan** (run information, liquid feed, mixed-gas composition, catalyst loading, target conditions), **Liq** (liquid sample: collection times, TLP / phase masses, C wt% of the product; product analyses on request), **Gas** (verified Ar / mixed gas, 01i14FI01 and 01i14FIC0r flows of the sample window). **Load Run Plan** reads a filled MassBal workbook (optional). Samples are added / chosen in the Liq and Gas tabs. |
+| Analysis → Online Analysis | unchanged page: import the run export (.txt) and review it; the mass balance takes its GC reps and feed flows from this file. |
+| Analysis → ZMB | replaces Offline Analysis (DHA). Import the ZMB export; one table at a time: **Overview** (average of every GC block, mixed-gas source, ZMB Argon suggestion), **GC by reactor** (R1–R8 / Bypass selector, click #n to exclude an injection), **Liquid verification** (Rep-1/2/3 selector + verified liquid flow). |
+| Calculation → Calculation table | tabs **R#_MB** (All reactors by default or one reactor; one group at a time: Results, Composition, Mass flows, Volumetric flows, Carbon flows; zero rows hidden), **C-Balance** (carbon balance, C4+ yield, acetylene conversion / ethylene selectivity; helpers on request), **Summary** (per reactor, or by GC rep). Export .xlsx. |
+| Calculation → Custom table | primary table = Mass Balance GC reps (`ils_mb_rep_table`). |
+| Data Integrity | sources “Mass Balance · GC reps” and “Mass Balance · Summary” (Condition from the sample name, C1-S1 → 1). |
+| Plots | GC-rep rows and sample rows (`ils_mb_rep_table` + `ils_mb_summary_table`); X = TOS(h), or GC rep when the reps have no time. |
+| Summary Dashboard / History / Runs | table sources and saved state include the Mass Balance tables. |
+
+`frontend/js/mb_core.js` holds the inputs (`ils_mb_inputs`), calls `/api/mass-balance/calculate` and publishes
+`ils_mb_rep_table` / `ils_mb_summary_table`. Page scripts: `mb_run_plan.js` (run_plan.html), `mb_zmb.js` (zmb.html),
+`mb_calculation.js` (mb_calculation.html). `navigation.js` sends index.html → zmb.html and calculation_table.html →
+mb_calculation.html when the process is Mass Balance (and back for the other processes).
 
 ## Data sources
 | Workbook cells | Source |
@@ -41,8 +44,8 @@ GC rows without `Sampled_reactor` (last lines) are reported and skipped.
   `workbook.py` (blue cells + GC tables of a MassBal workbook), `engine.py` (all formulas, workbook cell in each
   comment), `service.py` (imports, windows, flows, calculation), `views.py` (sheet-like tables), `export.py`,
   `routes.py` (`/api/mass-balance/{browse-file, import-txt, import-workbook, gc-map, calculate, export-xlsx}`).
-- `frontend/mass_balance.html`, `js/mass_balance.js`, `css/mass_balance.css`; `navigation.js` (third process,
-  Mass Balance tab), `historian_save.js`, `run_data.js` (state keys), `app.py` (blueprint + `/mass-balance`).
+- Frontend: see the table above; `css/mass_balance.css`; `historian_save.js`, `run_data.js` (state keys), `plots.js`,
+  `plot_dashboard.js`, `custom_table.js`, `features/data_integrity` (sources); `app.py` (blueprint, `/zmb`, `/mass-balance`).
 - Tests: `tests/test_mass_balance_engine.py` compares the engine with 1 811 Excel-calculated cells of Ver2.2
   (`tests/fixtures/mass_balance/golden_R6-C1-S1.json`); `tests/test_mass_balance_txt.py` covers both exports, the
   quirks, flows, sample windows and the end-to-end service. `python -m pytest -q` → 19 passed.

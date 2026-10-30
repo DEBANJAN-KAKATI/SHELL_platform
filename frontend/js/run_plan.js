@@ -341,6 +341,8 @@ async function processFile(path) {
 }
 
 async function init() {
+    // The Mass Balance process has its own Plan / Liq / Gas tabs (mb_run_plan.js).
+    if (window.ILSProcess?.isMassBalance?.()) return;
     const hasRestored = restoreState();
     try {
         const r = await fetch('/api/settings');
