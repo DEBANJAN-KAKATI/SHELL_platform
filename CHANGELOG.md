@@ -1,3 +1,15 @@
+## 6.5.3 (2026-10-30) — Mass Balance Run Plan in the RunPlan.xlsx format, aligned tables
+- Mass Balance Run Plan: the shared `RunPlan.xlsx` format (Plan, DOE, Feed) plus a **Liq** sheet is imported on the
+  Run Plan page (a filled MassBal workbook still works). Plan: objective, catalyst loading, Run Start; DOE: T/P per
+  block, gas and liquid flow per reactor; Feed: liquid feed (Carbon E2 …) and gas feed (verified Ar / mixed gas,
+  01i14FI01, target mixed-gas composition); Liq: liquid samples and ZMB liquid reps. Example:
+  `scripts/build_mass_balance_run_plan.py` → `tests/fixtures/mass_balance/RunPlan_MassBalance_R08.xlsx`.
+- Mixed gas falls back to the Feed-sheet target composition when no ZMB export is loaded (option "Run Plan Feed sheet").
+- TLP flow of later samples is divided by the hours since the sample window start (previous collection) instead of
+  the hours since Run Start; the first sample is unchanged (golden tests unchanged).
+- A reactor with GC reps but no gas feed in the window (01i14FIC0r = 0) gets an explicit error, not a balance.
+- Tables use fixed column widths, so R1…R8 line up between stacked tables; numbers and their headers are right-aligned.
+
 ## 6.5.2 (2026-10-30) — launcher opens the right copy
 - `run_app.py` reuses a dashboard that is already running only when it is this folder (`/api/health` now reports
   `root`). When another copy, such as the previous version in its old folder, holds port 5001, it says so and

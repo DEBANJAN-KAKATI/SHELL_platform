@@ -69,3 +69,21 @@ GC rows without `Sampled_reactor` (last lines) are reported and skipped.
 - The provided run export (Result_R08, Oct 2024) and the Ver2.2 workbook / Run6 ZMB export (May 2024) belong to
   different runs, so the end-to-end test checks mechanics, not plant results. The Run 6 run export would allow a
   full txt-only comparison with Ver2.2.
+
+
+## Run Plan workbook (v6.5.3)
+Same format as the shared `RunPlan.xlsx` plus a **Liq** sheet; loaded with **Load Run Plan** in Mass Balance mode
+(`backend/mass_balance/run_plan.py`; a filled MassBal workbook is still accepted and recognised by its sheets).
+
+| Sheet | Content |
+|---|---|
+| Plan | B2 objective; A4:J14 Catalyst Loading Plan (Catalyst, Shape & Size, volume, CBD, amount, loaded weight per R1–R8; `X` = not loaded); Op.Conditions; label rows (A label, C value): **Run Start** (or Feed Cut-In), Feed SL ID, Feed molecular weight |
+| DOE | header row 10, data from row 11: Condition No., Block, Start/End Date, Temperature, Pressure (per block), Reactor ID, **Gas Flow (NmL/h)**, **Liquid Flow (g/h)**, LHSV, GoR, Feed Gas, Remarks, Catalyst (N) |
+| Feed | liquid feed: Carbon (E2, C-Balance C3), Hydrogen, Molecular Weight, Oxygen, Sulfur, Nitrogen, Density, Feed ID, description; gas feed: Argon (verified), Mixed gas (verified), Total gas feed (01i14FI01), Mixed gas – <component> target mol% |
+| Liq | table “Sample · Condition · Reactor ID · Collection Started · Collection Finished · TLP Mass · HC Phase · Aqueous Phase · C in Liquid Product · Density”, one row per sample and reactor; table “Rep · Reactor ID · Collection Started · Collection Finished · TL Collected Mass” for the ZMB liquid reps |
+
+DOE gas flows and the Feed 01i14FI01 are the hand-entered feed flows of a sample when no Online Analysis export is
+loaded. The example `tests/fixtures/mass_balance/RunPlan_MassBalance_R08.xlsx` (built by
+`scripts/build_mass_balance_run_plan.py`) matches `Result_R08-Ci-S4-27-Oct-24_1_3.txt`: gas to R1, R5, R6; gas to R5/R6
+stops on 27.10.2024 08:30, so sample C1-S4 has R1 only. With the Run6 ZMB export it gives mass balance closures of
+about 94–102 %.
