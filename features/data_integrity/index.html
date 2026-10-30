@@ -11,9 +11,9 @@
     <script src="/frontend/js/lucide.min.js" defer></script>
     <script src="/frontend/js/chart.umd.min.js" defer></script>
     <script src="/frontend/js/plot_dashboard_store.js" defer></script>
-    <script src="/frontend/js/plot_dashboard.js" defer></script>
-    <script src="/frontend/js/navigation.js" defer></script>
-    <script src="/data-integrity/assets/app.js" defer></script>
+    <script src="/frontend/js/plot_dashboard.js?v=2" defer></script>
+    <script src="/frontend/js/navigation.js?v=4" defer></script>
+    <script src="/data-integrity/assets/app.js?v=2" defer></script>
 </head>
 <body class="dashboard-page integrity-page">
     <div class="app-layout">
@@ -25,7 +25,7 @@
         <div class="board-content">
             <section class="board-heading"><div><div class="board-eyebrow">RUN WORKSPACE / QUALITY REVIEW</div><h1>Data Integrity</h1><p id="integrityRun"></p></div><span class="integrity-badge">Optional feature</span></section>
             <form class="integrity-controls" id="integrityForm">
-                <label>Source table<select id="integritySource"><option value="ils_base_table_state">Base table</option><option value="ils_yield_table_state">Yield table</option><option value="ils_reforming_carbon_state">Reforming CARBON_TABULAR</option><option value="dhaOnlineState">Online Analysis</option></select></label>
+                <label>Source table<select id="integritySource"><option value="ils_base_table_state">Base table</option><option value="ils_yield_table_state">Yield table</option><option value="ils_reforming_carbon_state">Reforming CARBON_TABULAR</option><option value="dhaOnlineState">Online Analysis</option><option value="ils_mb_rep_table">Mass Balance · GC reps</option><option value="ils_mb_summary_table">Mass Balance · Summary</option></select></label>
                 <label>Parameter<select id="integrityParameters" disabled><option value="">No numeric parameters</option></select></label>
                 <label>Reactor<select id="integrityReactor"><option value="">All reactors</option></select></label>
                 <label>Condition<select id="integrityCondition"><option value="">All conditions</option></select></label>

@@ -3,7 +3,9 @@
     const sources = [
         ['ils_yield_table_state', 'Yield table'],
         ['ils_base_table_state', 'Base table'],
-        ['ils_custom_table_state', 'Custom table']
+        ['ils_custom_table_state', 'Custom table'],
+        ['ils_mb_summary_table', 'Mass Balance · Summary'],
+        ['ils_mb_rep_table', 'Mass Balance · GC reps']
     ];
 
     function icon(name) {

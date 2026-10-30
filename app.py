@@ -128,7 +128,11 @@ def create_app(test_config=None):
     @app.get("/mass-balance")
     @app.get("/mass_balance")
     def mass_balance_view():
-        return send_from_directory(BASE / "frontend", "mass_balance.html")
+        return send_from_directory(BASE / "frontend", "mb_calculation.html")
+
+    @app.get("/zmb")
+    def zmb_view():
+        return send_from_directory(BASE / "frontend", "zmb.html")
 
     @app.get("/history")
     def history_view():

@@ -48,34 +48,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const isRunPlan = path.endsWith('/run_plan.html') || path.endsWith('/run-plan') || path.endsWith('/run_plan') || path.includes('/frontend/run_plan.html');
     const isOnline = path.endsWith('/online_analysis.html') || path.endsWith('/online-analysis') || path.endsWith('/online_analysis');
     const isHistory = path.endsWith('/history.html') || path.endsWith('/history');
-    const isMassBalancePage = path.endsWith('/mass_balance.html') || path.endsWith('/mass-balance') || path.endsWith('/mass_balance');
-    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity && !isMassBalancePage;
-    // Mass Balance has its own Import / Calculation / Plots page; the DHA pages belong to Isomerization and Reforming.
+    const isZmb = path.endsWith('/zmb.html') || path.endsWith('/zmb');
+    const isMbCalculation = path.endsWith('/mb_calculation.html') || path.endsWith('/mass-balance') || path.endsWith('/mass_balance');
+    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity && !isZmb && !isMbCalculation;
+    // The main tabs are the same for every process. Mass Balance replaces the DHA page (Offline Analysis) by ZMB and
+    // opens its own calculation table; the other pages read the Mass Balance tables published by mb_core.js.
     const massBalance = window.ILSProcess.isMassBalance();
-    const dhaMenus = massBalance ? '' :
-        `<div class="analysis-menu${isOffline || isOnline ? ' active' : ''}">` +
-        `<button type="button" class="analysis-tab${isOffline || isOnline ? ' active' : ''}" aria-label="Analysis pages" aria-expanded="false" aria-haspopup="true">Analysis <span aria-hidden="true">▾</span></button>` +
-        `<div class="analysis-menu-items">` +
-        `<a aria-current="${isOffline ? 'page' : 'false'}" href="/frontend/index.html">Offline Analysis</a>` +
-        `<a aria-current="${isOnline ? 'page' : 'false'}" href="/frontend/online_analysis.html">Online Analysis</a>` +
-        `</div></div>` +
-        `<div class="analysis-menu${isCalculation || isCustom ? ' active' : ''}">` +
-        `<button type="button" class="analysis-tab${isCalculation || isCustom ? ' active' : ''}" aria-label="Calculation pages" aria-expanded="false" aria-haspopup="true">Calculation <span aria-hidden="true">▾</span></button>` +
-        `<div class="analysis-menu-items">` +
-        `<a aria-current="${isCalculation ? 'page' : 'false'}" href="/frontend/calculation_table.html">Calculation table</a>` +
-        `<a aria-current="${isCustom ? 'page' : 'false'}" href="/frontend/custom_table.html">Custom table</a>` +
-        `</div></div>` +
-        `<a aria-current="${isPlots ? 'page' : 'false'}" class="analysis-tab${isPlots ? ' active' : ''}" href="/frontend/plots.html">Plots</a>`;
-    const massBalanceTab = massBalance || isMassBalancePage
-        ? `<a aria-current="${isMassBalancePage ? 'page' : 'false'}" class="analysis-tab${isMassBalancePage ? ' active' : ''}" href="/frontend/mass_balance.html">Mass Balance</a>`
-        : '';
+    const redirect = massBalance
+        ? (isOffline && (path.endsWith('/index.html') || path.endsWith('/offline') || path.endsWith('/offline-analysis') || path.endsWith('/offline_analysis')) ? '/frontend/zmb.html'
+            : isCalculation ? '/frontend/mb_calculation.html' : null)
+        : (isZmb ? '/frontend/index.html' : isMbCalculation ? '/frontend/calculation_table.html' : null);
+    if (redirect) { window.location.replace(redirect); return; }
+    const analysisActive = isOffline || isOnline || isZmb;
+    const calculationActive = isCalculation || isCustom || isMbCalculation;
+    const firstAnalysis = massBalance
+        ? `<a aria-current="${isZmb ? 'page' : 'false'}" href="/frontend/zmb.html">ZMB</a>`
+        : `<a aria-current="${isOffline ? 'page' : 'false'}" href="/frontend/index.html">Offline Analysis</a>`;
+    const calculationHref = massBalance ? '/frontend/mb_calculation.html' : '/frontend/calculation_table.html';
 
     header.insertAdjacentHTML(
         'afterend',
         `<nav aria-label="Analysis mode" class="analysis-tabs">` +
         `<a class="analysis-tab" href="/">Runs</a>` +
         `<a aria-current="${isRunPlan ? 'page' : 'false'}" class="analysis-tab${isRunPlan ? ' active' : ''}" href="${window.ILSProcess.runPlanUrl()}">Run Plan</a>` +
-        massBalanceTab + dhaMenus +
+        `<div class="analysis-menu${analysisActive ? ' active' : ''}">` +
+        `<button type="button" class="analysis-tab${analysisActive ? ' active' : ''}" aria-label="Analysis pages" aria-expanded="false" aria-haspopup="true">Analysis <span aria-hidden="true">▾</span></button>` +
+        `<div class="analysis-menu-items">` + firstAnalysis +
+        `<a aria-current="${isOnline ? 'page' : 'false'}" href="/frontend/online_analysis.html">Online Analysis</a>` +
+        `</div></div>` +
+        `<div class="analysis-menu${calculationActive ? ' active' : ''}">` +
+        `<button type="button" class="analysis-tab${calculationActive ? ' active' : ''}" aria-label="Calculation pages" aria-expanded="false" aria-haspopup="true">Calculation <span aria-hidden="true">▾</span></button>` +
+        `<div class="analysis-menu-items">` +
+        `<a aria-current="${isCalculation || isMbCalculation ? 'page' : 'false'}" href="${calculationHref}">Calculation table</a>` +
+        `<a aria-current="${isCustom ? 'page' : 'false'}" href="/frontend/custom_table.html">Custom table</a>` +
+        `</div></div>` +
+        `<a aria-current="${isPlots ? 'page' : 'false'}" class="analysis-tab${isPlots ? ' active' : ''}" href="/frontend/plots.html">Plots</a>` +
         `<a aria-current="${isPlotDashboard ? 'page' : 'false'}" class="analysis-tab${isPlotDashboard ? ' active' : ''}" href="/frontend/plot_dashboard.html">Summary Dashboard</a>` +
         `<a aria-current="${isHistory ? 'page' : 'false'}" class="analysis-tab${isHistory ? ' active' : ''}" href="/frontend/history.html">History</a>` +
         `</nav>`
@@ -92,7 +99,6 @@ document.addEventListener('DOMContentLoaded', () => {
             link.href = '/data-integrity';
             link.textContent = 'Data Integrity';
             link.setAttribute('aria-current', active ? 'page' : 'false');
-            if (massBalance) return;
             tabs.querySelector('a[href="/frontend/plots.html"]').before(link);
         } catch (error) { }
     }
@@ -130,10 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=2';
+        historianScript.src = '/frontend/js/historian_save.js?v=3';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
-            runDataScript.src = '/frontend/js/run_data.js?v=2';
+            runDataScript.src = '/frontend/js/run_data.js?v=3';
             document.head.appendChild(runDataScript);
         };
         document.head.appendChild(historianScript);

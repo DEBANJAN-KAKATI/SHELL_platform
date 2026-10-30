@@ -4,7 +4,7 @@
     const historian = window.ILSHistorian;
     const sourceKeys = ['runPlanDashboardState', 'dhaDashboardState', 'dhaOnlineState',
         'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns', 'ils_custom_table_state',
-        'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state', 'ils_mb_inputs', 'ils_mb_results'];
+        'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state', 'ils_mb_inputs', 'ils_mb_results', 'ils_mb_rep_table', 'ils_mb_summary_table'];
 
     async function request(url, options) {
         const response = await fetch(url, options);

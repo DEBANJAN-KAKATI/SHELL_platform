@@ -103,7 +103,7 @@
         const conditions = new Set();
         parameterSelect.replaceChildren();
         state.matrixParameters = [];
-        [['ils_base_table_state', 'Base table'], ['ils_yield_table_state', 'Yield table'], ['ils_reforming_carbon_state', 'Reforming CARBON_TABULAR'], ['dhaOnlineState', 'Online Analysis']].forEach(([key, title]) => {
+        [['ils_base_table_state', 'Base table'], ['ils_yield_table_state', 'Yield table'], ['ils_reforming_carbon_state', 'Reforming CARBON_TABULAR'], ['dhaOnlineState', 'Online Analysis'], ['ils_mb_rep_table', 'Mass Balance · GC reps'], ['ils_mb_summary_table', 'Mass Balance · Summary']].forEach(([key, title]) => {
             const source = readState(key);
             const parameters = numericParameters(source);
             if (!parameters.length) return;

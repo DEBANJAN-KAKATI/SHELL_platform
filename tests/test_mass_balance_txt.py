@@ -58,7 +58,13 @@ def test_end_to_end_workbook_plus_zmb_txt():
     assert abs(result["c_balance"]["1"]["carbon_balance"] - 107.36426096079839) < 1e-6
     assert abs(result["reactors"]["7"]["header"]["closure"] - 103.56396627878621) < 1e-6
     assert abs(out["zmb_suggestion"] - 4.3) < 0.1
-    assert [v["id"] for v in result["views"]][:3] == ["zmb", "run_plan", "liq_gas"]
+    ids = [v["id"] for v in result["views"]]
+    assert ids[:7] == ["plan", "liq", "gas", "zmb_liquid", "zmb_gc", "zmb_overview", "mb_all"] and ids[-2:] == ["c_balance", "summary"]
+    tables = out["tables"]
+    assert len(tables["summary"]["rows"]) == 7                                  # R3 has no gas
+    r1 = [row for row in tables["reps"]["rows"] if row["Reactor"] == "R1"]
+    assert len(r1) == 12 and abs(r1[0]["Gas C'Bal [%]"] - 82.41031778440995) < 1e-6
+    assert {"DateTime", "Reactor", "Condition", "TOS(h)"} <= set(tables["reps"]["columns"])
 
 
 def test_run_txt_samples_windows():
