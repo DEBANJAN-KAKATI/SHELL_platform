@@ -13,7 +13,9 @@ api = Blueprint("api", __name__, url_prefix="/api")
 
 @api.get("/health")
 def health():
-    return jsonify({"status": "ok", "version": current_app.config["APP_VERSION"]})
+    # "root" lets run_app.py tell this dashboard apart from a copy in another folder on the same port.
+    root = str(Path(current_app.root_path).resolve())
+    return jsonify({"status": "ok", "version": current_app.config["APP_VERSION"], "root": root})
 
 
 @api.get("/settings")

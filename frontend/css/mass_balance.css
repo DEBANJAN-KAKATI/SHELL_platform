@@ -28,11 +28,13 @@
 .mb-section-note{padding:8px 17px;font-size:12px;color:var(--slate);background:rgba(216,201,179,.18);border-bottom:1px solid var(--border)}
 .mb-section-empty{padding:22px 17px;color:var(--slate);font-size:13px}
 .mb-table-wrap{max-height:70vh}
-.mb-table{width:100%;min-width:0;font-size:12px}
-.mb-table.mb-narrow{width:100%}
-.mb-table th{text-align:center;white-space:nowrap;padding:9px 10px}
-.mb-table td{white-space:nowrap;padding:6px 10px;text-align:right}
-.mb-table th:first-child,.mb-table td:first-child{position:sticky;left:0;text-align:left;z-index:1;background:var(--paper);min-width:220px}
+/* Fixed layout + <colgroup> widths from mb_core.js: label 300px, unit 90px, value columns share the rest, so the R1…R8
+   columns of stacked tables line up. Numbers and their headers are right-aligned; text columns left-aligned. */
+.mb-table{width:100%;table-layout:fixed;font-size:12px}
+.mb-table th{text-align:right;white-space:nowrap;padding:9px 12px;overflow:hidden;text-overflow:ellipsis}
+.mb-table td{white-space:nowrap;padding:6px 12px;text-align:right;overflow:hidden;text-overflow:ellipsis}
+.mb-table th.mb-left{text-align:left}
+.mb-table th:first-child,.mb-table td:first-child{position:sticky;left:0;text-align:left;z-index:1;background:var(--paper)}
 .mb-table th:first-child{z-index:3;background:var(--ink)}
 .mb-table td.mb-unit{text-align:left;color:var(--slate);font-size:11px}
 .mb-table td.mb-text{text-align:left}
@@ -44,8 +46,8 @@
 .mb-table td.mb-excluded,.mb-table th.mb-excluded{background:repeating-linear-gradient(45deg,#eef0f3,#eef0f3 4px,#fff 4px,#fff 8px);color:#9ca3af;text-decoration:line-through}
 .mb-table th.mb-rep{cursor:pointer}
 .mb-table th.mb-rep:hover{background:var(--burnt)}
-.mb-table input.mb-edit{width:100%;min-width:90px;padding:4px 6px;border:1px solid rgba(37,99,235,.35);border-radius:4px;background:#eff6ff;font:inherit;text-align:right;color:var(--ink)}
-.mb-table input.mb-edit.date{min-width:150px;text-align:left}
-.mb-table input.mb-edit.text{min-width:150px;text-align:left}
+.mb-table input.mb-edit{width:100%;min-width:0;box-sizing:border-box;padding:4px 6px;border:1px solid rgba(37,99,235,.35);border-radius:4px;background:#eff6ff;font:inherit;text-align:right;color:var(--ink)}
+.mb-table input.mb-edit.date{text-align:left;font-size:11px;padding:4px 3px;letter-spacing:-.3px}
+.mb-table input.mb-edit.text{text-align:left}
 .mb-table input.mb-edit:focus{outline:2px solid rgba(201,85,18,.35);border-color:var(--burnt)}
 @media(max-width:1100px){.mb-grid-2{grid-template-columns:1fr}}

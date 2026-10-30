@@ -73,7 +73,8 @@
         const s = load();
         const samples = s.samples.map(sample => {
             const copy = JSON.parse(JSON.stringify(sample));
-            const hasWorkbookGc = Object.keys(sample.gc || {}).length > 0;
+            const hasWorkbookGc = Object.values(sample.gc || {}).some(reps => (reps || []).length);
+            if (copy.gc_source === 'workbook' && !hasWorkbookGc) copy.gc_source = 'txt';
             if (copy.gc_source !== 'workbook') delete copy.gc;
             if (!s.imports.run_path && hasWorkbookGc) { copy.gc = sample.gc; copy.gc_source = 'workbook'; }
             if (!s.imports.run_path && (copy.gas || {}).source === 'txt') copy.gas.source = 'manual';
@@ -117,7 +118,9 @@
         s.common = data.common;
         s.common.zmb.excluded = keep.excluded;
         s.common.run.run_number = sessionStorage.getItem('ils_run_number') || s.common.run.run_number || '';
-        s.samples = data.samples.map(x => ({ ...emptySample(x.name), ...x, gc_source: s.imports.run_path ? 'txt' : 'workbook' }));
+        // GC reps come from the workbook only when it holds GC tables (a filled MassBal workbook) and no run export is loaded.
+        s.samples = data.samples.map(x => ({ ...emptySample(x.name), ...x,
+            gc_source: !s.imports.run_path && Object.keys(x.gc || {}).some(r => (x.gc[r] || []).length) ? 'workbook' : 'txt' }));
         s.active = 0;
         s.imports.wb_path = path;
         imports.workbook = { file: data.file };
@@ -156,7 +159,8 @@
         if (cell.in) {
             cls.push('mb-input');
             const kind = cell.f === 'date' ? 'date' : cell.f === 'text' ? 'text' : '';
-            const value = cell.v === null || cell.v === undefined ? '' : String(cell.v);
+            let value = cell.v === null || cell.v === undefined ? '' : String(cell.v);
+            if (kind === 'date') value = value.replace(/^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}):00$/, '$1');   // seconds only when not :00
             return `<td class="${cls.join(' ')}"${title}><input class="mb-edit ${kind}" data-path="${esc(cell.in)}" data-f="${cell.f}" value="${esc(value)}"${kind === 'date' ? ' placeholder="YYYY-MM-DD HH:MM"' : ''}></td>`;
         }
         const text = typeof cell.v === 'string' && cell.v.startsWith('ERROR') ? cell.v : fmt(cell.v, cell.f);
@@ -174,13 +178,24 @@
             const n = Number(m[1]);
             return `<th class="mb-rep${excluded.has(n) ? ' mb-excluded' : ''}" data-exclude="${esc(sec.exclude_path)}" data-rep="${n}" title="Click to ${excluded.has(n) ? 'include' : 'exclude'} this rep">${esc(col)}</th>`;
         };
-        const head = sec.columns.length ? `<thead><tr><th>Parameter</th>${hasUnit ? '<th>Unit</th>' : ''}${sec.columns.map(th).join('')}</tr></thead>` : '';
+        // Fixed column widths: every table with the same columns (R1…R8) lines up with the others on the page.
+        // A column holding only text/dates (or an all-text first column) is left-aligned, numbers right-aligned.
+        const textColumn = sec.columns.map((_, j) => rows.length > 0 && rows.every(r => !r.cells[j] || ['text', 'date'].includes(r.cells[j].f) || r.cells[j].v === null || r.cells[j].v === undefined)
+            && rows.some(r => r.cells[j] && ['text', 'date'].includes(r.cells[j].f)));
+        const head = sec.columns.length ? `<thead><tr><th>Parameter</th>${hasUnit ? '<th class="mb-left">Unit</th>' : ''}${sec.columns.map((col, j) => {
+            const cell = th(col);
+            return textColumn[j] && !cell.includes('mb-rep') ? cell.replace('<th>', '<th class="mb-left">') : cell;
+        }).join('')}</tr></thead>` : '';
         const body = rows.map(r => `<tr><td>${esc(r.label)}</td>${hasUnit ? `<td class="mb-unit">${esc(r.unit || '')}</td>` : ''}${r.cells.map(cellHtml).join('')}</tr>`).join('');
         const notes = [sec.note, hidden ? `${hidden} rows with only zeros are hidden.` : ''].filter(Boolean);
         const note = notes.length ? `<div class="mb-section-note">${esc(notes.join(' '))}</div>` : '';
+        const hasDate = rows.some(r => r.cells.some(cell => cell.f === 'date'));
+        const widths = { label: hasDate ? 250 : 300, unit: 80, value: sec.columns.length <= 2 ? 220 : hasDate ? 148 : 120 };
+        const minWidth = widths.label + (hasUnit ? widths.unit : 0) + sec.columns.length * widths.value;
+        const cols = `<colgroup><col style="width:${widths.label}px">${hasUnit ? `<col style="width:${widths.unit}px">` : ''}${sec.columns.map(() => '<col>').join('')}</colgroup>`;
         const narrow = sec.columns.length <= 2 ? ' mb-narrow' : '';
         const table = sec.rows.length
-            ? `<div class="table-wrap mb-table-wrap"><table class="mb-table${narrow}">${head}<tbody>${body}</tbody></table></div>`
+            ? `<div class="table-wrap mb-table-wrap"><table class="mb-table${narrow}" style="min-width:${minWidth}px">${cols}${head}<tbody>${body}</tbody></table></div>`
             : '<div class="mb-section-empty">No data.</div>';
         const title = opts.noTitle ? '' : `<div class="card-head"><div>${opts.eyebrow ? `<div class="eyebrow">${esc(opts.eyebrow)}</div>` : ''}<h3>${esc(sec.title)}</h3></div></div>`;
         return `<div class="card mb-section">${title}${note}${table}</div>`;

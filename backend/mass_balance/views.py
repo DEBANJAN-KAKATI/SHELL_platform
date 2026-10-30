@@ -75,7 +75,8 @@ def plan_view(common, result):
         conditions.append(row(label, [c(x.get(key), "text" if key == "duration_unit" else "num",
                                         f"common.run_plan.conditions.{i}.{key}") for i, x in enumerate(cond_list)], unit))
     source = mix["source"]
-    src_label = {"mean": "mean of the reactor blocks", "0": "bypass block"}.get(str(source), f"ZMB Reactor-{source} block")
+    src_label = {"mean": "mean of the reactor blocks", "0": "bypass block", "feed": "Run Plan Feed sheet (target)"}.get(
+        str(source), f"ZMB Reactor-{source} block")
     columns = [name for name, *_ in MIX_GASES] + ["Total"]
     mix_rows = [row("Concentration", [c(mix["mol"][n], "mol") for n, *_ in MIX_GASES] + [c(mix["mol_sum"], "mol")], "mol%"),
                 row("Concentration", [c(mix["mass"][n], "pct") for n, *_ in MIX_GASES] + [c(100 if mix["mw"] else None, "pct")], "mass%"),
@@ -83,7 +84,15 @@ def plan_view(common, result):
     for i, element in enumerate(("Carbon", "Hydrogen", "Oxygen", "Nitrogen")):
         mix_rows.append(row(f"{element} in 100 kg gas", [c((mix["mass"][g[0]] or 0) * g[2 + i] / 100) for g in MIX_GASES] +
                             [c(mix["elements"][element[0]])], "kg"))
-    return {"id": "plan", "title": "Plan", "sections": [
+    doe = plan.get("doe") or []
+    doe_rows = [row(f"C{d.get('condition') or '?'} · R{d['reactor']}", [
+        c(d.get("block"), "text"), c(d.get("start"), "date"), c(d.get("end"), "date"), c(d.get("temperature")), c(d.get("pressure")),
+        c(d.get("gas_flow")), c(d.get("liquid_flow")), c(d.get("lhsv")), c(d.get("gor"))]) for d in doe
+        if any(d.get(k) not in (None, "") for k in ("temperature", "gas_flow", "liquid_flow"))]
+    sections_extra = [section("doe", "Design of experiments (DOE sheet)", ["Block", "Start", "End", "T [°C]", "P [barg]",
+                                                                          "Gas [NmL/h]", "Liquid [g/h]", "LHSV [1/h]", "GoR [Nl/l]"],
+                              doe_rows, note="Gas flow per reactor is the hand-entered feed flow of a sample when no Online Analysis export is loaded.")] if doe_rows else []
+    return {"id": "plan", "title": "Plan", "sections": sections_extra + [
         section("run", "Run information", ["Value"], info),
         section("feed", "Hydrocarbon / solvent feed", ["Value"], feed),
         section("catalysts", "Catalyst loading", ["Catalyst ID", "Target [mg]", "Actual [mg]", "Volume [mL]"], catalysts,
@@ -103,12 +112,14 @@ def liq_view(sample, result):
         row("Sample collection finished", per_reactor(lambda k: L[k]["finish"], "date", base + ".{r}.finish")),
         row("Duration of sampling", per_reactor(lambda k: L[k]["duration_min"]), "min"),
         row("Average time-on-stream", per_reactor(lambda k: L[k]["tos_h"]), "h"),
+        row("Hours collected (since window start)", per_reactor(lambda k: L[k]["liquid_hours"],
+                                                                     src="TLP flow divisor: previous collection finished, or Run Start for the first sample"), "h"),
         row("Feed flow rate (verified in ZMB)", per_reactor(lambda k: L[k]["feed"], "g", src="Liq!B13 = ZMB!B13"), "g/h"),
         row("TLP mass", per_reactor(lambda k: L[k]["tlp"], "g", base + ".{r}.tlp"), "g"),
         row("Hydrocarbon (top) phase mass", per_reactor(lambda k: L[k]["hc"], "g", base + ".{r}.hc"), "g"),
         row("Aqueous (bottom) phase mass", per_reactor(lambda k: L[k]["aq"], "g", base + ".{r}.aq"), "g"),
         row("Decantation loss", per_reactor(lambda k: L[k]["decantation_loss"], "pct"), "%"),
-        row("Hydrocarbon (top) phase flow rate", per_reactor(lambda k: L[k]["hc_flow"], "g", src="Liq!B40 = (TLP − aqueous) / TOS"), "g/h"),
+        row("Hydrocarbon (top) phase flow rate", per_reactor(lambda k: L[k]["hc_flow"], "g", src="Liq!B40 = (TLP − aqueous) / hours collected"), "g/h"),
         row("Aqueous (bottom) phase flow rate", per_reactor(lambda k: L[k]["aq_flow"], "g", src="Liq!B41 = aqueous / sampling hours"), "g/h"),
         row("Carbon in liquid product", per_reactor(lambda k: result["c_balance"][k]["c_wt_liquid_product"], "pct",
                                                     f"samples.{i}.c_wt_liquid_product" + ".{r}", src="C-Balance!N34"), "wt%"),
@@ -292,7 +303,7 @@ def reactor_view(sample, result, r):
     carbon = [row(name, [c(R["carbon_mean"][name] if R["carbon_mean"] else None, "g")] +
                   [c(rep["carbon"][name] if rep["carbon"] else None, "g", flag=ex(rep)) for rep in reps], "g/h") for name in MB_NAMES]
     carbon.append(row("Total", [c(R["carbon_gas"], "g", flag="kpi")] + [c(rep["carbon_total"], "g", flag=ex(rep)) for rep in reps], "g/h"))
-    errors = [f"#{rep['index']}: {rep['error']}" for rep in reps if rep.get("error")]
+    errors = sorted({rep["error"] for rep in reps if rep.get("error")})
     exclude = f"samples.{i}.excluded.{r}"
     return {"id": f"r{r}", "title": f"R{r}_MB", "reactor": r, "sections": [
         section("results", f"Reactor {r} · mass balance", ["Value"], head, group="results", note="; ".join(errors) or None),

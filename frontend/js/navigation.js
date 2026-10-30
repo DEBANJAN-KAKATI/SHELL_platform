@@ -103,6 +103,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { }
     }
     addOptionalIntegrityTab();
+    // Version of the running dashboard, so an old copy still open in the background is easy to spot.
+    fetch('/api/health').then(r => r.json()).then(health => {
+        if (!health?.version) return;
+        const badge = document.createElement('span');
+        badge.className = 'nav-version';
+        badge.textContent = `v${health.version}`;
+        badge.title = health.root ? `Dashboard ${health.version} · ${health.root}` : `Dashboard ${health.version}`;
+        badge.style.cssText = 'margin-left:auto;align-self:center;font-size:11px;color:var(--slate);opacity:.75';
+        tabs.appendChild(badge);
+    }).catch(() => {});
     function closeMenus(except = null) {
         tabs.querySelectorAll('.analysis-menu').forEach(menu => {
             if (menu !== except) {

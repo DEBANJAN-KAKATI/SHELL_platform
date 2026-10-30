@@ -82,15 +82,21 @@ def zmb_stage(zmb):
     return {"liquid": liquid, "gc": gc}
 
 
-def mixed_gas(zmb_result, source="1"):
-    """Run_Plan!B35:K46: mixed-gas composition = a ZMB GC block (workbook: Reactor-1 block, not normalised)."""
+def mixed_gas(zmb_result, source="1", target=None):
+    """Run_Plan!B35:K46: mixed-gas composition = a ZMB GC block (workbook: Reactor-1 block, not normalised).
+    source "feed", or a ZMB block without injections, uses the target composition of the Run Plan Feed sheet."""
     gc = zmb_result["gc"]
     if source == "mean":
         blocks = [gc[k] for k in gc if k != "0" and gc[k]["count"]]
         mol = {name: avg([b["average"][name] for b in blocks]) for name, *_ in MIX_GASES}
+    elif source == "feed":
+        mol = {name: num((target or {}).get(name)) for name, *_ in MIX_GASES}
     else:
         block = gc.get(str(source))
         mol = {name: (block["average"].get(name) if block else None) for name, *_ in MIX_GASES}
+    if all(v is None for v in mol.values()) and target and any(num(v) is not None for v in target.values()):
+        source = "feed"
+        mol = {name: num(target.get(name)) for name, *_ in MIX_GASES}
     g38 = {name: (mol[name] or 0) * mw for name, mw, *_ in MIX_GASES}                 # Run_Plan!B38 = B35*B37
     total = sum(g38.values())
     mass = {name: 100 * g38[name] / total if total else None for name, *_ in MIX_GASES}   # Run_Plan!B36
@@ -148,10 +154,16 @@ def liq_stage(sample, run_start, zmb_result):
         tos = 24 * (((start - run_start) + (finish - run_start)).total_seconds() / 86400) / 2 \
             if start and finish and run_start else None                                 # Liq!B8
         tlp, hc, aq = num(entry.get("tlp")), num(entry.get("hc")), num(entry.get("aq"))
-        hc_flow = ((tlp or 0) - (aq or 0)) / tos if tos else None                       # Liq!B40 (divides by TOS)
+        # Hours the TLP was collected: Liq!B8 measures the average collection time from Run Start, which is right for the
+        # first sample; later samples start at the previous collection (sample window start), so the same rule uses it.
+        window_start = to_dt(((sample.get("window_used") or {}).get(rkey(r)) or [None])[0]) or run_start
+        liquid_hours = 24 * (((start - window_start) + (finish - window_start)).total_seconds() / 86400) / 2 \
+            if start and finish and window_start else None
+        hc_flow = ((tlp or 0) - (aq or 0)) / liquid_hours if liquid_hours else None    # Liq!B40 (TLP / hours collected)
         aq_flow = (aq or 0) / (dur / 60) if dur else None                               # Liq!B41 (divides by sampling time)
         loss = 100 - 100 * ((hc or 0) + (aq or 0)) / tlp if tlp else None              # Liq!B20
         out[rkey(r)] = {"start": entry.get("start"), "finish": entry.get("finish"), "duration_min": dur, "tos_h": tos,
+                        "liquid_hours": liquid_hours, "window_start": window_start.strftime("%Y-%m-%d %H:%M:%S") if window_start else None,
                         "tlp": tlp, "hc": hc, "aq": aq, "decantation_loss": loss, "hc_flow": hc_flow, "aq_flow": aq_flow,
                         "feed": zmb_result["liquid"][rkey(r)]["verified"],             # Liq!B13 = ZMB!B13
                         "analyses": entry.get("analyses") or {}}
@@ -176,9 +188,12 @@ def reactor_stage(r, reps_in, gas_r, liq_r, gas, run_start, options):
                  "tos_h": 24 * (t - run_start).total_seconds() / 86400 if t and run_start else None,
                  "y": y, "excluded": bool(rep.get("excluded")), "source": rep.get("source")}
         y_ar = y.get("Argon")
-        if sum(v or 0 for v in y.values()) == 0 or not y_ar or ar_in is None:
+        if sum(v or 0 for v in y.values()) == 0 or not y_ar or not ar_in:
             entry.update(m=None, hc=None, cox=None, hc_cox=None, vtot=None, vtot_nl=None, v=None, carbon=None, carbon_total=None)
-            if not y_ar and sum(v or 0 for v in y.values()):
+            if sum(v or 0 for v in y.values()) and ar_in is not None and ar_in <= 0:
+                # GC still samples the reactor but no gas was fed (01i14FIC0r = 0): a balance would be meaningless.
+                entry["error"] = "ERROR: no gas feed to this reactor in the sample window (01i14FIC0r = 0)"
+            elif not y_ar and sum(v or 0 for v in y.values()):
                 entry["error"] = "ERROR: Argon is 0 or missing in this injection"
             reps.append(entry)
             continue
@@ -258,11 +273,11 @@ def c_balance_stage(reactors, gas, mix, liq, run_plan, sample):
         c_wt = num((sample.get("c_wt_liquid_product") or {}).get(k))
         c_wt = DEFAULT_C_WT_LIQUID_PRODUCT if c_wt is None else c_wt                        # N34
         c_liq_out_g = (L["tlp"] or 0) * c_wt / 100                                           # N35
-        c_liq_out = c_liq_out_g / L["tos_h"] if L["tos_h"] else None                        # N36 -> C6
+        c_liq_out = c_liq_out_g / L["liquid_hours"] if L["liquid_hours"] else None          # N36 -> C6
         c_gas_out = R["carbon_gas"]                                                          # C7
         denominator = (c_liq_in or 0) + (c_gas_in or 0)
         cbal = 100 * ((c_liq_out or 0) + c_gas_out) / denominator if c_gas_out is not None and denominator else None  # C9
-        c4_liq_out = L["tlp"] / L["tos_h"] if L["tlp"] is not None and L["tos_h"] else None   # C12
+        c4_liq_out = L["tlp"] / L["liquid_hours"] if L["tlp"] is not None and L["liquid_hours"] else None   # C12
         c4_gas_out = sum(R["mean_m"][n] for n in C4PLUS_ROWS) if R["has_data"] else None     # C14
         c4_feed = liq_feed
         c4_yield = (((c4_liq_out + (c4_gas_out or 0)) - (0 + (c4_feed or 0))) / (0 + c4_feed) * 100
@@ -309,7 +324,7 @@ def calculate(common, sample, options=None):
     options = options or {}
     run_start = to_dt((common.get("run") or {}).get("start"))
     zmb = zmb_stage(common.get("zmb") or {})
-    mix = mixed_gas(zmb, options.get("mixed_gas_source", "1"))
+    mix = mixed_gas(zmb, options.get("mixed_gas_source", "1"), (common.get("run_plan") or {}).get("mixed_gas_target"))
     gas = gas_stage({**(common.get("gas") or {}), **(sample.get("gas") or {})}, mix)   # Gas sheet is per sample
     liq = liq_stage(sample, run_start, zmb)
     reactors = {rkey(r): reactor_stage(r, (sample.get("gc") or {}).get(rkey(r)) or [], gas["reactors"][rkey(r)],

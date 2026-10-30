@@ -9,7 +9,7 @@
         const hero = document.querySelector('.hero');
         if (hero) {
             hero.querySelector('h1').textContent = 'Mass balance run plan.';
-            hero.querySelector('p').textContent = 'Plan (Run_Plan), Liq and Gas of the MassBal workbook. Load a filled workbook or type the blue cells; every change recalculates the run.';
+            hero.querySelector('p').textContent = 'Plan, Liq and Gas of the mass balance. Load the Run Plan (Plan, DOE, Feed and Liq sheets) or a filled MassBal workbook, or type the blue cells; every change recalculates the run.';
         }
         $('#mbRunPlan').hidden = false;
     }
@@ -32,7 +32,7 @@
     function sampleBar() {
         const s = MB.load();
         const sample = s.samples[s.active] || s.samples[0];
-        const workbookGc = Object.keys(sample.gc || {}).length > 0;
+        const workbookGc = Object.values(sample.gc || {}).some(reps => (reps || []).length);
         const res = MB.result();
         const used = res?.window?.['1'] ? res.window['1'].map(x => x || '—').join(' → ') : '—';
         $('#mbRpSampleBar').hidden = tab === 'plan';
@@ -69,7 +69,8 @@
             const by = key => v.sections.find(x => x.key === key);
             box.innerHTML = `<div class="mb-grid-2">${MB.sectionHtml(by('run'))}${MB.sectionHtml(by('feed'))}</div>` +
                 MB.sectionHtml(by('mixed_gas')) +
-                `<div class="mb-grid-2">${MB.sectionHtml(by('catalysts'))}${MB.sectionHtml(by('conditions'))}</div>`;
+                `<div class="mb-grid-2">${MB.sectionHtml(by('catalysts'))}${MB.sectionHtml(by('conditions'))}</div>` +
+                (by('doe') ? MB.sectionHtml(by('doe')) : '');
         } else {
             const main = v.sections.filter(x => !['analyses', 'contained'].includes(x.group));
             const more = v.sections.filter(x => ['analyses', 'contained'].includes(x.group));
@@ -93,7 +94,9 @@
             error(''); status('Loading...');
             try {
                 const data = await MB.importWorkbook(path);
-                $('#mbRpSummary').textContent = `${data.file} loaded: Run_Plan, Liq, Gas, ZMB liquid reps and sample ${data.samples[0]?.name || ''}.`;
+                $('#mbRpSummary').textContent = data.format === 'run_plan'
+                    ? `${data.file} loaded: Plan, DOE, Feed and Liq (${data.samples.length} samples: ${data.samples.map(x => x.name).join(', ')}).`
+                    : `${data.file} loaded: Run_Plan, Liq, Gas, ZMB liquid reps and sample ${data.samples[0]?.name || ''}.`;
                 await MB.calculate();
             } catch (e) { error(e.message); }
             status('Ready');

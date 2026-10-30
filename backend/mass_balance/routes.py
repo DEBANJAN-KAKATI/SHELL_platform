@@ -7,6 +7,7 @@ from backend.services.dialog_service import browse_file_dialog
 from .export import workbook_bytes
 from .service import export_summary, load_export, read_gc_map, run_calculation, save_gc_map
 from .workbook import read_workbook
+from .run_plan import is_run_plan_workbook, read_run_plan
 from .constants import MB_NAMES
 
 mass_balance_api = Blueprint("mass_balance_api", __name__, url_prefix="/api/mass-balance")
@@ -46,7 +47,13 @@ def import_workbook():
     if not path:
         return _error("Workbook path is required.")
     try:
-        return jsonify(read_workbook(path))
+        from openpyxl import load_workbook
+        workbook = load_workbook(path, read_only=True)
+        sheets = workbook.sheetnames
+        workbook.close()
+        if is_run_plan_workbook(sheets):               # RunPlan.xlsx format (Plan, DOE, Feed, Liq)
+            return jsonify(read_run_plan(path))
+        return jsonify(read_workbook(path))            # filled MassBal workbook (Run_Plan, Liq, Gas, ZMB, ...)
     except Exception as error:
         return _error(str(error))
 

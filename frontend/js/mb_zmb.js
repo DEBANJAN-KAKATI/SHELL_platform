@@ -4,7 +4,7 @@
     const $ = sel => document.querySelector(sel);
     const STREAMS = [['1', 'R1'], ['2', 'R2'], ['3', 'R3'], ['4', 'R4'], ['5', 'R5'], ['6', 'R6'], ['7', 'R7'], ['8', 'R8'], ['0', 'Bypass']];
     const SOURCES = [['1', 'Reactor-1 block (workbook)'], ...['2', '3', '4', '5', '6', '7', '8'].map(r => [r, `Reactor-${r} block`]),
-        ['mean', 'Mean of the reactor blocks'], ['0', 'Bypass block']];
+        ['mean', 'Mean of the reactor blocks'], ['0', 'Bypass block'], ['feed', 'Run Plan Feed sheet (target)']];
 
     function status(text) { $('#zmbStatus').textContent = text; }
     function error(text) { const el = $('#zmbError'); el.textContent = text || ''; el.classList.toggle('show', !!text); }

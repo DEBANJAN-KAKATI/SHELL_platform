@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.5.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.5.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (v6.4, Reactor 1 only) and
@@ -16,7 +16,8 @@ Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (
   `python312._pth` includes `..` so `import app` works). pip runs only when packages are missing or `requirements.txt`
   differs from the stamp `ils-requirements.txt` next to python.exe; a `wheels` folder enables offline install; a failed pip
   is tolerated when the app still imports. Company networks may answer 403 for python.org / pypi.org.
-  `run_app.py` moves to the next free port when 5001 is busy/reserved and reuses an already running dashboard.
+  `run_app.py` moves to the next free port when 5001 is busy/reserved and reuses an already running dashboard only
+  when `/api/health` `root` is the same folder (another copy/version on the port → next free port). Nav shows `vX.Y.Z`.
   Keep `.bat` files CRLF (`.gitattributes`); test exit codes with `neq 0`; avoid set-and-use of a variable inside one
   `( )` block. The embeddable runtime has no tkinter, so Browse uses the PowerShell dialog fallback in `dialog_service.py`.
 - pandas: 2.x on Python ≤3.14, 3.x on 3.15+ (requirements markers). Parse ISO timestamps with `format="ISO8601"` —
@@ -141,6 +142,11 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   = 100·(gas product w/o Ar + aq + HC)/(gas feed w/o Ar + liquid feed); C in gas feed from C2H2/CH4/C2H6/C2H4 only;
   mixed gas = ZMB R1 block (ESTD, not normalised). Golden tests: `tests/test_mass_balance_*.py` (Ver2.2, 1 811 cells).
 - State keys `ils_mb_inputs`, `ils_mb_imports`, `ils_mb_results`, `ils_mb_rep_table`, `ils_mb_summary_table`.
+- Run Plan for Mass Balance = shared RunPlan.xlsx format (Plan, DOE, Feed) + **Liq** sheet (`backend/mass_balance/run_plan.py`;
+  DOE Gas/Liquid Flow per reactor, Feed liquid + gas feed, Liq samples + ZMB liquid reps). Example built by
+  `scripts/build_mass_balance_run_plan.py` → `tests/fixtures/mass_balance/RunPlan_MassBalance_R08.xlsx`.
+- TLP flow divides by hours since the sample window start (= Run Start for the first sample, as in the workbook).
+  Reactors with GC but 01i14FIC0r = 0 in the window get `ERROR: no gas feed …`. Tables use fixed column widths.
 
 ## Working conventions seen in this codebase
 - Keep isomerization behaviour unchanged when adding reforming work; gate reforming code on
