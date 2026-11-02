@@ -174,7 +174,6 @@ function saveOnlineState() {
     sessionStorage.setItem('dhaOnlineState', state);
     localStorage.setItem('dhaOnlineState', state);
     sessionStorage.setItem('dhaDateTimeFilter', JSON.stringify({ from, to }));
-    window.dispatchEvent(new Event('ils:online-saved'));   // Mass Balance recalculates with the new export
 }
 
 function restoreOnlineState() {

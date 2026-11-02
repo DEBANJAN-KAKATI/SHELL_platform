@@ -1,0 +1,296 @@
+"""Universal Run Plan template (Plan, DOE, Feed) — one workbook layout for every experiment.
+
+Recognised by the Plan sheet's "Reactor role" row. Differences to the older RunPlan.xlsx:
+- Plan: Run ID (B1), Start date (H1), Objective (B2), Lab notebook ref. (B3), Feed (B4); Catalyst Loading Plan from the
+  "Reactor" row (7) down to the row before "Flow calculation basis" (rows 8-22, incl. Reactor role Catalyst/Inert/Not used).
+- DOE: header row 10, conditions from row 11 (one row per condition, block and reactor; Block-1 = R1-R4, Block-2 = R5-R8),
+  calculated flow columns up to "Check"; "Step 0 – Pretreatment / activation" table at the bottom (returned separately).
+- Feed: four Excel tables — tbl_Feed (properties A1:F13), tbl_comp (liquid components A14:F45 with Total),
+  tbl_compType (group-type summary H14:K22), tbl_gas (gas components M14:P31) — plus "Gas feed settings" (A46:E48).
+Formula cells are read with the values Excel saved (data_only).
+"""
+import math
+import re
+from datetime import datetime
+from pathlib import Path
+
+from openpyxl import load_workbook
+from openpyxl.utils import column_index_from_string, range_boundaries
+
+FEED_COLUMNS = ["Component / Parameter", "Carbon No.", "Group", "Unit / Method", "Value (wt%)"]
+LOADING_COLUMNS = ["Parameter", "Units", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8"]
+# DOE headers used by the rest of the dashboard (Calculation table, Plots: condition dates)
+DOE_HEADER_ALIASES = {"start (date, time)": "Start Date", "end (date, time)": "End Date"}
+DEFAULT_TABLES = {"tbl_Feed": "A1:F13", "tbl_comp": "A14:F45", "tbl_compType": "H14:K22", "tbl_gas": "M14:P31"}
+
+
+def clean(value):
+    """Same conventions as run_plan_service._clean_val: '' for empty, dates as text, short floats."""
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return ""
+        return int(value) if value.is_integer() else round(value, 4)
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d %H:%M:%S").replace(" 00:00:00", "")
+    if isinstance(value, str):
+        return value.strip()
+    return value
+
+
+def number(value):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _label(value):
+    return " ".join(str(value or "").split()).strip()
+
+
+def is_template(path):
+    """True for the universal template (Plan sheet has a "Reactor role" row)."""
+    path = Path(path)
+    if path.suffix.lower() != ".xlsx":
+        return False
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        if "Plan" not in wb.sheetnames:
+            return False
+        for row in wb["Plan"].iter_rows(min_row=1, max_row=40, max_col=1, values_only=True):
+            if _label(row[0]).lower() == "reactor role":
+                return True
+        return False
+    finally:
+        wb.close()
+
+
+def _rows(ws):
+    return [list(r) for r in ws.iter_rows(values_only=True)]
+
+
+def _cell(rows, ref):
+    col, row = re.match(r"([A-Z]+)(\d+)", ref).groups()
+    r, c = int(row) - 1, column_index_from_string(col) - 1
+    return rows[r][c] if r < len(rows) and c < len(rows[r]) else None
+
+
+# ---------------------------------------------------------------- Plan
+def parse_plan(ws):
+    rows = _rows(ws)
+    find = lambda text: next((i for i, r in enumerate(rows) if r and _label(r[0]).lower() == text), None)
+    objective = clean(_cell(rows, "B2"))
+    info = []
+    for label, ref in (("Run ID", "B1"), ("Start date", "H1"), ("Lab notebook ref.", "B3"), ("Feed", "B4")):
+        value = clean(_cell(rows, ref))
+        if value != "":
+            info.append({"parameter": label, "units": "", "value": value})
+    reactor = find("reactor")
+    loading = []
+    if reactor is not None:
+        for r in rows[reactor + 1:]:
+            label = _label(r[0]) if r else ""
+            if not label:
+                if loading:
+                    break
+                continue
+            values = [clean(r[i]) if i < len(r) else "" for i in range(1, 10)]
+            loading.append({"parameter": label, "units": values[0], **{f"r{k + 1}": values[k + 1] for k in range(8)}})
+    feed_mw = next((clean(r[2]) for r in rows if r and _label(r[0]).lower() == "feed molecular weight" and len(r) > 2), "")
+    return {"objective": objective, "info": info, "rows": loading, "feed_mw": feed_mw}
+
+
+# ---------------------------------------------------------------- DOE
+def parse_doe(ws):
+    rows = _rows(ws)
+    header_index = next((i for i, r in enumerate(rows) if r and _label(r[0]).lower().startswith("condition")), 9)
+    header = rows[header_index]
+    last = max((i for i, h in enumerate(header) if _label(h)), default=12)
+    columns = []
+    for i in range(last + 1):
+        name = _label(header[i]) or f"Col_{i + 1}"
+        columns.append(DOE_HEADER_ALIASES.get(name.lower(), name))
+    step0 = next((i for i, r in enumerate(rows) if r and _label(r[0]).lower().startswith("step 0")), len(rows))
+    # A condition is shown when one of its entered values is filled; the start date alone is not enough because the
+    # template chains it from the previous condition's end.
+    entered = [i for i, c in enumerate(columns) if re.match(r"(temperature|pressure|whsv|lhsv)", c.lower())]
+    react_i = next((i for i, c in enumerate(columns) if c.lower().startswith("reactor")), None)
+    doe_rows = []
+    for r in rows[header_index + 1:step0]:
+        if not r or react_i is None or not re.fullmatch(r"R[1-8]", _label(r[react_i] if react_i < len(r) else "")):
+            continue
+        has_data = any(i < len(r) and clean(r[i]) != "" for i in entered)
+        if not has_data:
+            continue                     # conditions left blank in the template are not shown
+        doe_rows.append({columns[i]: clean(r[i]) if i < len(r) else "" for i in range(len(columns))})
+    planned = {}
+    for r in rows[:header_index]:
+        if r and _label(r[0]).lower().startswith("planned hours"):
+            planned = {"block_1_h": clean(r[2]) if len(r) > 2 else "", "block_2_h": clean(r[4]) if len(r) > 4 else "",
+                       "run_end": clean(r[6]) if len(r) > 6 else ""}
+    pre = {"title": "", "columns": [], "rows": [], "total_h": ""}
+    if step0 < len(rows):
+        pre["title"] = _label(rows[step0][0])
+        head = rows[step0 + 1] if step0 + 1 < len(rows) else []
+        width = max((i for i, h in enumerate(head) if _label(h)), default=-1) + 1
+        pre["columns"] = [_label(h) for h in head[:width]]
+        for r in rows[step0 + 2:]:
+            if not r:
+                continue
+            tail = [clean(v) for v in r[:width + 2]]
+            if any(str(v).lower().startswith("total") for v in tail if isinstance(v, str)):
+                pre["total_h"] = next((v for v in tail if isinstance(v, (int, float))), "")
+                break
+            values = tail[:width]
+            # a step counts when anything besides its number is filled in
+            if any(v != "" for v in values[1:]):
+                pre["rows"].append(dict(zip(pre["columns"], values)))
+    return {"columns": columns, "rows": doe_rows, "pretreatment": pre, "planned": planned}
+
+
+# ---------------------------------------------------------------- Feed
+def _table_ranges(ws):
+    ranges = dict(DEFAULT_TABLES)
+    for name, table in getattr(ws, "tables", {}).items():
+        ref = table if isinstance(table, str) else getattr(table, "ref", None)
+        if ref:
+            ranges[name] = ref
+    return ranges
+
+
+def _block(rows, ref):
+    min_col, min_row, max_col, max_row = range_boundaries(ref)
+    return [[rows[r - 1][c - 1] if r - 1 < len(rows) and c - 1 < len(rows[r - 1]) else None for c in range(min_col, max_col + 1)]
+            for r in range(min_row + 1, max_row + 1)], min_row, min_col
+
+
+def _check(total):
+    if total is None:
+        return ""
+    return "OK" if abs(total - 100) <= 0.5 else "Not 100"
+
+
+def parse_feed(ws_values, ws_formulas=None):
+    rows = _rows(ws_values)
+    ranges = _table_ranges(ws_formulas or ws_values)
+    note = lambda r: clean(rows[r][6]) if r < len(rows) and len(rows[r]) > 6 else ""
+
+    props_block, first, _ = _block(rows, ranges["tbl_Feed"])
+    properties = []
+    for k, r in enumerate(props_block):
+        label = _label(r[0])
+        if label:
+            properties.append({"label": label, "unit": clean(r[3]) if len(r) > 3 else "", "value": clean(r[4]) if len(r) > 4 else "",
+                               "note": note(first + k)})
+
+    comp_block, first, _ = _block(rows, ranges["tbl_comp"])
+    liquid, liquid_total, liquid_check = [], None, ""
+    for r in comp_block:
+        label = _label(r[0])
+        if label.lower() == "total":
+            liquid_total, liquid_check = number(r[4]), clean(r[5])
+            continue
+        liquid.append({"component": label, "carbon_no": clean(r[1]), "type": clean(r[2]), "unit": clean(r[3]) or "wt%",
+                       "weight": clean(r[4]), "mw": clean(r[5])})
+    weights = [number(x["weight"]) for x in liquid if number(x["weight"]) is not None]
+    if liquid_total is None and weights:
+        liquid_total = sum(weights)
+    liquid_check = liquid_check or (_check(liquid_total) if weights else "")
+
+    group_block, _, _ = _block(rows, ranges["tbl_compType"])
+    groups = [{"group": _label(r[0]), "unit": clean(r[1]) or "wt%", "weight": clean(r[2]), "check": clean(r[3])} for r in group_block]
+    group_weights = [number(g["weight"]) for g in groups if number(g["weight"]) is not None]
+    group_total = sum(group_weights) if group_weights else None
+
+    gas_block, _, _ = _block(rows, ranges["tbl_gas"])
+    gas = [{"component": _label(r[0]), "unit": clean(r[1]) or "mol%", "value": clean(r[2]), "check": clean(r[3])} for r in gas_block]
+    gas_values = [number(g["value"]) for g in gas if number(g["value"]) is not None]
+    gas_total = sum(gas_values) if gas_values else None
+
+    settings, start = [], next((i for i, r in enumerate(rows) if r and _label(r[0]).lower() == "gas feed settings"), None)
+    if start is not None:
+        for i in range(start + 1, len(rows)):
+            label = _label(rows[i][0]) if rows[i] else ""
+            if not label:
+                break
+            settings.append({"label": label, "unit": clean(rows[i][3]) if len(rows[i]) > 3 else "",
+                             "value": clean(rows[i][4]) if len(rows[i]) > 4 else "", "note": note(i)})
+
+    tables = {
+        "properties": {"title": "Feed properties", "rows": properties},
+        "liquid": {"title": "Liquid components", "unit": "wt%", "rows": liquid, "total": liquid_total, "check": liquid_check},
+        "groups": {"title": "Group-type summary", "unit": "wt%", "rows": groups, "total": group_total,
+                   "check": _check(group_total) if group_weights else ""},
+        "gas": {"title": "Gas feed composition", "unit": "mol%", "rows": gas, "total": gas_total,
+                "check": _check(gas_total) if gas_values else "", "settings": settings},
+    }
+
+    # Flat rows for the rest of the dashboard: Carbon, Hydrogen and Molecular Weight first (the Calculation table, Plots
+    # and Custom table read Carbon from row 1 and MW from row 3), then the other properties, then filled components.
+    by_label = {p["label"].lower(): p for p in properties}
+    ordered = [by_label[k] for k in ("carbon", "hydrogen", "molecular weight") if k in by_label]
+    ordered += [p for p in properties if p not in ordered]
+    flat = [{"component": p["label"], "carbon_no": "", "group": "Property", "unit": p["unit"], "value": p["value"]} for p in ordered]
+    flat += [{"component": x["component"], "carbon_no": x["carbon_no"], "group": x["type"], "unit": x["unit"], "value": x["weight"]}
+             for x in liquid if x["component"] and x["weight"] != ""]
+    flat += [{"component": g["group"], "carbon_no": "", "group": "Group type", "unit": g["unit"], "value": g["weight"]}
+             for g in groups if g["group"] and g["weight"] != ""]
+    flat += [{"component": f"{g['component']} (gas)" if "(gas)" not in g["component"] else g["component"], "carbon_no": "",
+              "group": "Gas", "unit": g["unit"], "value": g["value"]} for g in gas if g["component"] and g["value"] != ""]
+    return {"tables": tables, "rows": flat}
+
+
+# ---------------------------------------------------------------- workbook
+def process_template(path):
+    path = Path(path).resolve()
+    wb = load_workbook(path, data_only=True)
+    wf = load_workbook(path)                    # table definitions (not in the data_only view of some files)
+    try:
+        plan = parse_plan(wb["Plan"])
+        doe = parse_doe(wb["DOE"]) if "DOE" in wb.sheetnames else {"columns": [], "rows": [], "pretreatment": {}, "planned": {}}
+        feed = parse_feed(wb["Feed"], wf["Feed"]) if "Feed" in wb.sheetnames else {"tables": {}, "rows": []}
+    finally:
+        wb.close()
+        wf.close()
+
+    props = {p["label"].lower(): p["value"] for p in feed["tables"].get("properties", {}).get("rows", [])}
+    if props.get("feed id / sample id (sl id)"):
+        plan["info"].append({"parameter": "Feed SL ID", "units": "", "value": props["feed id / sample id (sl id)"]})
+    if plan["feed_mw"] != "" or props.get("molecular weight") not in (None, ""):
+        plan["info"].append({"parameter": "Feed molecular weight", "units": "g/mol",
+                             "value": plan["feed_mw"] if plan["feed_mw"] != "" else props.get("molecular weight")})
+
+    roles = next((r for r in plan["rows"] if r["parameter"].lower() == "reactor role"), None)
+    catalysts = next((r for r in plan["rows"] if r["parameter"].lower() == "catalyst"), {})
+    for row in doe["rows"]:                     # DOE has no Catalyst column any more: take it from the Plan
+        reactor = str(row.get("Reactor ID", "")).strip()
+        if reactor and "Catalyst" not in row:
+            row["Catalyst"] = catalysts.get(f"r{reactor[1:]}", "") if reactor[1:].isdigit() else ""
+    if doe["rows"] and "Catalyst" not in doe["columns"]:
+        doe["columns"].append("Catalyst")
+    active = [f"R{k}" for k in range(1, 9)
+              if roles and str(roles.get(f"r{k}", "")).strip().lower() in ("catalyst", "inert")]
+    doe_reactors = sorted({str(r.get("Reactor ID", "")).strip() for r in doe["rows"] if str(r.get("Reactor ID", "")).strip()})
+    liquid_filled = [x for x in feed["tables"].get("liquid", {}).get("rows", []) if x["weight"] != ""]
+    summary = {
+        "file_name": path.name, "file_path": str(path), "format": "template",
+        "feed_count": len(liquid_filled), "doe_count": len(doe["rows"]),
+        "condition_count": len({(r.get("Block"), r.get("Condition No.")) for r in doe["rows"]}),
+        "reactor_count": len(doe_reactors) or 8,
+        "reactors": doe_reactors or [f"R{i}" for i in range(1, 9)], "active_reactors": active,
+        "pretreatment_steps": len(doe["pretreatment"].get("rows", [])),
+    }
+    return {
+        "feed": {"columns": FEED_COLUMNS, "rows": feed["rows"], "count": len(feed["rows"]), "tables": feed["tables"]},
+        "plan": {"objective": plan["objective"], "info": plan["info"], "columns": LOADING_COLUMNS, "rows": plan["rows"],
+                 "count": len(plan["rows"])},
+        "doe": {"columns": doe["columns"], "rows": doe["rows"], "count": len(doe["rows"]),
+                "pretreatment": doe["pretreatment"], "planned": doe["planned"]},
+        "summary": summary,
+    }

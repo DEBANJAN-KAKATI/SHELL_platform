@@ -17,21 +17,17 @@ function sortDateTimeRows(rows, column = 'DateTime') {
     })).sort((left, right) => left.time === right.time ? 0 : left.time - right.time).map(entry => entry.row);
 }
 
-// Process of the current run (Isomerization, Reforming or Mass Balance), chosen on the Run Plan page.
-// Kept per browser tab like the Run Number; cleared by the reset button.
+// One universal dashboard: there is no process selection any more. The Run Plan template describes every experiment;
+// the pages work in the Isomerization format for now. ILSProcess stays as a fixed answer so the dormant Reforming code
+// (process checks in older scripts) stays switched off; a process saved by an older version is cleared.
+try { sessionStorage.removeItem('ils_process'); } catch {}
 window.ILSProcess = {
     KEY: 'ils_process',
-    LABELS: { isomerization: 'Isomerization', reforming: 'Reforming', massbalance: 'Mass Balance' },
-    normalize(value) { return Object.prototype.hasOwnProperty.call(this.LABELS, value) ? value : 'isomerization'; },
-    get() {
-        try { return this.normalize(sessionStorage.getItem(this.KEY)); } catch { return 'isomerization'; }
-    },
-    set(value) {
-        try { sessionStorage.setItem(this.KEY, this.normalize(value)); } catch {}
-    },
-    isReforming() { return this.get() === 'reforming'; },
-    isMassBalance() { return this.get() === 'massbalance'; },
-    label() { return this.LABELS[this.get()]; },
+    get() { return 'isomerization'; },
+    set() {},
+    isReforming() { return false; },
+    isMassBalance() { return false; },
+    label() { return 'Isomerization'; },
     runPlanUrl() { return '/frontend/run_plan.html'; }
 };
 
@@ -48,23 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const isRunPlan = path.endsWith('/run_plan.html') || path.endsWith('/run-plan') || path.endsWith('/run_plan') || path.includes('/frontend/run_plan.html');
     const isOnline = path.endsWith('/online_analysis.html') || path.endsWith('/online-analysis') || path.endsWith('/online_analysis');
     const isHistory = path.endsWith('/history.html') || path.endsWith('/history');
-    const isZmb = path.endsWith('/zmb.html') || path.endsWith('/zmb');
-    const isMbCalculation = path.endsWith('/mb_calculation.html') || path.endsWith('/mass-balance') || path.endsWith('/mass_balance');
-    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity && !isZmb && !isMbCalculation;
-    // The main tabs are the same for every process. Mass Balance replaces the DHA page (Offline Analysis) by ZMB and
-    // opens its own calculation table; the other pages read the Mass Balance tables published by mb_core.js.
-    const massBalance = window.ILSProcess.isMassBalance();
-    const redirect = massBalance
-        ? (isOffline && (path.endsWith('/index.html') || path.endsWith('/offline') || path.endsWith('/offline-analysis') || path.endsWith('/offline_analysis')) ? '/frontend/zmb.html'
-            : isCalculation ? '/frontend/mb_calculation.html' : null)
-        : (isZmb ? '/frontend/index.html' : isMbCalculation ? '/frontend/calculation_table.html' : null);
-    if (redirect) { window.location.replace(redirect); return; }
-    const analysisActive = isOffline || isOnline || isZmb;
-    const calculationActive = isCalculation || isCustom || isMbCalculation;
-    const firstAnalysis = massBalance
-        ? `<a aria-current="${isZmb ? 'page' : 'false'}" href="/frontend/zmb.html">ZMB</a>`
-        : `<a aria-current="${isOffline ? 'page' : 'false'}" href="/frontend/index.html">Offline Analysis</a>`;
-    const calculationHref = massBalance ? '/frontend/mb_calculation.html' : '/frontend/calculation_table.html';
+    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
+    const analysisActive = isOffline || isOnline;
+    const calculationActive = isCalculation || isCustom;
+    const firstAnalysis = `<a aria-current="${isOffline ? 'page' : 'false'}" href="/frontend/index.html">Offline Analysis</a>`;
+    const calculationHref = '/frontend/calculation_table.html';
 
     header.insertAdjacentHTML(
         'afterend',
@@ -79,7 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `<div class="analysis-menu${calculationActive ? ' active' : ''}">` +
         `<button type="button" class="analysis-tab${calculationActive ? ' active' : ''}" aria-label="Calculation pages" aria-expanded="false" aria-haspopup="true">Calculation <span aria-hidden="true">▾</span></button>` +
         `<div class="analysis-menu-items">` +
-        `<a aria-current="${isCalculation || isMbCalculation ? 'page' : 'false'}" href="${calculationHref}">Calculation table</a>` +
+        `<a aria-current="${isCalculation ? 'page' : 'false'}" href="${calculationHref}">Calculation table</a>` +
         `<a aria-current="${isCustom ? 'page' : 'false'}" href="/frontend/custom_table.html">Custom table</a>` +
         `</div></div>` +
         `<a aria-current="${isPlots ? 'page' : 'false'}" class="analysis-tab${isPlots ? ' active' : ''}" href="/frontend/plots.html">Plots</a>` +
@@ -255,49 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Process selector (Run Plan pages) or read-only process badge (other pages)
-    let refreshProcessLock = () => {};
-    const processHost = (document.getElementById('runNumberInput') || document.getElementById('runNumberDisplay'))?.closest('.run-number-group');
-    if (isRunPlan) {
-        if (processHost) {
-            processHost.insertAdjacentHTML('afterend',
-                '<div class="run-number-group process-group">' +
-                '<label for="processSelect" class="run-number-label">Process</label>' +
-                '<select class="input run-number-input process-select" id="processSelect" title="Process of this run">' +
-                '<option value="isomerization">Isomerization</option><option value="reforming">Reforming</option>' +
-                '<option value="massbalance">Mass Balance</option>' +
-                '</select></div>');
-            const processSelect = document.getElementById('processSelect');
-            const runField = document.getElementById('runNumberInput');
-            processSelect.value = window.ILSProcess.get();
-            const syncProcessLock = () => {
-                const hasRun = !!(runField?.value || '').trim();
-                processSelect.disabled = !hasRun;
-                processSelect.title = hasRun ? 'Process of this run' : 'Enter the Run Number first';
-            };
-            refreshProcessLock = syncProcessLock;
-            syncProcessLock();
-            runField?.addEventListener('input', syncProcessLock);
-            runField?.addEventListener('change', syncProcessLock);
-            processSelect.addEventListener('change', () => {
-                if (processSelect.value !== window.ILSProcess.get()) {
-                    // The loaded Run Plan belongs to the previous process.
-                    try {
-                        sessionStorage.removeItem('runPlanDashboardState');
-                        sessionStorage.removeItem('ils_feed_properties');
-                    } catch {}
-                }
-                window.ILSProcess.set(processSelect.value);
-                window.location.assign(window.ILSProcess.runPlanUrl());
-            });
-        }
-    } else if (processHost) {
-        processHost.insertAdjacentHTML('afterend',
-            '<div class="run-number-group process-group">' +
-            '<span class="run-number-label">Process</span>' +
-            `<input type="text" class="input run-number-input run-number-readonly process-badge" id="processDisplay" readonly disabled title="Process selected on the Run Plan page" value="${window.ILSProcess.label()}" />` +
-            '</div>');
-    }
+    const refreshProcessLock = () => {};
 
     if (isRunPlan) {
         const runInput = document.getElementById('runNumberInput');

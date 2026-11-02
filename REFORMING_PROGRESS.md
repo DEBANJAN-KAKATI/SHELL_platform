@@ -1,3 +1,5 @@
+> **Dormant since v6.6 (2026-11-02):** the dashboard has no process selection any more. The Reforming backend code and tests stay in the repo for reuse; its pages/UI were removed.
+
 # v6.4 — Reforming process (released 2026-10-14; runs from run_dashboard.bat on port 5001)
 
 v6.4 is a copy of v6.3 (v6.3 is left untouched as the backup). VERSION = 6.4.0.

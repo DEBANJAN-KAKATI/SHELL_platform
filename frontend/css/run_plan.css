@@ -1,0 +1,66 @@
+/* Run Plan page: Feed of the universal template (properties tiles + liquid / group-type / gas cards) and DOE Step 0. */
+.rp-switch{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--slate);white-space:nowrap;cursor:pointer}
+.rp-switch[hidden]{display:none}
+.rp-switch input{accent-color:var(--burnt);width:15px;height:15px}
+.rp-feed{padding:16px}
+.rp-feed[hidden],#feedLegacy[hidden]{display:none}
+
+/* Feed properties: one tile per property */
+.rp-props{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:10px;margin-bottom:16px}
+.rp-prop{padding:11px 13px;border:1px solid var(--border);border-left:3px solid var(--burnt);border-radius:7px;background:#fffaf0}
+.rp-prop span{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--slate);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rp-prop b{display:block;margin-top:5px;font:700 18px Georgia,serif;color:var(--ink);overflow-wrap:anywhere}
+.rp-prop b small{font:600 11px "Fira Code","Segoe UI",monospace;color:var(--slate)}
+.rp-prop.empty{border-left-color:var(--sand);opacity:.7}
+.rp-prop[title]{cursor:help}
+
+/* Cards */
+.rp-feed-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.rp-feed-side{display:grid;gap:16px}
+.rp-card{background:#fffaf0;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.rp-card header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 15px;border-bottom:1px solid var(--border);background:rgba(216,201,179,.16)}
+.rp-card h4{margin:3px 0 0;font:700 17px Georgia,serif;color:var(--ink)}
+.rp-card h4 small{font:600 12px "Fira Code","Segoe UI",monospace;color:var(--slate)}
+
+/* Tables inside the cards */
+.rp-table{width:100%;min-width:0;border-collapse:collapse;font-size:12px}
+.rp-table th{position:static;background:transparent;color:var(--slate);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)}
+.rp-table td{text-align:left;padding:7px 12px;border-bottom:1px solid rgba(7,26,45,.07)}
+.rp-table th:first-child,.rp-table td:first-child{text-align:left;padding-left:15px}
+.rp-table tbody tr:nth-child(even) td{background:rgba(216,201,179,.08)}
+.rp-table tbody tr:hover td{background:#fff0df}
+.rp-table .rp-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rp-table td.rp-num{font-weight:700}
+.rp-muted{color:var(--slate);font-weight:400!important}
+.rp-dash{color:rgba(52,66,83,.45);font-weight:400}
+.rp-bar{display:inline-block;width:72px;height:6px;margin-left:10px;border-radius:3px;background:rgba(7,26,45,.08);vertical-align:middle;overflow:hidden}
+.rp-bar i{display:block;height:100%;border-radius:3px;background:var(--burnt)}
+.rp-empty{padding:16px;color:var(--slate);font-size:12px;text-align:center}
+
+/* Hydrocarbon type badges (n-P, i-P, N, A, O) */
+.rp-type{display:inline-block;min-width:30px;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:700;text-align:center;background:#eef0f3;color:var(--slate)}
+.rp-type.t-np{background:#e0ecff;color:#1d4ed8}
+.rp-type.t-ip{background:#e3f6ec;color:#047857}
+.rp-type.t-n{background:#fdf0dc;color:#b45309}
+.rp-type.t-a{background:#f3e8ff;color:#6d28d9}
+.rp-type.t-o{background:#fde7ef;color:#be185d}
+
+/* Totals / check badges */
+.rp-badge{display:inline-block;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;background:#eef0f3;color:var(--slate)}
+.rp-badge.ok{background:#dcfce7;color:#166534}
+.rp-badge.warn{background:#fee2e2;color:#991b1b}
+.rp-badge.muted{background:transparent;border:1px dashed var(--border)}
+
+/* Gas feed settings chips */
+.rp-settings{display:flex;flex-wrap:wrap;gap:8px;padding:12px 15px;border-bottom:1px solid var(--border)}
+.rp-chip{padding:7px 11px;border:1px solid var(--border);border-radius:7px;background:var(--paper);font-size:12px}
+.rp-chip span{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--slate)}
+.rp-chip b{display:block;margin-top:2px;color:var(--ink)}
+
+/* DOE: planned hours + Step 0 toggle, pretreatment table */
+.rp-doe-bar{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.rp-doe-bar[hidden],.rp-pretreat[hidden]{display:none}
+.rp-pretreat{border-top:3px solid var(--sand);margin-top:4px}
+.rp-pretreat-table{min-width:1000px}
+
+@media(max-width:1100px){.rp-feed-grid{grid-template-columns:1fr}}
