@@ -8,8 +8,9 @@
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
     <script src="/frontend/js/navigation.js?v=6" defer></script>
-    <link href="/frontend/css/run_plan.css?v=2" rel="stylesheet">
-    <script src="/frontend/js/run_plan.js?v=7" defer></script>
+    <link href="/frontend/css/run_plan.css?v=3" rel="stylesheet">
+    <script src="/frontend/js/chart.umd.min.js" defer></script>
+    <script src="/frontend/js/run_plan.js?v=8" defer></script>
 </head>
 
 <body>
@@ -67,6 +68,7 @@
                     <button aria-controls="feedPanel" aria-selected="true" class="table-tab active" data-subtab="feed" id="tabFeed" role="tab" type="button">Feed</button>
                     <button aria-controls="planPanel" aria-selected="false" class="table-tab" data-subtab="plan" id="tabPlan" role="tab" type="button">Plan</button>
                     <button aria-controls="doePanel" aria-selected="false" class="table-tab" data-subtab="doe" id="tabDoe" role="tab" type="button">DOE</button>
+                    <button aria-controls="prerunPanel" aria-selected="false" class="table-tab" data-subtab="prerun" id="tabPrerun" role="tab" type="button">Pre-run</button>
                 </div>
 
                 <!-- Feed Sub-Tab Panel -->
@@ -174,7 +176,6 @@
                     </div>
                     <div class="filter-summary rp-doe-bar" id="doeBar" hidden>
                         <span id="doePlanned"></span>
-                        <label class="rp-switch" id="doePretreatWrap"><input type="checkbox" id="doeShowPretreat"> Show Step 0 – Pretreatment / activation</label>
                     </div>
                     <div class="filter-summary" id="doeImportStatus" role="status" aria-live="polite">No DOE data imported.</div>
                     <div class="filter-summary" id="doeSummary">Showing condition matrix</div>
@@ -187,19 +188,23 @@
                         </table>
                         <div class="empty" id="doeEmpty">Load a Run Plan Excel file to view DOE conditions.</div>
                     </div>
-                    <section class="rp-pretreat" id="doePretreat" hidden>
-                        <div class="card-head">
-                            <div>
-                                <div class="eyebrow">DOE · STEP 0</div>
-                                <h3 id="doePretreatTitle">Pretreatment / activation</h3>
-                            </div>
-                            <span class="rp-badge" id="doePretreatTotal"></span>
+                </div>
+
+                <!-- Pre-run Sub-Tab Panel: DOE Step 0 (drying, reduction, feed cut-in ...) -->
+                <div class="card run-plan-panel" id="prerunPanel" hidden>
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">RUN PLAN · PRE-RUN (DOE STEP 0)</div>
+                            <h3 id="prerunTitle">Pre-run</h3>
                         </div>
-                        <div class="table-wrap">
-                            <table class="runplan-table rp-pretreat-table"><thead><tr id="doePretreatHead"></tr></thead><tbody id="doePretreatBody"></tbody></table>
-                            <div class="empty" id="doePretreatEmpty">No pretreatment steps in this Run Plan.</div>
-                        </div>
-                    </section>
+                        <div class="rp-prerun-totals" id="prerunTotals"></div>
+                    </div>
+                    <div class="filter-summary" id="prerunSummary">Load a Run Plan Excel file to view the pre-run.</div>
+                    <div class="table-wrap">
+                        <table class="runplan-table rp-prerun-table"><thead><tr id="prerunHead"></tr></thead><tbody id="prerunBody"></tbody></table>
+                        <div class="empty" id="prerunEmpty">No pre-run steps in this Run Plan.</div>
+                    </div>
+                    <div class="rp-prerun-charts" id="prerunCharts"></div>
                 </div>
 
             </section>

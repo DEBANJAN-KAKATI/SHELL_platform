@@ -136,3 +136,28 @@ def test_blank_template_has_an_empty_prerun_and_untouched_plan_and_feed():
     assert ws["A108"].value.startswith("Step 0") and ws["B110"].value is None and ws["H110"].value is None
     assert len(ws._charts) == 2
     assert process_run_plan_file(str(path))["doe"]["pretreatment"]["rows"] == []
+
+
+def test_prerun_profile_for_the_charts():
+    """Pre-run tab: temperature by phase and pressure per block, computed from the entered steps."""
+    prof = process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_Isomerisation_Rheinland.xlsx"))["doe"]["pretreatment"]["profile"]
+    assert prof["right_axis"] == "Pressure (barg)" and prof["phases"][:4] == ["Drying", "Reduction", "Sulfiding", "Feed cut-in"]
+    b1, b2 = prof["blocks"]
+    assert (b1["block"], b1["total_h"], b1["feed_cut_in_h"]) == ("Block-1", 24.3, 23.3)
+    assert (b2["total_h"], b2["feed_cut_in_h"]) == (35.6, 34.6)
+    assert b1["temperature"]["Drying"][:6] == [[0, 25], [0, 25], [2, 25], [2, 25], [7.5, 300], [9.5, 300]]
+    assert [12.5, 150] in b1["temperature"]["Reduction"] and b1["temperature"]["Feed cut-in"][-1] == [24.3, 210]
+    assert [14.5, 1] in b1["right"] and [15.5, 5] in b1["right"] and [22.3, 25] in b1["right"]   # 1 -> 5 barg over 1 h
+    assert "profile" not in process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_Template_Feed_SS.xlsx"))["doe"]["pretreatment"]
+
+
+def test_prerun_profile_breaks_lines_between_phase_parts():
+    from backend.services.run_plan_template import prerun_profile
+    steps = [{"Block": "Block-1", "Phase": "Drying", "Start T (°C)": 25, "Target T (°C)": 100, "Ramp (°C/h)": 25, "Hold (h)": 1,
+              "Gas flow (NLPH)": 10},
+             {"Block": "Block-1", "Phase": "Reduction", "Target T (°C)": 100, "Hold (h)": 2, "Gas flow (NLPH)": 20},
+             {"Block": "Block-1", "Phase": "Drying", "Target T (°C)": 50, "Ramp (°C/h)": 50, "Hold (h)": 0, "Gas flow (NLPH)": 30}]
+    b = prerun_profile(steps, axis="Gas flow (NLPH)")["blocks"][0]
+    assert b["total_h"] == 7.0
+    assert b["temperature"]["Drying"][3] is None                      # gap while reducing
+    assert b["right"][3:5] == [[4.0, 10], [4.0, 20]]                   # flow changes at the step start

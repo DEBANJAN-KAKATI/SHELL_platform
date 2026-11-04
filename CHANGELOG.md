@@ -1,3 +1,11 @@
+## 6.7.0 (2026-11-04) — Run Plan: Pre-run tab
+- New **Pre-run** tab on the Run Plan page (after DOE): the DOE Step 0 steps with the columns of the Run Plan up to
+  Remarks (Step, Block, Start/End date, Phase with its chart colour, Gas, Start/Target T, Ramp, Hold, Pressure,
+  Pressure change, Remarks), block totals and the feed cut-in hour, and one chart per block — temperature coloured by
+  phase and the pressure (or the gas / liquid flow chosen in the template) dashed on the right axis against time.
+- The profile is computed from the entered steps (`prerun_profile` in `run_plan_template.py`), so it does not depend on
+  the workbook's cached graph data. The Step 0 switch on the DOE tab is removed (the table moved to Pre-run).
+
 ## 6.6.4 (2026-11-04) — Blank pre-run template in DOE Step 0
 - `RunPlan_Template_Feed_SS.xlsx` is blank again in Step 0 (6.6.3 had an example program); Plan, Feed and DOE rows
   1-107 are exactly the uploaded template.

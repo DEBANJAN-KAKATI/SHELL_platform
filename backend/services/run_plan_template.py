@@ -156,7 +156,101 @@ def parse_doe(ws):
                 pre["rows"].append(dict(zip(pre["columns"], values)))
     if pre["totals"]:
         pre["total_h"] = pre["totals"][0]["value"] if len(pre["totals"]) == 1 else ""
+    if pre["rows"]:
+        pre["profile"] = prerun_profile(pre["rows"], *_chart_settings(rows[step0:]))
     return {"columns": columns, "rows": doe_rows, "pretreatment": pre, "planned": planned}
+
+
+# ---------------------------------------------------------------- Pre-run (DOE Step 0) profile for the charts
+PRERUN_PHASES = ["Drying", "Reduction", "Sulfiding", "Feed cut-in", "Other"]
+PRERUN_AXES = ["Pressure (barg)", "Gas flow (NLPH)", "Liquid flow (g/h)"]
+BLOCK_LABELS = {"Block-1": "Block-1 (R1–R4)", "Block-2": "Block-2 (R5–R8)"}
+
+
+def _chart_settings(rows):
+    """Phase names (rows "Phase 1".."Phase 5", value in column E) and the chosen right axis ("Chart right axis")."""
+    phases, axis = list(PRERUN_PHASES), PRERUN_AXES[0]
+    for r in rows:
+        label = _label(r[0]).lower() if r else ""
+        value = _label(r[4]) if r and len(r) > 4 else ""
+        m = re.fullmatch(r"phase ([1-5])", label)
+        if m and value:
+            phases[int(m.group(1)) - 1] = value
+        elif label == "chart right axis" and value:
+            axis = value
+    return phases, axis
+
+
+def _pick(row, *names):
+    """Value of the first column whose name starts with one of the names (headers carry units, e.g. 'Hold (h)')."""
+    for name in names:
+        for key, value in row.items():
+            if key.lower().startswith(name.lower()):
+                return value
+    return ""
+
+
+def prerun_profile(steps, phases=None, axis=None):
+    """Temperature and right-axis profile per block, 3 points per step (start, end of ramp, end of hold).
+
+    Computed from the entered values like the template's graph data: ramp time = |target - start| / ramp, step time =
+    ramp time + hold, steps of a block follow each other. The pressure changes linearly over 'Pressure change (h)'
+    (blank = at the start of the step); gas / liquid flows change at the start of the step. Temperature points are
+    grouped by phase; None breaks a line where the phase changes.
+    """
+    phases = list(phases or PRERUN_PHASES)
+    axis = axis if axis in PRERUN_AXES else PRERUN_AXES[0]
+    blocks, order = {}, []
+    for step in steps:
+        block = _label(_pick(step, "Block")) or "All"
+        phase = _label(_pick(step, "Phase")) or _label(_pick(step, "Gas")) or "Other"
+        if phase not in phases:
+            phases.append(phase)
+        b = blocks.get(block)
+        if b is None:
+            b = blocks[block] = {"block": block, "label": BLOCK_LABELS.get(block, block), "t": 0.0, "last_T": None,
+                                 "last_right": None, "points": [], "right": [], "feed_cut_in_h": None}
+            order.append(block)
+        t0, t1 = number(_pick(step, "Start T")), number(_pick(step, "Target T"))
+        hold = number(_pick(step, "Hold")) or 0.0
+        if t0 is None:
+            t0 = b["last_T"] if b["last_T"] is not None else t1
+        if t1 is None:
+            t1 = t0
+        if t0 is None and not hold:
+            continue                                   # nothing to draw
+        ramp = number(_pick(step, "Ramp ("))
+        ramp_h = abs(t1 - t0) / ramp if t0 is not None and t1 != t0 and ramp and ramp > 0 else 0.0
+        start, end = b["t"], b["t"] + ramp_h + hold
+        if phase == phases[3] and b["feed_cut_in_h"] is None:
+            b["feed_cut_in_h"] = round(start, 4)
+        b["points"].append((phase, [(start, t0), (start + ramp_h, t1), (end, t1)]))
+        column = {"Pressure (barg)": "Pressure (", "Gas flow (NLPH)": "Gas flow", "Liquid flow (g/h)": "Liquid flow"}[axis]
+        value = number(_pick(step, column))
+        if value is not None:
+            change = number(_pick(step, "Pressure change")) if axis == PRERUN_AXES[0] else 0.0
+            change = min(max(change or 0.0, 0.0), end - start)
+            before = b["last_right"] if b["last_right"] is not None else value
+            b["right"] += [(start, before), (start + change, value), (end, value)]
+            b["last_right"] = value
+        b["t"], b["last_T"] = end, t1
+    out = []
+    for name in order:
+        b = blocks[name]
+        series = {}
+        for phase in phases:
+            line, prev_in = [], False
+            for ph, pts in b["points"]:
+                if ph == phase:
+                    line += [[round(x, 4), y] for x, y in pts]
+                elif prev_in:
+                    line.append(None)                  # break the line between separate parts of a phase
+                prev_in = ph == phase
+            if any(p for p in line):
+                series[phase] = line[:-1] if line and line[-1] is None else line
+        out.append({"block": name, "label": b["label"], "total_h": round(b["t"], 4), "feed_cut_in_h": b["feed_cut_in_h"],
+                    "temperature": series, "right": [[round(x, 4), y] for x, y in b["right"]]})
+    return {"phases": phases, "right_axis": axis, "blocks": out}
 
 
 # ---------------------------------------------------------------- Feed
