@@ -108,8 +108,8 @@ def test_mass_balance_plan_in_the_template():
     assert {r["component"]: r["value"] for r in gas["rows"]}["Argon"] == 5
 
 
-def test_step0_pretreatment_with_profile_and_charts():
-    """DOE Step 0 (drying, reduction, feed cut-in): phases, per-block times and dates, graph data and two charts."""
+def test_step0_prerun_with_profile_and_charts():
+    """DOE Step 0 pre-run (drying, reduction, feed cut-in): per-block times and dates, graph data and two charts."""
     import openpyxl
     path = FIXTURES / "run_plan" / "RunPlan_Isomerisation_Rheinland.xlsx"
     pre = process_run_plan_file(str(path))["doe"]["pretreatment"]
@@ -119,14 +119,20 @@ def test_step0_pretreatment_with_profile_and_charts():
     assert [r["Phase"] for r in b1] == ["Drying"] * 3 + ["Reduction"] * 5 + ["Feed cut-in"]
     assert b1[-1]["Start (h)"] == 23.3 and b1[-1]["Start (date, time)"] == "2026-09-04 14:00:00"   # feed cut-in = condition 1
     assert all(r["Check"] == "OK" for r in pre["rows"])
-    wb = openpyxl.load_workbook(path, data_only=True)
-    ws = wb["DOE"]
-    assert ws["E138"].value.strftime("%Y-%m-%d %H:%M") == "2026-09-03 14:42"                     # Block-1 start
-    # Block-1 profile: (time, temperature) and (pressure time, pressure) of the drying & reduction graph
-    temps = [(ws[f"F{r}"].value, ws[f"E{r}"].value) for r in range(151, 178)]
+    ws = openpyxl.load_workbook(path, data_only=True)["DOE"]
+    assert ws["E148"].value.strftime("%Y-%m-%d %H:%M") == "2026-09-03 14:42"                     # Block-1 pre-run start
+    assert ws["E159"].value == "Pressure (barg)"                                                   # chart right axis
+    temps = [(ws[f"G{r}"].value, ws[f"E{r}"].value) for r in range(170, 197)]                     # Block-1 time, temperature
     assert temps[3:6] == [(2, 25), (7.5, 300), (9.5, 300)]
-    press = [(ws[f"L{r}"].value, ws[f"M{r}"].value) for r in range(151, 178)]
+    press = [(ws[f"M{r}"].value, ws[f"N{r}"].value) for r in range(170, 197)]                     # Block-1 right axis
     assert (15.5, 5) in press and (22.3, 25) in press and (14.5, 1) in press
     assert len(openpyxl.load_workbook(path)["DOE"]._charts) == 2
-    empty = process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_Template_Feed_SS.xlsx"))
-    assert len(empty["doe"]["pretreatment"]["rows"]) == 18                                        # example program
+
+
+def test_blank_template_has_an_empty_prerun_and_untouched_plan_and_feed():
+    import openpyxl
+    path = FIXTURES / "run_plan" / "RunPlan_Template_Feed_SS.xlsx"
+    ws = openpyxl.load_workbook(path)["DOE"]
+    assert ws["A108"].value.startswith("Step 0") and ws["B110"].value is None and ws["H110"].value is None
+    assert len(ws._charts) == 2
+    assert process_run_plan_file(str(path))["doe"]["pretreatment"]["rows"] == []

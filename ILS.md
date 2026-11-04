@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.6.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.6.4). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
@@ -100,17 +100,17 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   space velocity is filled; Start/End (date, time) → `Start Date`/`End Date`; Catalyst column added from Plan. Row 9
   planned hours/run end → `doe.planned`; Step 0 table → `doe.pretreatment` (shown behind a switch, default hidden;
   `totals` = every "… total (h)" row, e.g. one per block).
-- DOE Step 0 (v6.6.3, pre-run: drying, reduction, feed cut-in), all on the DOE sheet: steps rows 110-129 (A..S: Step,
-  Block, Start/End date (calc), Phase Drying|Reduction|Sulfiding|Feed cut-in|Other, Gas, Start T, Target T, Ramp °C/h,
-  Hold h, Gas flow, Pressure, Remarks, Pressure change h (blank = at step start, else linear), Ramp time, Step time,
-  Start h, End h (per block, SUMIF), Check); totals rows 130/131; settings rows 133-141 (Block-1 col E, Block-2 col H:
-  feed cut-in = DOE C11/C59, hours to the 'Feed cut-in' step, pretreatment start, program time/end); graph data rows
-  151-210 (3 points per step; per block F-M / N-U: time, 5 phase temperatures, pressure time, pressure; #N/A = gap) and
-  two charts (temperature by phase + pressure vs time) at W108 / W132. Built by `scripts/run_plan_examples/
-  add_pretreatment_doe.py`; template with an example program: `tests/fixtures/run_plan/RunPlan_Template_Feed_SS.xlsx`.
-  The dashboard reads the step table unchanged; plotting the profile in the dashboard is still open. Filled examples: `RunPlan_Isomerisation_Rheinland.xlsx`;
-  `RunPlan_MassBalance_SS.xlsx` (R08 mass balance: R1/R5/R6, LHSV + GoR (Nl/ml) basis, feed gas = Ar 5 % + mixed gas
-  in tbl_gas, extra Liq sheet kept but not read; built by `scripts/run_plan_examples/fill_template_mass_balance.py`).
+- DOE Step 0 pre-run (v6.6.4; drying, reduction, sulfiding, feed cut-in …), blank in the template, all on the DOE sheet:
+  steps rows 110-139 (A..T: Step, Block, Start/End date (calc), Phase, Gas, Start T (default = previous target of the
+  block), Target T, Ramp °C/h, Hold h, Pressure, Pressure change h (blank = at step start, else linear), Remarks, Gas flow
+  NLPH, Liquid flow g/h, Ramp time, Step time, Start h, End h (per block, SUMIF), Check); totals rows 140/141 (read by the
+  dashboard as before); settings rows 143-151 (Block-1 col E, Block-2 col H: feed cut-in = DOE C11/C59, hours to the
+  phase-4 step, pre-run start, program time/end); chart settings 153-159 (5 renamable phase names E154:E158 = Phase
+  drop-down + legend, right axis E159 Pressure / Gas flow / Liquid flow); graph data rows 170-259 (3 points per step;
+  per block G-N / O-V: time, 5 phase temperatures, right-axis time, value; #N/A = gap); charts at X108 / X133.
+  Built by `scripts/run_plan_examples/prerun_doe.py` (blank, or `doe` to convert an old Step 0 table). Plan, Feed and DOE
+  rows 1-107 are not touched. Template: `tests/fixtures/run_plan/RunPlan_Template_Feed_SS.xlsx`; filled test file:
+  `RunPlan_Isomerisation_Rheinland.xlsx`. Plotting the profile in the dashboard is still open.
 - Feed: Excel tables tbl_Feed (A1:F13 properties: label A, unit D, value E, note G), tbl_comp (A14:F45 liquid, Total row),
   tbl_compType (H14:K22), tbl_gas (M14:P31) + "Gas feed settings" (A46:E48) → `feed.tables`; flat `feed.rows` start
   with Carbon, Hydrogen, Molecular Weight (consumers read Carbon = row 1, MW = row 3), then other properties and filled

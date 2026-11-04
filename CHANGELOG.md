@@ -1,3 +1,12 @@
+## 6.6.4 (2026-11-04) — Blank pre-run template in DOE Step 0
+- `RunPlan_Template_Feed_SS.xlsx` is blank again in Step 0 (6.6.3 had an example program); Plan, Feed and DOE rows
+  1-107 are exactly the uploaded template.
+- Step 0 pre-run made practical for any experiment: 30 step rows, gas flow and liquid flow columns, phase names that
+  can be renamed (drop-down + chart legend), chart right axis selectable (pressure, gas flow or liquid flow), start T
+  defaults to the previous target of the block (overwrite turns orange).
+- Script `scripts/run_plan_examples/prerun_doe.py` replaces `add_pretreatment_doe.py`; the Rheinland test file was
+  converted with it (Block-1 24.3 h, Block-2 35.6 h).
+
 ## 6.6.3 (2026-11-04) — Run Plan template: pre-run (drying & reduction) in DOE Step 0
 - Template only (no dashboard change): the DOE "Step 0" section now holds the whole pre-run, as in the
   "Drying & Reduction" sheets of the screening workbook — one row per step and block with Phase (Drying, Reduction,
