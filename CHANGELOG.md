@@ -1,3 +1,48 @@
+## 6.7.0 (2026-11-04) — Run Plan: Pre-run tab
+- New **Pre-run** tab on the Run Plan page (after DOE): the DOE Step 0 steps with the columns of the Run Plan up to
+  Remarks (Step, Block, Start/End date, Phase with its chart colour, Gas, Start/Target T, Ramp, Hold, Pressure,
+  Pressure change, Remarks), block totals and the feed cut-in hour, and one chart per block — temperature coloured by
+  phase and the pressure (or the gas / liquid flow chosen in the template) dashed on the right axis against time.
+- The profile is computed from the entered steps (`prerun_profile` in `run_plan_template.py`), so it does not depend on
+  the workbook's cached graph data. The Step 0 switch on the DOE tab is removed (the table moved to Pre-run).
+
+## 6.6.4 (2026-11-04) — Blank pre-run template in DOE Step 0
+- `RunPlan_Template_Feed_SS.xlsx` is blank again in Step 0 (6.6.3 had an example program); Plan, Feed and DOE rows
+  1-107 are exactly the uploaded template.
+- Step 0 pre-run made practical for any experiment: 30 step rows, gas flow and liquid flow columns, phase names that
+  can be renamed (drop-down + chart legend), chart right axis selectable (pressure, gas flow or liquid flow), start T
+  defaults to the previous target of the block (overwrite turns orange).
+- Script `scripts/run_plan_examples/prerun_doe.py` replaces `add_pretreatment_doe.py`; the Rheinland test file was
+  converted with it (Block-1 24.3 h, Block-2 35.6 h).
+
+## 6.6.3 (2026-11-04) — Run Plan template: pre-run (drying & reduction) in DOE Step 0
+- Template only (no dashboard change): the DOE "Step 0" section now holds the whole pre-run, as in the
+  "Drying & Reduction" sheets of the screening workbook — one row per step and block with Phase (Drying, Reduction,
+  Sulfiding, Feed cut-in, Other), gas, start/target temperature, ramp, hold, gas flow, pressure and pressure-change time;
+  calculated ramp/step time, start/end hours per block, start/end dates counted back from the feed cut-in (= start of
+  DOE condition 1 of the block) and a Check column; settings per block; graph data and one chart per block
+  (temperature coloured by phase + pressure on the right axis vs time, like the drying & reduction graph).
+- `tests/fixtures/run_plan/RunPlan_Template_Feed_SS.xlsx` (template, example program in both blocks) and the
+  Rheinland plan updated (Block-1 isomerisation catalyst 24.3 h, Block-2 SLD 35.6 h). The dashboard still reads the
+  Step 0 table (18 steps, both totals).
+
+## 6.6.2 (2026-11-04) — Mass balance plan in the universal template
+- `tests/fixtures/run_plan/RunPlan_MassBalance_SS.xlsx`: the R08 mass balance plan (`RunPlan_MassBalance_R08.xlsx`)
+  in the universal template, built by `scripts/run_plan_examples/fill_template_mass_balance.py` and recalculated.
+  Plan: R1 Ni2CBV-3014, R5 Ni5CBV-3014, R6 Cu5CBV500 (role Catalyst, others Not used), LHSV basis and GoR (Nl/ml);
+  DOE: Block-1 200 °C (76.5 h), Block-2 250 °C (66.5 h), 5 barg, LHSV 0.198, GoR 2.6 / 5.3, measured gas flows in the
+  remarks; Feed: diesel properties (no component analysis), feed gas = Ar 5 mol% + 0.95 × mixed gas, the remainder of
+  the not-normalised mixed-gas analysis as "Other (gas)"; the Liq sheet (samples, ZMB liquid reps) is kept as an
+  extra sheet. No Step 0 in the source plan.
+- Run Plan page: a feed table without values shows "no values" instead of a red "0 wt% · check"; the Step 0 total
+  badge is hidden when there is no total.
+
+## 6.6.1 (2026-11-04) — Rheinland isomerisation plan in the universal template
+- `tests/fixtures/run_plan/RunPlan_Isomerisation_Rheinland.xlsx`: the Rheinland catalyst screening plan copied into the
+  universal template (Plan, 11 conditions per block, 18 Step 0 steps, Feed in the four tables; recalculated values
+  identical to the source plan). Step 0 extended to 20 rows with a total per block.
+- DOE Step 0: every total row is read (e.g. "Block-1 total (h)", "Block-2 total (h)") and shown on the DOE tab.
+
 ## 6.6.0 (2026-11-02) — One universal dashboard, universal Run Plan template
 - **No process selection any more.** The Isomerization / Reforming / Mass Balance selector and the Mass Balance pages
   (ZMB, Mass Balance calculation) are removed; every page works in the Isomerization format for now (calculation table

@@ -5,10 +5,9 @@ let feedRows = [];
 let planData = { objective: '', rows: [] };
 let doeData = { columns: [], rows: [] };
 let summary = null;
-// Universal Run Plan template: Feed as 4 tables (properties, liquid, group-type, gas) and the DOE Step 0 table.
+// Universal Run Plan template: Feed as 4 tables (properties, liquid, group-type, gas); DOE Step 0 on the Pre-run tab.
 let feedTables = null;
 let feedShowEmpty = false;
-let doeShowPretreat = false;
 
 const showError = (m = '') => {
     const el = $('#runPlanError');
@@ -78,7 +77,7 @@ const fmtAmount = v => {
 const TYPE_CLASS = { 'n-p': 'np', 'i-p': 'ip', 'n': 'n', 'a': 'a', 'o': 'o', 'ol': 'o' };
 
 function checkBadge(check, total, unit) {
-    if (!hasValue(total)) return '<span class="rp-badge muted">no values</span>';
+    if (!hasValue(total) || Number(total) === 0) return '<span class="rp-badge muted">no values</span>';
     const ok = String(check).toUpperCase() === 'OK';
     return `<span class="rp-badge ${ok ? 'ok' : 'warn'}">${fmtAmount(total)} ${esc(unit)} · ${ok ? 'OK' : esc(check || 'check')}</span>`;
 }
@@ -247,35 +246,116 @@ function updateDoeImportStatus() {
     }
 }
 
-function renderPretreatment() {
-    const pre = doeData.pretreatment || {};
+function renderDoePlanned() {
     const planned = doeData.planned || {};
     const parts = [];
     if (hasValue(planned.block_1_h)) parts.push(`Planned hours: Block-1 ${fmtAmount(planned.block_1_h)} h`);
     if (hasValue(planned.block_2_h)) parts.push(`Block-2 ${fmtAmount(planned.block_2_h)} h`);
     if (hasValue(planned.run_end)) parts.push(`Run end ${esc(planned.run_end)}`);
-    const steps = (pre.rows || []).length;
-    if ($('#doeBar')) $('#doeBar').hidden = !parts.length && !(pre.columns || []).length;
+    if ($('#doeBar')) $('#doeBar').hidden = !parts.length;
     if ($('#doePlanned')) $('#doePlanned').textContent = parts.join(' · ');
-    if ($('#doePretreatWrap')) {
-        $('#doePretreatWrap').hidden = !(pre.columns || []).length;
-        $('#doePretreatWrap').lastChild.textContent = ` Show Step 0 – Pretreatment / activation (${steps} step${steps === 1 ? '' : 's'})`;
+}
+
+// ---------------------------------------------------------------- Pre-run tab (DOE Step 0)
+const PRERUN_COLOURS = ['#5B9BD5', '#ED7D31', '#FFC000', '#A5A5A5', '#70AD47', '#8E6FB5', '#2E9C9C', '#C05050'];
+let prerunCharts = [];
+
+const prerunColour = (phases, phase) => PRERUN_COLOURS[Math.max(0, (phases || []).indexOf(phase)) % PRERUN_COLOURS.length];
+
+function prerunCell(column, value, phases) {
+    if (value === '' || value === null || value === undefined) return '<span class="rp-dash">–</span>';
+    if (/^phase$/i.test(column)) {
+        return `<span class="rp-phase"><i style="background:${prerunColour(phases, value)}"></i>${esc(value)}</span>`;
     }
-    if ($('#doeShowPretreat')) $('#doeShowPretreat').checked = doeShowPretreat;
-    const section = $('#doePretreat');
-    if (!section) return;
-    section.hidden = !doeShowPretreat || !(pre.columns || []).length;
-    if (section.hidden) return;
-    if ($('#doePretreatTitle')) $('#doePretreatTitle').textContent = pre.title || 'Step 0 – Pretreatment / activation';
-    if ($('#doePretreatTotal')) $('#doePretreatTotal').textContent = hasValue(pre.total_h) ? `Total ${fmtAmount(pre.total_h)} h` : '';
-    $('#doePretreatHead').innerHTML = (pre.columns || []).map(c => `<th>${esc(c)}</th>`).join('');
-    $('#doePretreatBody').innerHTML = (pre.rows || []).map(r => `<tr>${pre.columns.map(c => `<td>${esc(fmt(r[c]))}</td>`).join('')}</tr>`).join('');
-    if ($('#doePretreatEmpty')) $('#doePretreatEmpty').style.display = steps ? 'none' : 'block';
+    if (/date, time/i.test(column)) return esc(String(value).replace(/:00$/, ''));
+    return esc(fmt(value));
+}
+
+function renderPrerun() {
+    const pre = doeData.pretreatment || {};
+    const profile = pre.profile || null;
+    const phases = profile?.phases || [];
+    const rows = pre.rows || [];
+    // columns as in the Run Plan up to Remarks
+    const all = pre.columns || [];
+    const stop = all.findIndex(c => /^remarks/i.test(c));
+    const cols = stop >= 0 ? all.slice(0, stop + 1) : all;
+
+    if ($('#prerunTitle')) $('#prerunTitle').textContent = pre.title ? pre.title.replace(/^step 0\s*[–-]\s*/i, '') : 'Pre-run';
+    const totals = (pre.totals || []).filter(t => hasValue(t.value));
+    if ($('#prerunTotals')) {
+        $('#prerunTotals').innerHTML = totals.map(t =>
+            `<span class="rp-badge">${esc(String(t.label).replace(/\s*total\s*\(h\)\s*$/i, ''))}: ${fmtAmount(t.value)} h</span>`).join('');
+    }
+    if ($('#prerunSummary')) {
+        $('#prerunSummary').textContent = !all.length
+            ? (summary ? 'This Run Plan has no pre-run (DOE Step 0) table.' : 'Load a Run Plan Excel file to view the pre-run.')
+            : `${rows.length} step${rows.length === 1 ? '' : 's'}`
+              + (profile?.blocks?.length ? ` · ${profile.blocks.map(b => `${b.label}: feed cut-in at ${fmtAmount(b.feed_cut_in_h ?? b.total_h)} h`).join(' · ')}` : '');
+    }
+    $('#prerunHead').innerHTML = cols.map(c => `<th>${esc(c)}</th>`).join('');
+    $('#prerunBody').innerHTML = rows.map(r => `<tr>${cols.map(c =>
+        `<td class="${/^remarks/i.test(c) ? 'rp-remarks' : ''}">${prerunCell(c, r[c], phases)}</td>`).join('')}</tr>`).join('');
+    if ($('#prerunEmpty')) $('#prerunEmpty').style.display = rows.length ? 'none' : 'block';
+    drawPrerunCharts(profile);
+}
+
+function drawPrerunCharts(profile) {
+    prerunCharts.forEach(c => c.destroy());
+    prerunCharts = [];
+    const box = $('#prerunCharts');
+    if (!box) return;
+    const blocks = profile?.blocks || [];
+    box.innerHTML = blocks.map((b, i) => `
+        <section class="rp-card rp-prerun-chart">
+            <header><div><div class="eyebrow">PRE-RUN PROFILE</div><h4>${esc(b.label)} <small>${fmtAmount(b.total_h)} h</small></h4></div></header>
+            <div class="rp-chart-box"><canvas id="prerunChart${i}"></canvas></div>
+        </section>`).join('');
+    if (!blocks.length || typeof Chart === 'undefined') return;
+    const toXY = line => {
+        let lastX = 0;
+        return line.map(p => (p ? ((lastX = p[0]), { x: p[0], y: p[1] }) : { x: lastX, y: null }));
+    };
+    blocks.forEach((b, i) => {
+        const temps = b.temperature || {};
+        const order = [...(profile.phases || []).filter(ph => temps[ph]), ...Object.keys(temps).filter(ph => !(profile.phases || []).includes(ph))];
+        const datasets = order.map(phase => [phase, temps[phase]]).map(([phase, line]) => ({
+            label: phase, data: toXY(line), yAxisID: 'y', showLine: true, spanGaps: false,
+            borderColor: prerunColour(profile.phases, phase), backgroundColor: prerunColour(profile.phases, phase),
+            borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, tension: 0,
+        }));
+        if ((b.right || []).length) {
+            datasets.push({
+                label: profile.right_axis, data: toXY(b.right), yAxisID: 'y1', showLine: true,
+                borderColor: '#404040', backgroundColor: '#404040', borderDash: [6, 4], borderWidth: 1.8,
+                pointRadius: 0, pointHoverRadius: 4, tension: 0,
+            });
+        }
+        const ctx = document.getElementById(`prerunChart${i}`);
+        prerunCharts.push(new Chart(ctx, {
+            type: 'scatter',
+            data: { datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false, animation: false,
+                interaction: { mode: 'nearest', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 28 } },
+                    tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtAmount(c.parsed.y)} at ${fmtAmount(c.parsed.x)} h` } },
+                },
+                scales: {
+                    x: { type: 'linear', min: 0, title: { display: true, text: 'Time, hrs' } },
+                    y: { min: 0, title: { display: true, text: 'Temperature, °C' } },
+                    y1: { position: 'right', min: 0, grid: { drawOnChartArea: false }, display: (b.right || []).length > 0,
+                          title: { display: true, text: profile.right_axis } },
+                },
+            },
+        }));
+    });
 }
 
 function renderDoe() {
     updateDoeImportStatus();
-    renderPretreatment();
+    renderDoePlanned();
     const conditionFilter = $('#doeConditionFilter')?.value || '';
     const reactorFilter = $('#doeReactorFilter')?.value || '';
     const cols = doeData.columns || [];
@@ -332,10 +412,12 @@ function switchSubtab(name) {
     if ($('#feedPanel')) $('#feedPanel').hidden = name !== 'feed';
     if ($('#planPanel')) $('#planPanel').hidden = name !== 'plan';
     if ($('#doePanel')) $('#doePanel').hidden = name !== 'doe';
+    if ($('#prerunPanel')) $('#prerunPanel').hidden = name !== 'prerun';
 
     if (name === 'feed') renderFeed();
     else if (name === 'plan') renderPlan();
     else if (name === 'doe') renderDoe();
+    else if (name === 'prerun') renderPrerun();
 
     saveState();
 }
@@ -348,7 +430,6 @@ function saveState() {
             feedRows,
             feedTables,
             feedShowEmpty,
-            doeShowPretreat,
             planData,
             doeData,
             summary,
@@ -374,7 +455,6 @@ function restoreState() {
             if (Array.isArray(saved.feedRows)) feedRows = saved.feedRows;
             feedTables = saved.feedTables || null;
             feedShowEmpty = !!saved.feedShowEmpty;
-            doeShowPretreat = !!saved.doeShowPretreat;
             if (saved.planData) planData = saved.planData;
             if (saved.doeData) doeData = saved.doeData;
             updateConditionFilterOptions();
@@ -532,7 +612,6 @@ async function init() {
         $('#feedShowEmpty').checked = feedShowEmpty;
         $('#feedShowEmpty').onchange = () => { feedShowEmpty = $('#feedShowEmpty').checked; renderFeed(); saveState(); };
     }
-    if ($('#doeShowPretreat')) $('#doeShowPretreat').onchange = () => { doeShowPretreat = $('#doeShowPretreat').checked; renderPretreatment(); saveState(); };
 
     // Initial render
     switchSubtab(activeSubtab);

@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.6.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.7.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
@@ -98,7 +98,22 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - DOE: header row 10 (A..R: … H2 Flow, Naphtha/liquid Flow, N2 dilution, WHSV|LHSV, H2/Naphtha|GoR, Remarks, Duration,
   H2 flow NLPH, Total gas, Liquid flow if fed, Check); rows R1-R8 up to the "Step 0" title, kept only when T, P or
   space velocity is filled; Start/End (date, time) → `Start Date`/`End Date`; Catalyst column added from Plan. Row 9
-  planned hours/run end → `doe.planned`; Step 0 table → `doe.pretreatment` (shown behind a switch, default hidden).
+  planned hours/run end → `doe.planned`; Step 0 table → `doe.pretreatment` (`totals` = every "… total (h)" row, e.g.
+  one per block; `profile` = `prerun_profile()`: per block 3 points per step, temperature by phase with `None` gaps, right
+  axis (pressure with 'Pressure change (h)', or gas / liquid flow), `total_h`, `feed_cut_in_h`; phase names and right axis
+  from the template's Chart settings). Shown on the Run Plan **Pre-run** tab: columns up to Remarks + one Chart.js
+  chart per block (`renderPrerun` / `drawPrerunCharts` in run_plan.js).
+- DOE Step 0 pre-run (v6.6.4; drying, reduction, sulfiding, feed cut-in …), blank in the template, all on the DOE sheet:
+  steps rows 110-139 (A..T: Step, Block, Start/End date (calc), Phase, Gas, Start T (default = previous target of the
+  block), Target T, Ramp °C/h, Hold h, Pressure, Pressure change h (blank = at step start, else linear), Remarks, Gas flow
+  NLPH, Liquid flow g/h, Ramp time, Step time, Start h, End h (per block, SUMIF), Check); totals rows 140/141 (read by the
+  dashboard as before); settings rows 143-151 (Block-1 col E, Block-2 col H: feed cut-in = DOE C11/C59, hours to the
+  phase-4 step, pre-run start, program time/end); chart settings 153-159 (5 renamable phase names E154:E158 = Phase
+  drop-down + legend, right axis E159 Pressure / Gas flow / Liquid flow); graph data rows 170-259 (3 points per step;
+  per block G-N / O-V: time, 5 phase temperatures, right-axis time, value; #N/A = gap); charts at X108 / X133.
+  Built by `scripts/run_plan_examples/prerun_doe.py` (blank, or `doe` to convert an old Step 0 table). Plan, Feed and DOE
+  rows 1-107 are not touched. Template: `tests/fixtures/run_plan/RunPlan_Template_Feed_SS.xlsx`; filled test file:
+  `RunPlan_Isomerisation_Rheinland.xlsx`.
 - Feed: Excel tables tbl_Feed (A1:F13 properties: label A, unit D, value E, note G), tbl_comp (A14:F45 liquid, Total row),
   tbl_compType (H14:K22), tbl_gas (M14:P31) + "Gas feed settings" (A46:E48) → `feed.tables`; flat `feed.rows` start
   with Carbon, Hydrogen, Molecular Weight (consumers read Carbon = row 1, MW = row 3), then other properties and filled
