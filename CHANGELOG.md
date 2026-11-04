@@ -1,3 +1,21 @@
+## 6.6.0 (2026-11-02) — One universal dashboard, universal Run Plan template
+- **No process selection any more.** The Isomerization / Reforming / Mass Balance selector and the Mass Balance pages
+  (ZMB, Mass Balance calculation) are removed; every page works in the Isomerization format for now (calculation table
+  and import analysis will be generalised later). Reforming and Mass Balance backend code and tests stay in the repo,
+  unused (dormant); old links `/zmb`, `/mass-balance` open the standard pages.
+- **Universal Run Plan template** (`tests/fixtures/run_plan/RunPlan_Template.xlsx`), detected by the Plan "Reactor role"
+  row (`backend/services/run_plan_template.py`); older RunPlan.xlsx files still load with the fixed ranges.
+  - Plan: catalyst loading rows 8-22 (Reactor role, Catalyst, SCI, CISPRO, shape, volume, CBD, LOI, amount, zones,
+    loaded weight, remarks); Run ID, Start date, Lab notebook ref., Feed in the info; active reactors = role Catalyst/Inert.
+  - DOE: only conditions with an entered T / P / space velocity are shown (blank template conditions are skipped);
+    "Start (date, time)" / "End (date, time)" are returned as Start Date / End Date for the condition filters; planned
+    hours and run end shown above the table; **Step 0 – Pretreatment / activation** is hidden behind a switch.
+  - Feed: the four tables are shown separately — feed properties as tiles, Liquid components, Group-type summary and
+    Gas feed composition (with the gas feed settings) as cards with value bars, totals and a 100 % check; empty rows
+    hidden by default ("Show empty rows"). Carbon, Hydrogen and Molecular Weight stay the first feed rows, so the
+    Calculation table, Plots and Custom table read them as before.
+- Online Analysis no longer triggers Mass Balance recalculation; Data Integrity lists only the Isomerization sources.
+
 ## 6.5.3 (2026-10-30) — Mass Balance Run Plan in the RunPlan.xlsx format, aligned tables
 - Mass Balance Run Plan: the shared `RunPlan.xlsx` format (Plan, DOE, Feed) plus a **Liq** sheet is imported on the
   Run Plan page (a filled MassBal workbook still works). Plan: objective, catalyst loading, Run Start; DOE: T/P per

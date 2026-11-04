@@ -4,6 +4,7 @@ import math
 import pandas as pd
 
 from RunPlan import load_run_plan_data, read_excel_range
+from backend.services.run_plan_template import is_template, process_template
 
 
 def _clean_val(val):
@@ -41,6 +42,11 @@ def process_run_plan_file(file_path):
         raise FileNotFoundError(f"Selected RunPlan file does not exist: {file_path}")
     if path.suffix.lower() not in [".xlsx", ".xls"]:
         raise ValueError(f"Selected file must be an Excel spreadsheet (.xlsx or .xls), got {path.suffix}")
+
+    # The universal Run Plan template (Plan with "Reactor role", DOE with Step 0, Feed with 4 tables) has its own reader;
+    # older RunPlan.xlsx files keep the fixed ranges below.
+    if is_template(path):
+        return process_template(path)
 
     data = load_run_plan_data(str(path))
     df_plan = data["df_plan"]

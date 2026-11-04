@@ -1,3 +1,5 @@
+> **Dormant since v6.6 (2026-11-02):** the dashboard has no process selection any more. The Mass Balance backend code and tests stay in the repo for reuse; its pages/UI were removed.
+
 # Mass Balance process (v6.5)
 
 Third process next to Isomerization and Reforming. It reproduces the MassBal workbook

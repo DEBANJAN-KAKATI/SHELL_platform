@@ -7,11 +7,9 @@
     <title>Run Plan | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=5" defer></script>
-    <link href="/frontend/css/mass_balance.css?v=5" rel="stylesheet">
-    <script src="/frontend/js/run_plan.js?v=3" defer></script>
-    <script src="/frontend/js/mb_core.js?v=4" defer></script>
-    <script src="/frontend/js/mb_run_plan.js?v=5" defer></script>
+    <script src="/frontend/js/navigation.js?v=6" defer></script>
+    <link href="/frontend/css/run_plan.css?v=1" rel="stylesheet">
+    <script src="/frontend/js/run_plan.js?v=5" defer></script>
 </head>
 
 <body>
@@ -44,27 +42,10 @@
                 <div class="hero">
                     <div class="eyebrow">RUN PLAN WORKSPACE</div>
                     <h1>Import and review unit run plan.</h1>
-                    <p>Load an experimental Run Plan workbook (.xlsx) to configure Feed composition, Catalyst Loading, and Design of Experiments (DOE).</p>
+                    <p>Load the Run Plan workbook (.xlsx) — one template for every experiment: Feed (properties, liquid and gas composition), Catalyst Loading (Plan) and Design of Experiments (DOE).</p>
                 </div>
                 <div class="error" id="runPlanError"></div>
 
-                <!-- Mass Balance process: Plan / Liq / Gas (mb_run_plan.js) -->
-                <div id="mbRunPlan" hidden>
-                    <div class="card run-plan-source-row mb-source-card">
-                        <input class="input" id="mbRpPath" placeholder="Path to the Run Plan (.xlsx: Plan, DOE, Feed, Liq) or a filled MassBal workbook" type="text">
-                        <button class="btn secondary" id="mbRpBrowse" type="button">Browse</button>
-                        <button class="btn primary" id="mbRpLoad" type="button">Load Run Plan</button>
-                    </div>
-                    <div class="mb-import-summary" id="mbRpSummary">Load the Run Plan workbook (Plan, DOE, Feed and Liq sheets) or a filled MassBal workbook; everything can also be typed below.</div>
-                    <div class="kpis" id="mbRpKpis"></div>
-                    <div class="table-tabs mb-tabs" id="mbRpTabs" role="tablist">
-                        <button class="table-tab active" data-tab="plan" role="tab" type="button">Plan</button>
-                        <button class="table-tab" data-tab="liq" role="tab" type="button">Liq</button>
-                        <button class="table-tab" data-tab="gas" role="tab" type="button">Gas</button>
-                    </div>
-                    <div class="card mb-toolbar" id="mbRpSampleBar" hidden></div>
-                    <div id="mbRpView"></div>
-                </div>
 
                 <!-- File Selection Card -->
                 <div class="card run-plan-source-row">
@@ -92,15 +73,30 @@
                 <div class="card run-plan-panel" id="feedPanel">
                     <div class="card-head">
                         <div>
-                            <div class="eyebrow">RUN PLAN · FEED COMPOSITION</div>
-                            <h3>Synthetic Feed Analysis (df_feed)</h3>
+                            <div class="eyebrow">RUN PLAN · FEED</div>
+                            <h3>Feed composition</h3>
                         </div>
                         <div class="table-actions">
+                            <label class="rp-switch" id="feedShowEmptyWrap" hidden><input type="checkbox" id="feedShowEmpty"> Show empty rows</label>
                             <input class="input search" id="feedSearch" placeholder="Search feed components..." type="search">
                         </div>
                     </div>
                     <div class="filter-summary" id="feedSummary">Showing all feed components and properties</div>
-                    <div class="table-wrap">
+
+                    <!-- Universal template: properties + 4 tables (run_plan.js renderFeedTemplate) -->
+                    <div class="rp-feed" id="feedTemplate" hidden>
+                        <div class="rp-props" id="feedProps"></div>
+                        <div class="rp-feed-grid">
+                            <section class="rp-card rp-card-liquid" id="feedLiquid"></section>
+                            <div class="rp-feed-side">
+                                <section class="rp-card" id="feedGroups"></section>
+                                <section class="rp-card" id="feedGas"></section>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Older Run Plan files: one feed list -->
+                    <div class="table-wrap" id="feedLegacy">
                         <table class="runplan-table" id="feedTable">
                             <thead>
                                 <tr id="feedThead">
@@ -176,6 +172,10 @@
                             </div>
                         </div>
                     </div>
+                    <div class="filter-summary rp-doe-bar" id="doeBar" hidden>
+                        <span id="doePlanned"></span>
+                        <label class="rp-switch" id="doePretreatWrap"><input type="checkbox" id="doeShowPretreat"> Show Step 0 – Pretreatment / activation</label>
+                    </div>
                     <div class="filter-summary" id="doeImportStatus" role="status" aria-live="polite">No DOE data imported.</div>
                     <div class="filter-summary" id="doeSummary">Showing condition matrix</div>
                     <div class="table-wrap">
@@ -187,6 +187,19 @@
                         </table>
                         <div class="empty" id="doeEmpty">Load a Run Plan Excel file to view DOE conditions.</div>
                     </div>
+                    <section class="rp-pretreat" id="doePretreat" hidden>
+                        <div class="card-head">
+                            <div>
+                                <div class="eyebrow">DOE · STEP 0</div>
+                                <h3 id="doePretreatTitle">Pretreatment / activation</h3>
+                            </div>
+                            <span class="rp-badge" id="doePretreatTotal"></span>
+                        </div>
+                        <div class="table-wrap">
+                            <table class="runplan-table rp-pretreat-table"><thead><tr id="doePretreatHead"></tr></thead><tbody id="doePretreatBody"></tbody></table>
+                            <div class="empty" id="doePretreatEmpty">No pretreatment steps in this Run Plan.</div>
+                        </div>
+                    </section>
                 </div>
 
             </section>

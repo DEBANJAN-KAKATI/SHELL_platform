@@ -1,11 +1,12 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.5.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.6.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
-Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (v6.4, Reactor 1 only) and
-**Mass Balance** (v6.5, R1–R8 mass/carbon balance from the GC exports, see `MASS_BALANCE_PROGRESS.md`).
+**One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
+and the pages work in the Isomerization format for now (calculation table and import analysis to be generalised later).
+Reforming (v6.4) and Mass Balance (v6.5) code is **dormant**: backend packages and tests stay, their UI is removed.
 
 ## Run / stack
 - Python 3, Flask 3, pandas 2, olefile + xlrd (legacy `.XLS` read via the OLE `Workbook`/`Book` stream), openpyxl.
@@ -61,7 +62,7 @@ Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (
 Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
 (`index.html`), Online (`online_analysis.html`) → Calculation: Calculation table, Custom table → Data Integrity
 (`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
-Mass Balance uses the same tabs (Offline Analysis → ZMB, Calculation table → `mb_calculation.html`).
+No process selector; `/zmb` and `/mass-balance` redirect to Offline Analysis / Calculation table.
 
 ## API
 - `/api`: `health`, `settings`, `run-number` (GET/POST), `browse-folder`, `process` (DHA folder),
@@ -87,6 +88,23 @@ snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number o
 new version. History stores runs in `Historian/Run_<n>.sqlite` and compares tables between runs.
 Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 
+## Run Plan (universal template, v6.6) — `backend/services/run_plan_template.py`
+- Detected by the Plan row "Reactor role"; otherwise the older fixed ranges (Plan A2:B2, A4:J14; DOE header row 10;
+  Feed A2:E25) in `RunPlan.py` / `run_plan_service.py` are used. Example: `tests/fixtures/run_plan/RunPlan_Template.xlsx`
+  (empty) and `RunPlan_Template_Filled.xlsx` (recalculated with LibreOffice so formula values exist).
+- Plan: B1 Run ID, H1 Start date, B2 Objective, B3 Lab notebook ref., B4 Feed; Catalyst Loading Plan rows after the
+  "Reactor" row (7) until the blank row (8-22: Reactor role Catalyst/Inert/Not used, Catalyst, …, Loaded catalyst
+  weight, remarks). Active reactors = role Catalyst or Inert. Flow calculation basis / reactor flow basis are not shown.
+- DOE: header row 10 (A..R: … H2 Flow, Naphtha/liquid Flow, N2 dilution, WHSV|LHSV, H2/Naphtha|GoR, Remarks, Duration,
+  H2 flow NLPH, Total gas, Liquid flow if fed, Check); rows R1-R8 up to the "Step 0" title, kept only when T, P or
+  space velocity is filled; Start/End (date, time) → `Start Date`/`End Date`; Catalyst column added from Plan. Row 9
+  planned hours/run end → `doe.planned`; Step 0 table → `doe.pretreatment` (shown behind a switch, default hidden).
+- Feed: Excel tables tbl_Feed (A1:F13 properties: label A, unit D, value E, note G), tbl_comp (A14:F45 liquid, Total row),
+  tbl_compType (H14:K22), tbl_gas (M14:P31) + "Gas feed settings" (A46:E48) → `feed.tables`; flat `feed.rows` start
+  with Carbon, Hydrogen, Molecular Weight (consumers read Carbon = row 1, MW = row 3), then other properties and filled
+  components. Totals checked to 100 ± 0.5.
+- Open item: condition assignment (Calculation table, Plots) matches DOE dates only, not per block/reactor.
+
 ## Isomerization calculations
 - Online tags: temperatures `10i1TIC02` (R1–4) / `10i2TIC02` (R5–8), pressures `10i1PIC01` / `10i2PIC01`,
   N2 flows `10i1FIC01..04` (R1–4) / `10i2FIC01..04` (R5–8), feed `01i14FIC01..08`, `01i14FI01`, GC `ESTD_H2`,
@@ -105,7 +123,7 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   cell lineage inspector, CSV and JSON template import/export.
 - Data Integrity: per Run/Condition/Reactor/Parameter stats and MAD-based outlier flags; never modifies data.
 
-## Reforming (v6.4) — details in `REFORMING_PROGRESS.md`
+## Reforming (v6.4, dormant since v6.6) — details in `REFORMING_PROGRESS.md`
 - Process selector after Run Number on the shared Run Plan page; switching clears the loaded Run Plan and stays on
   `run_plan.html`. The process is never inferred from the workbook.
 - **Unified Run Plan** (2026-10-28): both processes use one `RunPlan.xlsx` format — `Plan` (objective, R1–R8 Catalyst
@@ -128,7 +146,7 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%
   (Reactor1 sheet) not done; History / Summary Dashboard plan tables assume R1–R8 columns.
 
-## Mass Balance (v6.5) — details in `MASS_BALANCE_PROGRESS.md`
+## Mass Balance (v6.5, dormant since v6.6: frontend removed, backend + tests kept) — `MASS_BALANCE_PROGRESS.md`
 - `window.ILSProcess` values `isomerization | reforming | massbalance`. Same main tabs for every process; for
   massbalance: Run Plan → Plan/Liq/Gas (`mb_run_plan.js`), Analysis → ZMB (`zmb.html`, replaces Offline) + Online
   Analysis (run export), Calculation table → `mb_calculation.html` (R#_MB / C-Balance / Summary). `mb_core.js` keeps
@@ -149,8 +167,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   Reactors with GC but 01i14FIC0r = 0 in the window get `ERROR: no gas feed …`. Tables use fixed column widths.
 
 ## Working conventions seen in this codebase
-- Keep isomerization behaviour unchanged when adding reforming work; gate reforming code on
-  `window.ILSProcess` / `process === 'reforming'`.
+- One dashboard for every experiment (v6.6): no process gates in new code. `window.ILSProcess` is fixed to
+  'isomerization' only to keep the dormant reforming checks off.
 - Make previous versions recoverable (versioned folders, `backups/<date>_<topic>/`); record changes in
   `CHANGELOG.md`, `README.md` and, for reforming, `REFORMING_PROGRESS.md`.
 - Errors are shown explicitly in tables rather than silently replaced with zero.

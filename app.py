@@ -125,14 +125,17 @@ def create_app(test_config=None):
     def plots_view():
         return send_from_directory(BASE / "frontend", "plots.html")
 
+    # Pages of the retired process selection (v6.5): old bookmarks open the standard pages.
     @app.get("/mass-balance")
     @app.get("/mass_balance")
+    @app.get("/frontend/mb_calculation.html")
     def mass_balance_view():
-        return send_from_directory(BASE / "frontend", "mb_calculation.html")
+        return redirect("/frontend/calculation_table.html")
 
     @app.get("/zmb")
+    @app.get("/frontend/zmb.html")
     def zmb_view():
-        return send_from_directory(BASE / "frontend", "zmb.html")
+        return redirect("/frontend/index.html")
 
     @app.get("/history")
     def history_view():
