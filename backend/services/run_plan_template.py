@@ -134,7 +134,7 @@ def parse_doe(ws):
         if r and _label(r[0]).lower().startswith("planned hours"):
             planned = {"block_1_h": clean(r[2]) if len(r) > 2 else "", "block_2_h": clean(r[4]) if len(r) > 4 else "",
                        "run_end": clean(r[6]) if len(r) > 6 else ""}
-    pre = {"title": "", "columns": [], "rows": [], "total_h": ""}
+    pre = {"title": "", "columns": [], "rows": [], "total_h": "", "totals": []}
     if step0 < len(rows):
         pre["title"] = _label(rows[step0][0])
         head = rows[step0 + 1] if step0 + 1 < len(rows) else []
@@ -144,13 +144,18 @@ def parse_doe(ws):
             if not r:
                 continue
             tail = [clean(v) for v in r[:width + 2]]
-            if any(str(v).lower().startswith("total") for v in tail if isinstance(v, str)):
-                pre["total_h"] = next((v for v in tail if isinstance(v, (int, float))), "")
+            label = next((v for v in tail if isinstance(v, str) and "total" in v.lower()), None)
+            if label:                    # "Total (h)", or one total per block ("Block-1 total (h)", "Block-2 total (h)")
+                pre["totals"].append({"label": label, "value": next((v for v in tail if isinstance(v, (int, float))), "")})
+                continue
+            if pre["totals"]:
                 break
             values = tail[:width]
             # a step counts when anything besides its number is filled in
             if any(v != "" for v in values[1:]):
                 pre["rows"].append(dict(zip(pre["columns"], values)))
+    if pre["totals"]:
+        pre["total_h"] = pre["totals"][0]["value"] if len(pre["totals"]) == 1 else ""
     return {"columns": columns, "rows": doe_rows, "pretreatment": pre, "planned": planned}
 
 

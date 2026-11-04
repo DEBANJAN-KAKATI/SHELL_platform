@@ -1,3 +1,9 @@
+## 6.6.1 (2026-11-04) — Rheinland isomerisation plan in the universal template
+- `tests/fixtures/run_plan/RunPlan_Isomerisation_Rheinland.xlsx`: the Rheinland catalyst screening plan copied into the
+  universal template (Plan, 11 conditions per block, 18 Step 0 steps, Feed in the four tables; recalculated values
+  identical to the source plan). Step 0 extended to 20 rows with a total per block.
+- DOE Step 0: every total row is read (e.g. "Block-1 total (h)", "Block-2 total (h)") and shown on the DOE tab.
+
 ## 6.6.0 (2026-11-02) — One universal dashboard, universal Run Plan template
 - **No process selection any more.** The Isomerization / Reforming / Mass Balance selector and the Mass Balance pages
   (ZMB, Mass Balance calculation) are removed; every page works in the Isomerization format for now (calculation table

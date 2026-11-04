@@ -267,7 +267,12 @@ function renderPretreatment() {
     section.hidden = !doeShowPretreat || !(pre.columns || []).length;
     if (section.hidden) return;
     if ($('#doePretreatTitle')) $('#doePretreatTitle').textContent = pre.title || 'Step 0 – Pretreatment / activation';
-    if ($('#doePretreatTotal')) $('#doePretreatTotal').textContent = hasValue(pre.total_h) ? `Total ${fmtAmount(pre.total_h)} h` : '';
+    if ($('#doePretreatTotal')) {
+        const totals = (pre.totals || []).filter(t => hasValue(t.value));
+        $('#doePretreatTotal').textContent = totals.length
+            ? totals.map(t => `${String(t.label).replace(/\s*\(h\)\s*$/i, '')}: ${fmtAmount(t.value)} h`).join(' · ')
+            : (hasValue(pre.total_h) ? `Total ${fmtAmount(pre.total_h)} h` : '');
+    }
     $('#doePretreatHead').innerHTML = (pre.columns || []).map(c => `<th>${esc(c)}</th>`).join('');
     $('#doePretreatBody').innerHTML = (pre.rows || []).map(r => `<tr>${pre.columns.map(c => `<td>${esc(fmt(r[c]))}</td>`).join('')}</tr>`).join('');
     if ($('#doePretreatEmpty')) $('#doePretreatEmpty').style.display = steps ? 'none' : 'block';

@@ -72,3 +72,18 @@ def test_old_format_still_uses_the_fixed_ranges():
     out = process_run_plan_file(str(OLD_FORMAT))
     assert "tables" not in out["feed"] and out["summary"]["active_reactors"] == ["R1", "R5", "R6"]
     assert out["feed"]["rows"][0]["component"] == "Carbon"
+
+
+def test_rheinland_isomerisation_plan_in_the_template():
+    """The Rheinland screening plan copied into the template: 11 conditions per block, 18 Step 0 steps, two totals."""
+    out = process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_Isomerisation_Rheinland.xlsx"))
+    doe = out["doe"]
+    assert doe["count"] == 88 and out["summary"]["condition_count"] == 22
+    assert doe["planned"] == {"block_1_h": 528, "block_2_h": 528, "run_end": "2026-09-26 14:00:00"}
+    assert all(r["Check"] == "OK" for r in doe["rows"])
+    pre = doe["pretreatment"]
+    assert len(pre["rows"]) == 18 and [t["value"] for t in pre["totals"]] == [24.3, 35.6]
+    tables = out["feed"]["tables"]
+    assert (tables["liquid"]["check"], tables["groups"]["check"], tables["gas"]["check"]) == ("OK", "OK", "OK")
+    assert [(r["component"], r["value"]) for r in out["feed"]["rows"][:3]] == [("Carbon", 83.6), ("Hydrogen", 16.4), ("Molecular Weight", 89)]
+    assert out["summary"]["active_reactors"] == [f"R{k}" for k in range(1, 9)]

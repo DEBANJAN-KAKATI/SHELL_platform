@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.6.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.6.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
@@ -98,7 +98,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - DOE: header row 10 (A..R: … H2 Flow, Naphtha/liquid Flow, N2 dilution, WHSV|LHSV, H2/Naphtha|GoR, Remarks, Duration,
   H2 flow NLPH, Total gas, Liquid flow if fed, Check); rows R1-R8 up to the "Step 0" title, kept only when T, P or
   space velocity is filled; Start/End (date, time) → `Start Date`/`End Date`; Catalyst column added from Plan. Row 9
-  planned hours/run end → `doe.planned`; Step 0 table → `doe.pretreatment` (shown behind a switch, default hidden).
+  planned hours/run end → `doe.planned`; Step 0 table → `doe.pretreatment` (shown behind a switch, default hidden;
+  `totals` = every "… total (h)" row, e.g. one per block). Filled example: `RunPlan_Isomerisation_Rheinland.xlsx`.
 - Feed: Excel tables tbl_Feed (A1:F13 properties: label A, unit D, value E, note G), tbl_comp (A14:F45 liquid, Total row),
   tbl_compType (H14:K22), tbl_gas (M14:P31) + "Gas feed settings" (A46:E48) → `feed.tables`; flat `feed.rows` start
   with Carbon, Hydrogen, Molecular Weight (consumers read Carbon = row 1, MW = row 3), then other properties and filled
