@@ -87,3 +87,22 @@ def test_rheinland_isomerisation_plan_in_the_template():
     assert (tables["liquid"]["check"], tables["groups"]["check"], tables["gas"]["check"]) == ("OK", "OK", "OK")
     assert [(r["component"], r["value"]) for r in out["feed"]["rows"][:3]] == [("Carbon", 83.6), ("Hydrogen", 16.4), ("Molecular Weight", 89)]
     assert out["summary"]["active_reactors"] == [f"R{k}" for k in range(1, 9)]
+
+
+def test_mass_balance_plan_in_the_template():
+    """The R08 mass balance plan in the template: R1/R5/R6, GoR (Nl/ml) basis, Ar + mixed gas, Liq sheet kept."""
+    out = process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_MassBalance_SS.xlsx"))
+    s = out["summary"]
+    assert s["format"] == "template" and s["active_reactors"] == ["R1", "R5", "R6"]
+    assert s["condition_count"] == 2 and s["pretreatment_steps"] == 0
+    rows = {r["Reactor ID"]: r for r in out["doe"]["rows"]}
+    assert rows["R1"]["Temperature (°C)"] == 200 and rows["R5"]["Temperature (°C)"] == 250
+    assert rows["R1"]["Check"] == "OK" and rows["R6"]["Catalyst"] == "Cu5CBV500"
+    assert abs(rows["R1"]["Liquid flow if fed (gms/h)"] - 0.499) < 0.001
+    assert rows["R1"]["H2 Flow (gms/h)"] == "n/a"                # GoR basis: no H2/HC flow
+    assert out["doe"]["planned"]["block_1_h"] == 76.5 and out["doe"]["planned"]["block_2_h"] == 66.5
+    feed = out["feed"]["rows"]
+    assert [r["value"] for r in feed[:3]] == [85.2, 13.4, 160]
+    gas = out["feed"]["tables"]["gas"]
+    assert gas["check"] == "OK" and abs(gas["total"] - 100) < 0.01
+    assert {r["component"]: r["value"] for r in gas["rows"]}["Argon"] == 5

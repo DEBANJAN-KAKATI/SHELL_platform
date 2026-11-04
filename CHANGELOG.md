@@ -1,3 +1,14 @@
+## 6.6.2 (2026-11-04) — Mass balance plan in the universal template
+- `tests/fixtures/run_plan/RunPlan_MassBalance_SS.xlsx`: the R08 mass balance plan (`RunPlan_MassBalance_R08.xlsx`)
+  in the universal template, built by `scripts/run_plan_examples/fill_template_mass_balance.py` and recalculated.
+  Plan: R1 Ni2CBV-3014, R5 Ni5CBV-3014, R6 Cu5CBV500 (role Catalyst, others Not used), LHSV basis and GoR (Nl/ml);
+  DOE: Block-1 200 °C (76.5 h), Block-2 250 °C (66.5 h), 5 barg, LHSV 0.198, GoR 2.6 / 5.3, measured gas flows in the
+  remarks; Feed: diesel properties (no component analysis), feed gas = Ar 5 mol% + 0.95 × mixed gas, the remainder of
+  the not-normalised mixed-gas analysis as "Other (gas)"; the Liq sheet (samples, ZMB liquid reps) is kept as an
+  extra sheet. No Step 0 in the source plan.
+- Run Plan page: a feed table without values shows "no values" instead of a red "0 wt% · check"; the Step 0 total
+  badge is hidden when there is no total.
+
 ## 6.6.1 (2026-11-04) — Rheinland isomerisation plan in the universal template
 - `tests/fixtures/run_plan/RunPlan_Isomerisation_Rheinland.xlsx`: the Rheinland catalyst screening plan copied into the
   universal template (Plan, 11 conditions per block, 18 Step 0 steps, Feed in the four tables; recalculated values

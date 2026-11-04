@@ -78,7 +78,7 @@ const fmtAmount = v => {
 const TYPE_CLASS = { 'n-p': 'np', 'i-p': 'ip', 'n': 'n', 'a': 'a', 'o': 'o', 'ol': 'o' };
 
 function checkBadge(check, total, unit) {
-    if (!hasValue(total)) return '<span class="rp-badge muted">no values</span>';
+    if (!hasValue(total) || Number(total) === 0) return '<span class="rp-badge muted">no values</span>';
     const ok = String(check).toUpperCase() === 'OK';
     return `<span class="rp-badge ${ok ? 'ok' : 'warn'}">${fmtAmount(total)} ${esc(unit)} · ${ok ? 'OK' : esc(check || 'check')}</span>`;
 }
@@ -272,6 +272,7 @@ function renderPretreatment() {
         $('#doePretreatTotal').textContent = totals.length
             ? totals.map(t => `${String(t.label).replace(/\s*\(h\)\s*$/i, '')}: ${fmtAmount(t.value)} h`).join(' · ')
             : (hasValue(pre.total_h) ? `Total ${fmtAmount(pre.total_h)} h` : '');
+        $('#doePretreatTotal').hidden = !$('#doePretreatTotal').textContent;
     }
     $('#doePretreatHead').innerHTML = (pre.columns || []).map(c => `<th>${esc(c)}</th>`).join('');
     $('#doePretreatBody').innerHTML = (pre.rows || []).map(r => `<tr>${pre.columns.map(c => `<td>${esc(fmt(r[c]))}</td>`).join('')}</tr>`).join('');
