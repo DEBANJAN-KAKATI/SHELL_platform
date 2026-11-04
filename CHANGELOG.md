@@ -1,3 +1,14 @@
+## 6.6.3 (2026-11-04) — Run Plan template: pre-run (drying & reduction) in DOE Step 0
+- Template only (no dashboard change): the DOE "Step 0" section now holds the whole pre-run, as in the
+  "Drying & Reduction" sheets of the screening workbook — one row per step and block with Phase (Drying, Reduction,
+  Sulfiding, Feed cut-in, Other), gas, start/target temperature, ramp, hold, gas flow, pressure and pressure-change time;
+  calculated ramp/step time, start/end hours per block, start/end dates counted back from the feed cut-in (= start of
+  DOE condition 1 of the block) and a Check column; settings per block; graph data and one chart per block
+  (temperature coloured by phase + pressure on the right axis vs time, like the drying & reduction graph).
+- `tests/fixtures/run_plan/RunPlan_Template_Feed_SS.xlsx` (template, example program in both blocks) and the
+  Rheinland plan updated (Block-1 isomerisation catalyst 24.3 h, Block-2 SLD 35.6 h). The dashboard still reads the
+  Step 0 table (18 steps, both totals).
+
 ## 6.6.2 (2026-11-04) — Mass balance plan in the universal template
 - `tests/fixtures/run_plan/RunPlan_MassBalance_SS.xlsx`: the R08 mass balance plan (`RunPlan_MassBalance_R08.xlsx`)
   in the universal template, built by `scripts/run_plan_examples/fill_template_mass_balance.py` and recalculated.
