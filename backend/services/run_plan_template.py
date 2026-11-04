@@ -156,6 +156,8 @@ def parse_doe(ws):
                 pre["rows"].append(dict(zip(pre["columns"], values)))
     if pre["totals"]:
         pre["total_h"] = pre["totals"][0]["value"] if len(pre["totals"]) == 1 else ""
+    if step0 < len(rows):
+        pre["settings"] = _prerun_settings(rows[step0:])
     if pre["rows"]:
         pre["profile"] = prerun_profile(pre["rows"], *_chart_settings(rows[step0:]))
     return {"columns": columns, "rows": doe_rows, "pretreatment": pre, "planned": planned}
@@ -165,6 +167,20 @@ def parse_doe(ws):
 PRERUN_PHASES = ["Drying", "Reduction", "Sulfiding", "Feed cut-in", "Other"]
 PRERUN_AXES = ["Pressure (barg)", "Gas flow (NLPH)", "Liquid flow (g/h)"]
 BLOCK_LABELS = {"Block-1": "Block-1 (R1–R4)", "Block-2": "Block-2 (R5–R8)"}
+
+
+PRERUN_SETTINGS = ("program name", "feed cut-in (date, time)", "start to feed cut-in (h)", "pre-run start (date, time)",
+                   "program time (h)", "program end (date, time)")
+
+
+def _prerun_settings(rows):
+    """Pre-run settings per block (label in column A, Block-1 value in E, Block-2 value in H)."""
+    out = {}
+    for r in rows:
+        label = _label(r[0]) if r else ""
+        if label.lower() in PRERUN_SETTINGS:
+            out[label] = {"Block-1": clean(r[4]) if len(r) > 4 else "", "Block-2": clean(r[7]) if len(r) > 7 else ""}
+    return out
 
 
 def _chart_settings(rows):
@@ -366,6 +382,15 @@ def process_template(path):
                              "value": plan["feed_mw"] if plan["feed_mw"] != "" else props.get("molecular weight")})
 
     roles = next((r for r in plan["rows"] if r["parameter"].lower() == "reactor role"), None)
+    # Feed Cut-In (time zero of TOS, e.g. for Reforming): pre-run feed cut-in of the block of the first active reactor,
+    # else the start of the first DOE condition of that block.
+    first = next((f"R{k}" for k in range(1, 9) if roles and str(roles.get(f"r{k}", "")).strip().lower() in ("catalyst", "inert")), "R1")
+    block = "Block-1" if int(first[1:]) <= 4 else "Block-2"
+    cut_in = (doe["pretreatment"].get("settings", {}).get("Feed cut-in (date, time)", {}) or {}).get(block, "")
+    if cut_in in ("", None):
+        cut_in = next((r.get("Start Date", "") for r in doe["rows"] if r.get("Block") == block and r.get("Start Date")), "")
+    if cut_in not in ("", None) and not any(i["parameter"].lower() == "feed cut-in" for i in plan["info"]):
+        plan["info"].append({"parameter": "Feed Cut-In", "units": "", "value": cut_in})
     catalysts = next((r for r in plan["rows"] if r["parameter"].lower() == "catalyst"), {})
     for row in doe["rows"]:                     # DOE has no Catalyst column any more: take it from the Plan
         reactor = str(row.get("Reactor ID", "")).strip()

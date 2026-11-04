@@ -1,3 +1,10 @@
+## 6.7.1 (2026-11-04) — Feed Cut-In from the pre-run; 6.4.1 update package
+- Template Run Plans now give the Plan info "Feed Cut-In" (TOS zero): the pre-run feed cut-in of the first active
+  reactor's block, else the start of its first DOE condition; `doe.pretreatment.settings` holds the pre-run settings
+  per block (program name, feed cut-in, pre-run start, program time / end).
+- `upgrade/6.4.1_run_plan/`: step-by-step guide, checker and git patch to bring the new Run Plan (Feed in 4 tables,
+  Pre-run tab with charts, launcher fix) to an offline 6.4.0 dashboard with the process selection kept.
+
 ## 6.7.0 (2026-11-04) — Run Plan: Pre-run tab
 - New **Pre-run** tab on the Run Plan page (after DOE): the DOE Step 0 steps with the columns of the Run Plan up to
   Remarks (Step, Block, Start/End date, Phase with its chart colour, Gas, Start/Target T, Ramp, Hold, Pressure,
