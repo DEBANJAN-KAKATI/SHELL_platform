@@ -24,8 +24,9 @@
   condition with a gas flow at this time"). Molar volume fixed at 22.414 Nl/mol (0 °C).
 
 ## Unreleased — 6.4.3 update package
-- `upgrade/6.4.3_online_gas_feed/`: guide, checker and patch that bring 6.8.1–6.8.2 (gas feed for GC exports without
-  flows, Etylene, earlier Run Plan gas block) to the offline 6.4.2 dashboard with the process selection kept.
+- `upgrade/6.4.3_online_gas_feed/`: guide, implementation plan, checker and patch that bring 6.8.1–6.8.3 (gas feed from
+  the Run Plan DOE for GC exports without flows, Ar only from the Run Plan, Etylene, earlier Run Plan gas block) to the
+  offline 6.4.2 dashboard with the process selection kept.
 
 ## Unreleased — 6.4.2 update package
 - `upgrade/6.4.2_online_units/`: step-by-step guide (with the formulas and workbook cells), checker and git patch that

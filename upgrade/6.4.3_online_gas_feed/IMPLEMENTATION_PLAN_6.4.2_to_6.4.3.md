@@ -1,57 +1,42 @@
-# Implementation plan — remove the "no gas feed to Rr (01i14FIC0r = empty)" errors (6.4.2 → 6.4.3)
+# Implementation plan 6.4.2 → 6.4.3 — Online Analysis units from the export and the Run Plan
 
-## 1. The problem (from the screenshot)
+Removes the errors `ERROR: no gas feed to Rr (01i14FIC0r = empty)` and the Ar input fields of the Conversion basis
+block. Code blocks are the tested patch (`-` removed, `+` added). Fastest route: copy `files/` and go to Phase 6.
 
-| What you see | Cause |
+## What 6.4.3 does
+
+| Problem in 6.4.2 (your screenshots) | 6.4.3 |
 |---|---|
-| Every line: `ERROR: no gas feed to R1 (01i14FIC01 = empty)` | The GC export (e.g. `R3-C2-S1_9-06-23.txt`) has the GC columns but **no gas flow columns** (`01i14FIC01…08`, `01i14FI01`). 6.4.2 only takes the gas feed from the export line. |
-| No **Ethylene** column in the table | The GC method writes `ESTD_Etylene`; 6.4.2 does not know that name. |
-| Mass flows need Ar in the feed gas, but the Run Plan's gas is not read | Run Plans of the earlier template keep the gas in a "Gas composition (mol%)" block; 6.4.2 reads only the template's `tbl_gas`. |
-| First line `ERROR: no reactor (bypass …)` | Correct — `Sampled_reactor = 0` (bypass). This one stays. |
+| Every line `ERROR: no gas feed to Rr (01i14FIC0r = empty)` — the GC export has no gas flow columns | The gas feed of a line comes from the export line, else from the **Run Plan DOE**: the gas flow of the condition running for that reactor at that time (`Total gas (Nl/h)`, older Run Plans `Gas Flow (NmL/h)`) |
+| Ar mol% / wt% had to be typed in the Conversion basis block | **Removed.** Ar in the feed gas comes **only from the Run Plan** (Feed → Gas feed composition, Argon mol%) |
+| `Etylene – no MW (lumped peak)`, no Ethylene column | `ESTD_Etylene` is read as **Ethylene** |
+| The R6 Run Plan's gas is not read | The "Gas composition (mol%)" block of the earlier template layout is read as the Gas feed composition |
+| — | Without `01i14FI01` the Ar flow is `FIC_r/1000 / 22.414 × Ar mol%/100 × 39.948` (moles of Ar × MW_Ar; agrees with the workbook's `01i14FI01 × FIC_r/ΣFIC × w_Ar` within 1 %) |
+| — | New column **Flow source** (`export`, `Run Plan DOE`, `…, 01i14FI01` / `…, molar volume`) |
+| — | The Conversion basis block is **read-only**; it opens in red and says what is missing in the Run Plan |
 
-## 2. The solution in one picture
+Formulas (unchanged): `m_i = y_i·MW_i/(y_Ar·39.948)·F_Ar,r`, `V_out = FIC_r/1000 · y_Ar,feed/y_Ar`, `V_i = y_i/100 · V_out`,
+`C_i = 12.011·nC_i/MW_i·m_i`; MWs = experimental standards of the MassBal workbook.
 
-```
-gas feed of a GC line  =  export line (01i14FIC0r, 01i14FI01)          ← as before
-                       →  else values typed per reactor (R1–R8 NmL/h)   ← like the workbook's Gas!B11:I11 (+ E5)
-                       →  else Run Plan DOE flow of the running condition
-argon to reactor r     =  01i14FI01 · FIC_r/ΣFIC · w_Ar                 (when 01i14FI01 and Ar wt% are known — workbook)
-                       =  FIC_r/1000 / 22.414 · Ar mol%/100 · 39.948     (otherwise — moles of Ar × MW_Ar)
-mass flow m_i          =  y_i · MW_i / (y_Ar · 39.948) · F_Ar,r         (unchanged)
-```
+## What the Run Plan must contain
 
-Result with `R3-C2-S1_9-06-23.txt`, Ar 5 mol% and 3000 NmL/h per reactor: **44 lines calculated, 2 ERROR**
-(bypass + empty GC line); Flow source "entered, molar volume".
-
-## 3. Before you start (10 min)
-
-1. Close the dashboard; back up the folder (`ILS_App\backups\<date>_before_6.4.3\`).
-2. Your version must be **6.4.2** (`VERSION` file, menu bar shows v6.4.2).
-3. Fastest route: copy `files/` of `ILS_6.4.3_Online_gas_feed_update.zip` over the folder (or
-   `git apply --binary --whitespace=nowarn ILS_6.4.2_to_6.4.3.patch`) and go to **Phase 6**. Use Phases 1–5 when you
-   implement by hand or have changed these files yourself. `-` lines are removed, `+` lines added.
+| For | Run Plan entry |
+|---|---|
+| Ar in feed gas | Feed → Gas feed composition: **Argon mol%** (use the **verified** value, e.g. 4.3 mol% as the MassBal workbook's Gas!I35; the target 5 mol% gives 16.8 % higher flows) and the mixed-gas components |
+| Gas feed when the GC export has no flow columns | DOE: per condition the **start date**, the **duration** (or end) and the gas flow ("Total gas (Nl/h)", from LHSV and GoR) for every reactor. A condition without an end counts until the next one; without a start date it is not used |
+| TOS zero | DOE condition 1 start (Feed Cut-In) |
+| *not needed* | Liquid feed C / H / MW — comes later with the liquid product data |
 
 ---
 
-## Phase 1 — Backend: the conversion (`backend/services/online_units.py`)
-
-**Goal:** find the gas feed of each line in the order export → entered → Run Plan DOE, calculate the Ar flow from the
-volume when there is no `01i14FI01`, read `Etylene` as Ethylene, and report what is missing.
-
-Steps:
-1. Module docstring: describe the two Ar routes and the three flow sources.
-2. Add `ALIASES = {"Etylene": "Ethylene"}` and `MOLAR_VOLUME = 22.414` (Nl/mol at 0 °C — the normal litre of NmL/h).
-3. Replace `_flows()` by `_line_flows()` (returns `None` when the export line has no `FIC_r`), add `doe_gas_flows()`
-   (DOE rows → reactor, start, end, NmL/h; template "Total gas (Nl/h)" × 1000, older "Gas Flow (NmL/h)") and
-   `_doe_flow()` (condition running at that time, start ≤ t < end; open end = until the next one).
-4. `convert_online_rows(...)` gets the arguments `gas_feed`, `total_feed_g_h`, `molar_volume`, `doe_rows`:
-   * Ar check: mass/carbon need Ar mol% **or** wt%; volume needs Ar mol%;
-   * components: map aliases; a component can come from `ESTD_Etylene` or `ESTD_Ethylene`;
-   * per line: flow source export → entered → DOE; status `ERROR: no gas feed for Rr (not in the export) – enter it
-     under Conversion basis` when none; Ar route 1 or 2; new column **Flow source**;
-   * mass/carbon extras: "Gas feed to reactor [NmL/h]";
-   * `basis`: `molar_volume`, `export_has_flows`, `entered_flows`, `doe_flows`, `flow_sources`, `flows_missing`,
-     `flows_needed`, `argon_missing` (the page uses them to open the Conversion basis block).
+## Phase 1 — `backend/services/online_units.py` (conversion)
+1. Docstring: Ar from the Run Plan; gas feed from the export, else the Run Plan DOE.
+2. `ALIASES = {"Etylene": "Ethylene"}`, `MOLAR_VOLUME = 22.414`.
+3. `_flows()` → `_line_flows()` (None when the export line has no FIC_r); new `doe_gas_flows()` and `_doe_flow()`.
+4. `convert_online_rows(rows, unit, feed_gas, feed_cut_in, doe_rows, ar_mol_pct=None, ar_wt_pct=None)` — the two
+   `ar_…` arguments are for scripts/tests only; the page does not send them. Per line: export → Run Plan DOE; Ar route
+   with `01i14FI01` (workbook) or from the volume; column "Flow source"; Run-Plan error messages;
+   `basis.flows_missing / flows_needed / argon_missing / flow_sources / doe_flows / export_has_flows`.
 
 ```diff
 --- a/backend/services/online_units.py
@@ -61,8 +46,8 @@ Steps:
  * Gas feed to reactor r   F_r [g/h]   = 01i14FI01 · V_r / ΣV            (Gas!B12; V = 01i14FIC01..08 [NmL/h])
  * Argon to reactor r      F_Ar,r      = F_r · w_Ar / 100                (Gas!G20; w_Ar = Ar wt% of the feed gas, Gas!I37)
 +                          without 01i14FI01: F_Ar,r = V_r/1000 / Vm · y_Ar,feed/100 · 39.948 (Vm = 22.414 Nl/mol)
-+  V_r / 01i14FI01 come from the export line, else from the values entered per reactor (Gas!B11:I11, Gas!E5),
-+  else from the Run Plan DOE condition running at that time ("Total gas (Nl/h)" / "Gas Flow (NmL/h)").
++  V_r / 01i14FI01 come from the export line, else from the Run Plan DOE condition running at that time
++  ("Total gas (Nl/h)" / "Gas Flow (NmL/h)"). Ar in the feed gas comes from the Run Plan (Feed → Gas feed composition).
  * Mass flow               m_i [g/h]   = y_i·MW_i / (y_Ar·MW_Ar) · F_Ar,r (R#_MB rows 52-80)
  * Volumetric flow         V_i [Nl/h]  = y_i/100 · V_out,  V_out = V_r/1000 · y_Ar,feed / y_Ar   (R#_MB rows 86-116)
  * Carbon flow             C_i [g C/h] = 12.011 · nC_i / MW_i · m_i       (R#_MB rows 121-150, "TOS Carbon of Each Molecule")
@@ -77,7 +62,7 @@ Steps:
  """
  from datetime import datetime
  
-@@ -108,68 +111,137 @@ def feed_argon(feed_gas):
+@@ -108,68 +111,131 @@ def feed_argon(feed_gas):
      return {"ar_mol_pct": ar_mol, "ar_wt_pct": wt, "excluded": excluded}
  
  
@@ -137,14 +122,15 @@ Steps:
 +    return hits[-1] if hits else None
 +
 +
-+def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=None, feed_cut_in=None,
-+                        gas_feed=None, total_feed_g_h=None, molar_volume=None, doe_rows=None):
++def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=None, ar_mol_pct=None, ar_wt_pct=None):
 +    """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, flows) in the chosen unit.
  
 -def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=None, feed_cut_in=None):
 -    """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, 01i14FI01, 01i14FIC0r) in the chosen unit."""
-+    Gas feed of a line, in this order: the export line (01i14FIC0r, 01i14FI01) → the values entered per reactor
-+    (`gas_feed` {"R1": NmL/h, ...}, `total_feed_g_h` = 01i14FI01) → the Run Plan DOE condition running at that time.
++    Everything comes from the export and the Run Plan: Ar in the feed gas from `feed_gas` (Run Plan Feed → Gas feed
++    composition), the gas feed of a line from the export line (01i14FIC0r, 01i14FI01), else from the Run Plan DOE
++    condition running at that time (`doe_rows`). `ar_mol_pct` / `ar_wt_pct` override the feed gas for scripts and tests
++    only (the page does not send them).
 +    Argon to the reactor: with 01i14FI01 and the Ar wt% as in the workbook (F_r · w_Ar); without 01i14FI01 from the
 +    volume: FIC_r/1000 / molar volume · y_Ar,feed/100 · 39.948 (the same quantity: n_Ar · MW_Ar).
 +    """
@@ -154,29 +140,24 @@ Steps:
      feed = feed_argon(feed_gas)
      ar_mol = _num(ar_mol_pct) if _num(ar_mol_pct) else feed["ar_mol_pct"]
      ar_wt = _num(ar_wt_pct) if _num(ar_wt_pct) else feed["ar_wt_pct"]
-+    vm = _num(molar_volume) or MOLAR_VOLUME
-+    entered = {}
-+    for key, value in (gas_feed or {}).items():
-+        reactor = reactor_number(key)
-+        if reactor and _num(value) is not None:
-+            entered[reactor] = _num(value)
-+    entered_total = _num(total_feed_g_h)
++    vm = MOLAR_VOLUME
 +    doe = doe_gas_flows(doe_rows)
 +    has_tags = any(_num(r.get(f"01i14FIC0{k}")) is not None or _num(r.get(f"02i2FIC0{k}")) is not None
 +                   for r in rows or [] for k in range(1, 9))
      basis = {"unit": unit, "label": UNITS[unit]["label"], "ar_feed_mol_pct": ar_mol, "ar_feed_wt_pct": ar_wt,
-              "ar_source": "entered" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
+-             "ar_source": "entered" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
 -             "excluded_feed_gas": feed["excluded"]}
++             "ar_source": "override" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
 +             "excluded_feed_gas": feed["excluded"], "molar_volume": vm, "export_has_flows": has_tags,
-+             "entered_flows": {f"R{k}": v for k, v in sorted(entered.items())}, "entered_total_g_h": entered_total,
 +             "doe_flows": len(doe)}
      missing = None
 -    if unit in ("mass", "carbon") and not ar_wt:
 -        missing = "ERROR: Ar wt% of the feed gas is not set (Run Plan Feed → Gas feed composition, or enter it)"
      if unit == "volume" and not ar_mol:
-         missing = "ERROR: Ar mol% of the feed gas is not set (Run Plan Feed → Gas feed composition, or enter it)"
+-        missing = "ERROR: Ar mol% of the feed gas is not set (Run Plan Feed → Gas feed composition, or enter it)"
++        missing = "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
 +    if unit in ("mass", "carbon") and not ar_mol and not ar_wt:
-+        missing = "ERROR: Ar in the feed gas is not set (Run Plan Feed → Gas feed composition, or enter mol% / wt%)"
++        missing = "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
  
      present = []
      for row in rows or []:
@@ -234,7 +215,7 @@ Steps:
              status = "ERROR: no GC values in this line"
          elif missing:
              status = missing
-@@ -178,19 +250,38 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
+@@ -178,19 +244,36 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
          elif not y_ar or y_ar <= 0:
              status = "ERROR: no argon peak (ESTD_Argon) – argon is the internal standard"
          else:
@@ -247,20 +228,18 @@ Steps:
 +            if flow is not None:
 +                fi01, v_r, v_sum = flow
 +                source = "export"
-+            elif reactor in entered:
-+                fi01, v_r, v_sum = entered_total, entered[reactor], sum(v for v in entered.values() if v > 0)
-+                source = "entered"
 +            else:
 +                v_r = _doe_flow(doe, reactor, when)
 +                fi01, source = None, "Run Plan DOE"
 +                v_sum = sum(v for v in (_doe_flow(doe, k, when) for k in range(1, 9)) if v and v > 0) if v_r else 0
 +            flow = (fi01, v_r, v_sum, source)
 +            if v_r is None:
-+                status = f"ERROR: no gas feed for R{reactor} (not in the export) – enter it under Conversion basis"
++                status = (f"ERROR: no gas feed for R{reactor} – not in the export and no Run Plan DOE condition "
++                          f"with a gas flow at this time")
 +            elif v_r <= 0 or not v_sum:
 +                status = f"ERROR: no gas feed to R{reactor} ({source}: {v_r:g} NmL/h)"
 +            elif unit != "volume" and not (fi01 and fi01 > 0 and ar_wt) and not ar_mol:
-+                status = "ERROR: no total gas feed 01i14FI01 and no Ar mol% – enter Ar mol% (or 01i14FI01 and Ar wt%)"
++                status = "ERROR: no Argon mol% in the Run Plan feed gas (needed without 01i14FI01)"
          if status != "OK":
              out["Status"] = status
              out_rows.append(out)
@@ -281,7 +260,7 @@ Steps:
          v_out = v_r / 1000 * ar_mol / y_ar if ar_mol else None
          problems, total = [], 0.0
          for n in names:
-@@ -216,17 +307,25 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
+@@ -216,17 +299,25 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
              out[f"{n} [{suffix}]"] = result
              total += result
          if unit == "mass":
@@ -305,46 +284,35 @@ Steps:
      ok = sum(1 for r in out_rows if r["Status"] == "OK")
 +    flows_missing = any(r["Status"].startswith("ERROR: no gas feed for R") for r in out_rows)
 +    basis["flows_missing"] = flows_missing
-+    # The export has no flows and nothing was entered / found in the DOE: the gas feed is needed as well
-+    basis["flows_needed"] = not has_tags and not entered and not doe
++    # The export has no flows and the Run Plan DOE has no gas flows: the gas feed is missing
++    basis["flows_needed"] = not has_tags and not doe
 +    basis["argon_missing"] = bool(missing)
      return {"unit": unit, "label": UNITS[unit]["label"], "columns": columns, "rows": out_rows, "basis": basis,
              "components": components, "ok_count": ok, "error_count": len(out_rows) - ok}
 ```
 
-**Check after Phase 1** (in the dashboard folder):
-```
-python -c "from backend.services.online_analysis_service import process_online_file as p; from backend.services.online_units import convert_online_rows as c; r=p('tests/fixtures/online/R3-C2-S1_9-06-23.txt')['rows']; o=c(r,'mass',ar_mol_pct=5,gas_feed={f'R{k}':3000 for k in range(1,9)}); print(o['ok_count'], o['error_count'])"
-```
-→ `44 2`
+**Check:** `python -m pytest -q tests/test_online_units.py` (after Phase 6 step 2) → all pass.
 
-## Phase 2 — Backend: endpoint (`backend/routes/api.py`)
-
-**Goal:** pass the new inputs from the page to the conversion.
+## Phase 2 — `backend/routes/api.py` (endpoint)
+`/api/online-units` passes `feed_gas`, `feed_cut_in`, `doe_rows` (no typed values).
 
 ```diff
 --- a/backend/routes/api.py
 +++ b/backend/routes/api.py
-@@ -175,7 +175,9 @@ def online_units():
+@@ -175,7 +175,7 @@ def online_units():
      try:
          return jsonify(convert_online_rows(
              body.get("rows") or [], body.get("unit"), feed_gas=body.get("feed_gas"),
 -            ar_mol_pct=body.get("ar_mol_pct"), ar_wt_pct=body.get("ar_wt_pct"), feed_cut_in=body.get("feed_cut_in")))
-+            ar_mol_pct=body.get("ar_mol_pct"), ar_wt_pct=body.get("ar_wt_pct"), feed_cut_in=body.get("feed_cut_in"),
-+            gas_feed=body.get("gas_feed"), total_feed_g_h=body.get("total_feed_g_h"),
-+            molar_volume=body.get("molar_volume"), doe_rows=body.get("doe_rows")))
++            feed_cut_in=body.get("feed_cut_in"), doe_rows=body.get("doe_rows")))
      except Exception as e:
          return jsonify({"error": str(e)}), 400
  
 ```
 
-## Phase 3 — Backend: Run Plan of the earlier layout (`backend/services/run_plan_template.py`)
-
-**Goal:** Ar in feed gas from Run Plans whose Feed has a "Gas composition (mol%)" block (e.g. `RunPlan_R6-C1-S1_MassBalance.xlsx`).
-
-Steps: in `parse_feed` (1) skip header rows inside the liquid range, (2) read the "Gas composition (mol%)" block
-(component A, unit D, value E, until Total) when `tbl_gas` has no values, (3) accept "Gas feed" as the settings title and
-stop the settings at the "Gas composition" row.
+## Phase 3 — `backend/services/run_plan_template.py` (earlier Run Plan layout)
+`parse_feed`: skip header rows in the liquid range; read the "Gas composition (mol%)" block (A label, D unit, E value,
+until Total) when `tbl_gas` has no values; "Gas feed" accepted as settings title, settings stop at that block.
 
 ```diff
 --- a/backend/services/run_plan_template.py
@@ -391,12 +359,9 @@ stop the settings at the "Gas composition" row.
                               "value": clean(rows[i][4]) if len(rows[i]) > 4 else "", "note": note(i)})
 ```
 
-**Check:** load the R6 Run Plan on the Run Plan page → Feed → Gas feed composition shows Argon 5, Hydrogen 19.859 …
-
-## Phase 4 — Frontend: inputs on the Online Analysis page (`frontend/online_analysis.html`, `frontend/css/online_units.css`)
-
-**Goal:** a "Gas feed" part in the Conversion basis block: R1–R8 (NmL/h), total `01i14FI01` (g/h, optional), molar volume.
-Bump the cache-busters so browsers load the new files.
+## Phase 4 — `frontend/online_analysis.html`, `frontend/css/online_units.css` (read-only block)
+Remove the two Ar inputs; the block shows the basis text, the flow note, the formula and the MW table. Cache-busters
+`online_units.css?v=2`, `online_analysis.js?v=5`.
 
 ```diff
 --- a/frontend/online_analysis.html
@@ -412,28 +377,17 @@ Bump the cache-busters so browsers load the new files.
      <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
  </head>
  
-@@ -104,6 +104,24 @@
-                             <label>Ar in feed gas <small>wt%</small><input class="input" id="onlineArWt" type="number" step="any" min="0" placeholder="Run Plan"></label>
-                             <span class="online-units-basis" id="onlineUnitsBasis"></span>
-                         </div>
-+                        <div class="online-units-flows" id="onlineFlowInputs">
-+                            <div class="online-units-title">Gas feed (used when the export has no 01i14FIC0r / 01i14FI01 columns, like the workbook's Gas sheet)</div>
-+                            <div class="online-units-inputs">
-+                                <label>R1 <small>NmL/h</small><input class="input online-flow" data-reactor="R1" type="number" step="any" min="0"></label>
-+                                <label>R2 <small>NmL/h</small><input class="input online-flow" data-reactor="R2" type="number" step="any" min="0"></label>
-+                                <label>R3 <small>NmL/h</small><input class="input online-flow" data-reactor="R3" type="number" step="any" min="0"></label>
-+                                <label>R4 <small>NmL/h</small><input class="input online-flow" data-reactor="R4" type="number" step="any" min="0"></label>
-+                                <label>R5 <small>NmL/h</small><input class="input online-flow" data-reactor="R5" type="number" step="any" min="0"></label>
-+                                <label>R6 <small>NmL/h</small><input class="input online-flow" data-reactor="R6" type="number" step="any" min="0"></label>
-+                                <label>R7 <small>NmL/h</small><input class="input online-flow" data-reactor="R7" type="number" step="any" min="0"></label>
-+                                <label>R8 <small>NmL/h</small><input class="input online-flow" data-reactor="R8" type="number" step="any" min="0"></label>
-+                            </div>
-+                            <div class="online-units-inputs">
-+                                <label>Total gas feed 01i14FI01 <small>g/h (optional)</small><input class="input" id="onlineFi01" type="number" step="any" min="0" placeholder="not used"></label>
-+                                <label>Molar volume <small>Nl/mol</small><input class="input" id="onlineVm" type="number" step="any" min="0" placeholder="22.414 (0 °C)"></label>
-+                                <span class="online-units-basis" id="onlineFlowNote"></span>
-+                            </div>
-+                        </div>
+@@ -99,11 +99,8 @@
+                     <!-- Conversion basis: collapsed under the table -->
+                     <details class="online-units-bar" id="onlineUnitsBar" hidden>
+                         <summary><span class="online-units-title">Conversion basis</span> <span id="onlineUnitsSummary"></span></summary>
+-                        <div class="online-units-inputs">
+-                            <label>Ar in feed gas <small>mol%</small><input class="input" id="onlineArMol" type="number" step="any" min="0" placeholder="Run Plan"></label>
+-                            <label>Ar in feed gas <small>wt%</small><input class="input" id="onlineArWt" type="number" step="any" min="0" placeholder="Run Plan"></label>
+-                            <span class="online-units-basis" id="onlineUnitsBasis"></span>
+-                        </div>
++                        <div class="online-units-basis" id="onlineUnitsBasis"></div>
++                        <div class="online-units-basis" id="onlineFlowNote"></div>
                          <div class="online-units-formula" id="onlineUnitsFormula"></div>
                          <div class="online-units-mw">
                              <div class="online-units-title">Molecular weights used (experimental standards of the MassBal workbook)</div>
@@ -442,55 +396,46 @@ Bump the cache-busters so browsers load the new files.
 ```diff
 --- a/frontend/css/online_units.css
 +++ b/frontend/css/online_units.css
-@@ -18,3 +18,7 @@
+@@ -18,3 +18,5 @@
  .online-units-bar summary{cursor:pointer;font-size:12px;color:var(--slate);list-style-position:inside}
  .online-units-bar:not([open]){padding:9px 15px}
  .online-units-title{font-size:12px;font-weight:700;color:var(--burnt)}
-+.online-units-flows{display:grid;gap:8px;padding-top:6px;border-top:1px dashed var(--border)}
-+.online-units-flows .online-flow{width:110px}
 +.online-units-bar.needs-input{border-left-color:#991b1b}
 +.online-units-bar.needs-input summary .online-units-title{color:#991b1b}
 ```
 
-## Phase 5 — Frontend: page logic (`frontend/js/online_analysis.js`)
-
-**Goal:** keep the new inputs (saved in `dhaOnlineState`), send them and the Run Plan DOE rows to `/api/online-units`,
-show where the flows came from, open the block (red title) when Ar or the gas feed is missing.
-
-Steps: (1) state `gasFeed`, `fi01`, `molarVolume`; (2) mass formula text with the second Ar route; (3) `onlineRunPlanContext()`
-also returns the DOE rows (Reactor ID, Start/End Date, Total gas / Gas Flow); (4) the request sends `gas_feed`,
-`total_feed_g_h`, `molar_volume`, `doe_rows`; (5) `renderUnitsBar()` fills the inputs, writes the flow note, opens the block
-when something is missing and puts "… missing – enter it here" in its summary; (6) save / restore the new state;
-(7) input handlers for all fields (recalculate 0.4 s after typing).
+## Phase 5 — `frontend/js/online_analysis.js` (page logic)
+Remove the `arMol` / `arWt` state, inputs, handlers and request fields; send the Run Plan DOE rows (`doe_rows`); the
+flow note lists the flow sources and what is missing in the Run Plan; the block opens in red when Ar or the DOE gas
+flows are missing; mass formula text with the second Ar route.
 
 ```diff
 --- a/frontend/js/online_analysis.js
 +++ b/frontend/js/online_analysis.js
-@@ -11,7 +11,10 @@ const onlineState = {
+@@ -9,9 +9,7 @@ const onlineState = {
+     // Units of the GC values: 'mol' (as imported) or a conversion from /api/online-units (mass, volume, carbon)
+     unit: 'mol',
      converted: null,
-     hiddenConverted: [],
-     arMol: '',
+-    hiddenConverted: [],
+-    arMol: '',
 -    arWt: ''
-+    arWt: '',
-+    gasFeed: {},
-+    fi01: '',
-+    molarVolume: ''
++    hiddenConverted: []
  };
  const online$ = (selector) => document.querySelector(selector);
  const formatOnlineValue = (value) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : (value ?? '');
-@@ -151,9 +154,9 @@ function applyReactorMapMapping(rows, reactorRows) {
+@@ -151,9 +149,9 @@ function applyReactorMapMapping(rows, reactorRows) {
  
  // ---------------------------------------------------------------- Units (mol% → g/h, Nl/h, g C/h)
  const ONLINE_UNIT_FORMULAS = {
 -    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar   (y = ESTD mol%)',
-+    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar,   or without 01i14FI01: F_Ar,r = FIC_r/1000 / Vm · y_Ar,feed/100 · 39.948   (y = ESTD mol%)',
++    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar,   or without 01i14FI01: F_Ar,r = FIC_r/1000 / 22.414 · y_Ar,feed/100 · 39.948   (y = ESTD mol%; FIC from the export or the Run Plan DOE; Ar from the Run Plan)',
      volume: 'V_i [Nl/h] = y_i/100 · V_out   with   V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar   (argon balance)',
 -    carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS)',
 +    carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS; m_i as for the mass flow rates)',
  };
  const escOnline = (value) => String(value ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
  
-@@ -173,9 +176,12 @@ function onlineRunPlanContext() {
+@@ -173,9 +171,12 @@ function onlineRunPlanContext() {
          const rp = JSON.parse(sessionStorage.getItem('runPlanDashboardState') || 'null') || {};
          const info = rp.planData?.info || [];
          const cutIn = info.find(i => String(i.parameter).trim().toLowerCase() === 'feed cut-in')?.value || '';
@@ -505,31 +450,30 @@ when something is missing and puts "… missing – enter it here" in its summar
      }
  }
  
-@@ -204,6 +210,10 @@ async function refreshOnlineUnits() {
+@@ -202,8 +203,7 @@ async function refreshOnlineUnits() {
+             method: 'POST', headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
                  unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas, feed_cut_in: ctx.feedCutIn,
-                 ar_mol_pct: onlineState.arMol === '' ? null : Number(onlineState.arMol),
-                 ar_wt_pct: onlineState.arWt === '' ? null : Number(onlineState.arWt),
-+                gas_feed: Object.fromEntries(Object.entries(onlineState.gasFeed).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])),
-+                total_feed_g_h: onlineState.fi01 === '' ? null : Number(onlineState.fi01),
-+                molar_volume: onlineState.molarVolume === '' ? null : Number(onlineState.molarVolume),
+-                ar_mol_pct: onlineState.arMol === '' ? null : Number(onlineState.arMol),
+-                ar_wt_pct: onlineState.arWt === '' ? null : Number(onlineState.arWt),
 +                doe_rows: ctx.doeRows,
              }),
          });
          const data = await onlineJson(response);
-@@ -234,6 +244,12 @@ function renderUnitsBar() {
-     const arMol = online$('#onlineArMol'), arWt = online$('#onlineArWt');
-     if (arMol && document.activeElement !== arMol) arMol.value = onlineState.arMol;
-     if (arWt && document.activeElement !== arWt) arWt.value = onlineState.arWt;
-+    document.querySelectorAll('.online-flow').forEach((input) => {
-+        if (document.activeElement !== input) input.value = onlineState.gasFeed[input.dataset.reactor] ?? '';
-+    });
-+    const fi01 = online$('#onlineFi01'), vm = online$('#onlineVm');
-+    if (fi01 && document.activeElement !== fi01) fi01.value = onlineState.fi01;
-+    if (vm && document.activeElement !== vm) vm.value = onlineState.molarVolume;
-     const fromPlan = basis.ar_source !== 'entered';
-     if (arMol) arMol.placeholder = basis.ar_feed_mol_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_mol_pct)} (Run Plan)` : 'Run Plan';
-     if (arWt) arWt.placeholder = basis.ar_feed_wt_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_wt_pct)} (Run Plan)` : 'Run Plan';
-@@ -249,9 +265,21 @@ function renderUnitsBar() {
+@@ -231,12 +231,6 @@ function renderUnitsBar() {
+     if (unit === 'mol') return;
+     const data = onlineState.converted;
+     const basis = data?.basis || {};
+-    const arMol = online$('#onlineArMol'), arWt = online$('#onlineArWt');
+-    if (arMol && document.activeElement !== arMol) arMol.value = onlineState.arMol;
+-    if (arWt && document.activeElement !== arWt) arWt.value = onlineState.arWt;
+-    const fromPlan = basis.ar_source !== 'entered';
+-    if (arMol) arMol.placeholder = basis.ar_feed_mol_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_mol_pct)} (Run Plan)` : 'Run Plan';
+-    if (arWt) arWt.placeholder = basis.ar_feed_wt_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_wt_pct)} (Run Plan)` : 'Run Plan';
+     const parts = [];
+     if (data) {
+         parts.push(`<b>${escOnline(data.label)}</b> · ${data.ok_count} line${data.ok_count === 1 ? '' : 's'} calculated`
+@@ -249,9 +243,22 @@ function renderUnitsBar() {
          parts.push(onlineState.rows.length ? 'Converting…' : 'Import a SystemTxt file first.');
      }
      online$('#onlineUnitsBasis').innerHTML = parts.join(' · ');
@@ -539,99 +483,66 @@ when something is missing and puts "… missing – enter it here" in its summar
 +    if (data && !basis.export_has_flows) flowNote.push('This export has no gas flow columns.');
 +    if (basis.doe_flows) flowNote.push(`Run Plan DOE gas flows: ${basis.doe_flows} rows`);
 +    if (sources) flowNote.push(`Flow source of the calculated lines – ${sources}`);
-+    if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Enter the gas feed of the reactors (NmL/h), or load a Run Plan with DOE gas flows.</span>');
++    if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Gas feed missing: load the Run Plan with the DOE gas flow of every condition (start date, duration, Total gas Nl/h).</span>');
++    if (basis.argon_missing) flowNote.push('<span class="online-cell-error">Ar missing: load the Run Plan with Argon in Feed → Gas feed composition.</span>');
 +    online$('#onlineFlowNote').innerHTML = flowNote.join(' · ');
-+    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'gas feed per reactor' : ''].filter(Boolean);
++    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'DOE gas flows' : ''].filter(Boolean);
 +    bar.classList.toggle('needs-input', missingInputs.length > 0);
 +    if (missingInputs.length && !bar.dataset.autoOpened) { bar.open = true; bar.dataset.autoOpened = '1'; }
      // One line on the closed block: Ar basis and how many lines could be calculated
      online$('#onlineUnitsSummary').innerHTML = data
 -        ? `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
-+        ? (missingInputs.length ? `· <span class="online-cell-error">${missingInputs.join(' and ')} missing – enter it here</span> ` : '')
++        ? (missingInputs.length ? `· <span class="online-cell-error">${missingInputs.join(' and ')} missing in the Run Plan</span> ` : '')
 +          + `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
            + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} · ${data.ok_count} calculated`
            + (data.error_count ? `, <span class="online-cell-error">${data.error_count} ERROR</span>` : '')
          : '';
-@@ -309,6 +337,9 @@ function saveOnlineState() {
+@@ -307,8 +314,6 @@ function saveOnlineState() {
+             reactorMapActive: onlineState.reactorMapActive,
+             unit: onlineState.unit,
              hiddenConverted: onlineState.hiddenConverted,
-             arMol: onlineState.arMol,
-             arWt: onlineState.arWt,
-+            gasFeed: onlineState.gasFeed,
-+            fi01: onlineState.fi01,
-+            molarVolume: onlineState.molarVolume,
+-            arMol: onlineState.arMol,
+-            arWt: onlineState.arWt,
              path: online$('#onlineFile').value,
              summary: online$('#onlineSummary').textContent,
              from: from,
-@@ -335,6 +366,9 @@ function restoreOnlineState() {
+@@ -333,8 +338,6 @@ function restoreOnlineState() {
+             onlineState.reactorMapActive = Boolean(saved.reactorMapActive);
+             if (['mol', 'mass', 'volume', 'carbon'].includes(saved.unit)) onlineState.unit = saved.unit;
              if (Array.isArray(saved.hiddenConverted)) onlineState.hiddenConverted = saved.hiddenConverted;
-             onlineState.arMol = saved.arMol ?? '';
-             onlineState.arWt = saved.arWt ?? '';
-+            onlineState.gasFeed = saved.gasFeed && typeof saved.gasFeed === 'object' ? saved.gasFeed : {};
-+            onlineState.fi01 = saved.fi01 ?? '';
-+            onlineState.molarVolume = saved.molarVolume ?? '';
+-            onlineState.arMol = saved.arMol ?? '';
+-            onlineState.arWt = saved.arWt ?? '';
              if (Array.isArray(saved.rows)) onlineState.rows = saved.rows;
              if (Array.isArray(saved.columns)) onlineState.columns = saved.columns;
              onlineState.allColumns = Array.isArray(saved.allColumns) ? saved.allColumns : [...onlineState.columns];
-@@ -552,14 +586,23 @@ if (online$('#onlineUnit')) online$('#onlineUnit').onchange = () => {
+@@ -551,17 +554,6 @@ if (online$('#onlineUnit')) online$('#onlineUnit').onchange = () => {
+     saveOnlineState();
      refreshOnlineUnits();
  };
- let unitInputTimer = null;
+-let unitInputTimer = null;
 -['#onlineArMol', '#onlineArWt'].forEach((selector) => {
-+const unitInputs = { '#onlineArMol': 'arMol', '#onlineArWt': 'arWt', '#onlineFi01': 'fi01', '#onlineVm': 'molarVolume' };
-+const scheduleUnits = () => {
-+    saveOnlineState();
-+    clearTimeout(unitInputTimer);
-+    unitInputTimer = setTimeout(refreshOnlineUnits, 400);
-+};
-+Object.entries(unitInputs).forEach(([selector, key]) => {
-     const input = online$(selector);
-     if (!input) return;
-+    input.oninput = () => { onlineState[key] = input.value.trim(); scheduleUnits(); };
-+});
-+document.querySelectorAll('.online-flow').forEach((input) => {
-     input.oninput = () => {
+-    const input = online$(selector);
+-    if (!input) return;
+-    input.oninput = () => {
 -        onlineState[selector === '#onlineArMol' ? 'arMol' : 'arWt'] = input.value.trim();
 -        saveOnlineState();
 -        clearTimeout(unitInputTimer);
 -        unitInputTimer = setTimeout(refreshOnlineUnits, 400);
-+        const value = input.value.trim();
-+        if (value === '') delete onlineState.gasFeed[input.dataset.reactor];
-+        else onlineState.gasFeed[input.dataset.reactor] = value;
-+        scheduleUnits();
-     };
- });
+-    };
+-});
  online$('#onlineReactorFilter').onchange = renderOnlineTable;
+ online$('#onlineRestoreColumns').onclick = () => {
+     if (onlineState.unit !== 'mol' && onlineState.converted) onlineState.hiddenConverted = [];
 ```
 
 ## Phase 6 — Version, documents, tests
-
-1. `VERSION` → `6.4.3`; add the 6.4.3 entries to `CHANGELOG.md`, `ILS.md`, `README.md` (texts in `files/`).
-2. Copy the new test files: `tests/fixtures/online/R3-C2-S1_9-06-23.txt`,
-   `tests/fixtures/run_plan/RunPlan_R6-C1-S1_MassBalance.xlsx`, and `tests/test_online_units.py` (new tests: export
-   without flows, entered gas feed, both Ar routes agree, DOE gas feed, R6 Run Plan).
+1. `VERSION` = `6.4.3`; 6.4.3 entries of `CHANGELOG.md`, `ILS.md`, `README.md` (see `files/`).
+2. Copy `tests/test_online_units.py`, `tests/fixtures/online/R3-C2-S1_9-06-23.txt`,
+   `tests/fixtures/run_plan/RunPlan_R6-C1-S1_MassBalance.xlsx`.
 3. `python -m pytest -q` → **25 passed**.
 
-## Phase 7 — Acceptance test in the browser
-
-| # | Action | Expected |
-|---|---|---|
-| 1 | `run_dashboard.bat`, Ctrl+F5 | menu bar **v6.4.3** |
-| 2 | Run Plan: load `RunPlan_R6-C1-S1_MassBalance.xlsx` | Feed → Gas feed composition: Argon 5, red badge "93.041 mol% · Not 100" |
-| 3 | Online: import `R3-C2-S1_9-06-23.txt`, Units = Mass flow rates | Conversion basis opens (red): "gas feed per reactor missing – enter it here"; lines `ERROR: no gas feed for Rr (not in the export) …` |
-| 4 | Type 3000 in R1…R8 (Ar 5 mol% if no Run Plan is loaded) | "44 calculated, 2 ERROR"; Flow source "entered, molar volume"; **Ethylene [g/h]** column present |
-| 5 | Line 08.06.2023 18:09:40 (R2) | Methane 0.00002768, Ethane 0.0000947, Ethylene 0.0008201 g/h |
-| 6 | Units = Carbon / Volumetric | same lines OK; Volumetric: Total out ≈ 2.97 Nl/h for 3 Nl/h feed |
-| 7 | Reload the page | unit, entered flows and Ar kept |
-| 8 | Units = Normalised mol% | original table, block hidden |
+## Phase 7 — Acceptance test
+See step 5 of `UPDATE_GUIDE_6.4.2_to_6.4.3.md` (four Run Plan / file combinations with the expected messages and values).
 
 ## Phase 8 — Rollback
-
-Copy the backup folder back (Step 3.1). No data files or settings are changed by this update.
-
-## Notes for the Run Plan
-
-* Ar in feed gas: the MassBal workbook uses the **verified** Ar (Gas!I35, e.g. 4.3 mol%); a Run Plan with the target
-  (5 mol%) gives 16.8 % higher flows. Put the verified value in the Run Plan gas composition or type it on the page.
-* Gas flows from the Run Plan DOE: a condition is used from its start date; without a duration (or end) it counts until
-  the end of the data, so enter the durations when the flows change between conditions. Conditions without a start date are not used.
-* The liquid (C, H, MW of the liquid) is **not** a Run Plan entry — it comes later with the liquid product data.
+Copy the backup folder back; no data or settings files are changed.
