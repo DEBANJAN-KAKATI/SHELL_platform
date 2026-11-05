@@ -249,6 +249,12 @@ function renderUnitsBar() {
         parts.push(onlineState.rows.length ? 'Converting…' : 'Import a SystemTxt file first.');
     }
     online$('#onlineUnitsBasis').innerHTML = parts.join(' · ');
+    // One line on the closed block: Ar basis and how many lines could be calculated
+    online$('#onlineUnitsSummary').innerHTML = data
+        ? `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
+          + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} · ${data.ok_count} calculated`
+          + (data.error_count ? `, <span class="online-cell-error">${data.error_count} ERROR</span>` : '')
+        : '';
     online$('#onlineUnitsFormula').textContent = ONLINE_UNIT_FORMULAS[unit] || '';
     online$('#onlineMwBody').innerHTML = (data?.components || []).map(c => `<tr><td>${escOnline(c.component)}</td>`
         + `<td>${c.mw ?? '–'}</td><td>${c.carbon_atoms ?? '–'}</td><td>${escOnline(c.source)}</td></tr>`).join('');

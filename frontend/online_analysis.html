@@ -8,8 +8,8 @@
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
     <script src="/frontend/js/navigation.js?v=7" defer></script>
-    <link href="/frontend/css/online_units.css?v=1" rel="stylesheet">
-    <script src="/frontend/js/online_analysis.js?v=6" defer></script>
+    <link href="/frontend/css/online_units.css?v=3" rel="stylesheet">
+    <script src="/frontend/js/online_analysis.js?v=7" defer></script>
     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
 </head>
 
@@ -87,18 +87,6 @@
                         <button type="button" class="btn secondary online-clear-dates-btn" id="onlineClearDates" title="Clear date range">Clear dates</button>
                         <div class="online-filter-badge" id="onlineDateBadge"></div>
                     </div>
-                    <div class="online-units-bar" id="onlineUnitsBar" hidden>
-                        <div class="online-units-inputs">
-                            <label>Ar in feed gas <small>mol%</small><input class="input" id="onlineArMol" type="number" step="any" min="0" placeholder="Run Plan"></label>
-                            <label>Ar in feed gas <small>wt%</small><input class="input" id="onlineArWt" type="number" step="any" min="0" placeholder="Run Plan"></label>
-                            <span class="online-units-basis" id="onlineUnitsBasis"></span>
-                        </div>
-                        <div class="online-units-formula" id="onlineUnitsFormula"></div>
-                        <details class="online-units-mw">
-                            <summary>Molecular weights used (experimental standards of the MassBal workbook)</summary>
-                            <table class="online-mw-table"><thead><tr><th>Component</th><th>MW (g/mol)</th><th>C atoms</th><th>Source</th></tr></thead><tbody id="onlineMwBody"></tbody></table>
-                        </details>
-                    </div>
                     <div class="table-wrap online-table-wrap">
                         <table class="online-table" id="onlineTable">
                             <thead>
@@ -108,6 +96,20 @@
                         </table>
                         <div class="empty" id="onlineEmpty">Import a SystemTxt file to load Online Analysis data.</div>
                     </div>
+                    <!-- Conversion basis: collapsed under the table -->
+                    <details class="online-units-bar" id="onlineUnitsBar" hidden>
+                        <summary><span class="online-units-title">Conversion basis</span> <span id="onlineUnitsSummary"></span></summary>
+                        <div class="online-units-inputs">
+                            <label>Ar in feed gas <small>mol%</small><input class="input" id="onlineArMol" type="number" step="any" min="0" placeholder="Run Plan"></label>
+                            <label>Ar in feed gas <small>wt%</small><input class="input" id="onlineArWt" type="number" step="any" min="0" placeholder="Run Plan"></label>
+                            <span class="online-units-basis" id="onlineUnitsBasis"></span>
+                        </div>
+                        <div class="online-units-formula" id="onlineUnitsFormula"></div>
+                        <div class="online-units-mw">
+                            <div class="online-units-title">Molecular weights used (experimental standards of the MassBal workbook)</div>
+                            <table class="online-mw-table"><thead><tr><th>Component</th><th>MW (g/mol)</th><th>C atoms</th><th>Source</th></tr></thead><tbody id="onlineMwBody"></tbody></table>
+                        </div>
+                    </details>
                 </div>
             </section>
         </main>

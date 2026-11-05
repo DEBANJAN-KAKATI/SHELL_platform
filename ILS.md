@@ -170,7 +170,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - MWs and carbon atoms = experimental standards of the workbook (R#_MB columns B and AD; H2S, Propadiene: standard
   values; lumped peaks C3-C4, C4-C5, C5-C6, C6-C8 have no MW → `ERROR: no MW`). Feed gas MWs (Run_Plan row 37) give
   w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook);
-  Ar mol% / wt% can be entered on the page instead. TOS from the Run Plan Feed Cut-In (else the first record).
+  Ar mol% / wt% can be entered on the page instead (collapsed "Conversion basis" block under the table, with the formula
+  and the MW table; its summary line shows Ar mol% / wt% and the number of lines calculated / with ERROR). TOS from the Run Plan Feed Cut-In (else the first record).
 - Each line uses its own 01i14FI01 / 01i14FIC0r (else 02i2FIC0r); Reactor from `Sampled_reactor` or the Reactor Map
   (1, 1.0, "R1"). Status per line: OK or `ERROR: …` (bypass / no reactor, no argon peak, no gas feed to Rr, no GC values,
   feed argon not set). Converted rows are not stored (the unit, hidden columns and entered Ar values are, in

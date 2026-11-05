@@ -7,6 +7,8 @@
   stopped gas feed and missing feed argon. The mass and carbon flows reproduce the workbook's R6_MB values exactly; the
   workbook's total volumetric flow (R#_MB!D86) mixes g/h and NmL/h, so the argon balance it intends is used.
 - New `backend/services/online_units.py`, endpoint `POST /api/online-units`, tests `tests/test_online_units.py`.
+- The conversion basis (Ar in feed gas inputs, formula, molecular weights) sits collapsed under the table, with a
+  one-line summary (Ar mol% / wt%, lines calculated / with ERROR); the table follows the filters directly.
 - Online loader: `ESTD_C6 Above` is taken from `Area_C6 Above` when the export shifts that column (`Conc_C6 Above`
   empty); the import summary says so.
 - The first Mass Balance (v6.5: `backend/mass_balance`, its routes, GC map, tests, scripts and page hooks in Plots,
