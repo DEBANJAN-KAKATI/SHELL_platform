@@ -97,7 +97,8 @@ def test_run_export_end_to_end_with_the_run_plan_feed_gas():
 def test_errors_are_explicit():
     row = {"DateTime": "2024-01-01 10:00:00", "Reactor": "R2", "01i14FI01": 5, "01i14FIC02": 1000,
            "ESTD_Argon": 5, "ESTD_Methane": 1, "ESTD_C3-C4": 0.2}
-    assert convert_online_rows([row], "mass")["rows"][0]["Status"].startswith("ERROR: Ar in the feed gas is not set")
+    assert convert_online_rows([row], "mass")["rows"][0]["Status"] == \
+        "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
     out = convert_online_rows([row], "mass", ar_wt_pct=10)["rows"][0]
     assert out["C3-C4 [g/h]"] == "ERROR: no MW for C3-C4" and out["Status"].startswith("ERROR: no MW for C3-C4")
     assert out["Methane [g/h]"] == pytest.approx(1 * 16.04 / (5 * 39.948) * 5 * 0.10)
@@ -116,30 +117,34 @@ def test_reactor_numbers():
 R3_EXPORT = FIXTURES / "online" / "R3-C2-S1_9-06-23.txt"     # GC export without gas flow columns, "Etylene"
 
 
-def test_export_without_flows_asks_for_the_gas_feed():
+ARGON_5 = [{"component": "Argon", "value": 5}]                   # Run Plan feed gas with Ar 5 mol%
+
+
+def test_export_without_flows_needs_the_run_plan_doe():
     rows = process_online_file(R3_EXPORT)["rows"]
-    out = convert_online_rows(rows, "mass", ar_mol_pct=5)
+    out = convert_online_rows(rows, "mass", feed_gas=ARGON_5)
     assert out["basis"]["export_has_flows"] is False and out["basis"]["flows_needed"] and out["basis"]["flows_missing"]
     assert out["ok_count"] == 0
     r1 = next(r for r in out["rows"] if reactor_number(r["Reactor"]) == 1)
-    assert r1["Status"] == "ERROR: no gas feed for R1 (not in the export) – enter it under Conversion basis"
+    assert r1["Status"] == "ERROR: no gas feed for R1 – not in the export and no Run Plan DOE condition with a gas flow at this time"
     assert "Ethylene [g/h]" in out["columns"] and not any("Etylene" in c for c in out["columns"])
 
 
-def test_entered_gas_feed_like_the_workbook_gas_sheet():
+def test_gas_feed_from_the_run_plan_doe_for_an_export_without_flows():
+    """R3 export: no flow columns → the DOE gas flow of the running condition (3 Nl/h per reactor), Ar from the Run Plan."""
     rows = process_online_file(R3_EXPORT)["rows"]
-    gas = {f"R{k}": 3000 for k in range(1, 9)}
-    out = convert_online_rows(rows, "mass", ar_mol_pct=5, gas_feed=gas)
-    assert out["ok_count"] == 44 and out["basis"]["flow_sources"] == {"entered, molar volume": 44}
+    doe = [{"Reactor ID": f"R{k}", "Start Date": "2023-06-08 00:00:00", "End Date": "", "Total gas (Nl/h)": 3.0}
+           for k in range(1, 9)]
+    out = convert_online_rows(rows, "mass", feed_gas=ARGON_5, doe_rows=doe)
+    assert out["ok_count"] == 44 and out["basis"]["flow_sources"] == {"Run Plan DOE, molar volume": 44}
+    assert not out["basis"]["flows_needed"] and not out["basis"]["argon_missing"]
     line = out["rows"][2]                                                        # R2, 08.06.2023 18:09:40
     assert reactor_number(line["Reactor"]) == 2
-    ar = 3.0 / 22.414 * 0.05 * 39.948                                           # n_Ar · MW_Ar from 3000 NmL/h
+    ar = 3.0 / 22.414 * 0.05 * 39.948                                           # n_Ar · MW_Ar from 3 Nl/h
     assert line["Ar to reactor [g/h]"] == pytest.approx(ar)
     assert line["Ethylene [g/h]"] == pytest.approx(rows[2]["ESTD_Etylene"] * 28.05 / (rows[2]["ESTD_Argon"] * 39.948) * ar)
-    # with 01i14FI01 the workbook route: FI01 · V_r/ΣV · w_Ar
-    wb = convert_online_rows(rows, "mass", ar_mol_pct=5, ar_wt_pct=9.4, gas_feed=gas, total_feed_g_h=19.5)
-    assert wb["rows"][2]["Ar to reactor [g/h]"] == pytest.approx(19.5 / 8 * 0.094)
-    assert wb["basis"]["flow_sources"] == {"entered, 01i14FI01": 44}
+    before = [dict(r, DateTime="2023-06-07 10:00:00") for r in rows[1:3]]      # before the condition started
+    assert convert_online_rows(before, "mass", feed_gas=ARGON_5, doe_rows=doe)["rows"][0]["Status"].startswith("ERROR: no gas feed for R")
 
 
 def test_both_argon_routes_agree_for_consistent_inputs(workbook_case):

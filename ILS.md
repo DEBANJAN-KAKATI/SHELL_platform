@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.8.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.8.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
@@ -171,19 +171,19 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   159.7 Nl/h for 3 Nl/h feed, so the argon balance it intends is used); C_i = 12.011 · nC_i / MW_i · m_i (rows 121-150).
 - MWs and carbon atoms = experimental standards of the workbook (R#_MB columns B and AD; H2S, Propadiene: standard
   values; lumped peaks C3-C4, C4-C5, C5-C6, C6-C8 have no MW → `ERROR: no MW`). Feed gas MWs (Run_Plan row 37) give
-  w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook);
-  Ar mol% / wt% can be entered on the page instead (collapsed "Conversion basis" block under the table, with the formula
-  and the MW table; its summary line shows Ar mol% / wt% and the number of lines calculated / with ERROR). TOS from the Run Plan Feed Cut-In (else the first record).
-- Gas feed of a line (v6.8.1), in this order: the export line (01i14FIC0r [NmL/h], 01i14FI01 [g/h]) → values entered per
-  reactor in the Conversion basis block (R1–R8 NmL/h + optional total 01i14FI01 g/h = workbook Gas!B11:I11 / E5) → the Run
-  Plan DOE condition running at that time ("Total gas (Nl/h)" × 1000, older files "Gas Flow (NmL/h)"). Argon to the
-  reactor: with 01i14FI01 and Ar wt% as in the workbook; otherwise from the volume, F_Ar,r = FIC_r/1000 / Vm · y_Ar,feed/100
-  · 39.948 (Vm 22.414 Nl/mol = 0 °C, editable; same quantity, agrees with the workbook within 1 %). Column "Flow source"
-  per line. Many GC exports (e.g. `R3-C2-S1_9-06-23.txt`) have no flow columns: the block opens and asks for the gas feed /
-  Ar in feed gas. Export spelling `ESTD_Etylene` = Ethylene (`ALIASES`).
+  w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook).
+  **Everything comes from the export and the Run Plan (v6.8.3): no inputs on the page.** The collapsed "Conversion
+  basis" block under the table is read-only (Ar mol% / wt% from the Run Plan, flow sources, formula, MW table); it opens
+  in red and says what is missing in the Run Plan (Argon in Feed → Gas feed composition; DOE gas flows).
+  TOS from the Run Plan Feed Cut-In (else the first record).
+- Gas feed of a line: the export line (01i14FIC0r [NmL/h], 01i14FI01 [g/h]) → else the Run Plan DOE condition running at
+  that time ("Total gas (Nl/h)" × 1000, older files "Gas Flow (NmL/h)"; start ≤ t < end, no end = open). Argon to the
+  reactor: with 01i14FI01 and Ar wt% as in the workbook; otherwise from the volume, F_Ar,r = FIC_r/1000 / 22.414 ·
+  y_Ar,feed/100 · 39.948 (0 °C; same quantity, agrees with the workbook within 1 %). Column "Flow source" per line. GC
+  exports without flow columns (e.g. `R3-C2-S1_9-06-23.txt`) need the DOE gas flows. `ESTD_Etylene` = Ethylene (`ALIASES`).
 - With flows on the export each line uses its own 01i14FI01 / 01i14FIC0r (else 02i2FIC0r); Reactor from `Sampled_reactor` or the Reactor Map
   (1, 1.0, "R1"). Status per line: OK or `ERROR: …` (bypass / no reactor, no argon peak, no gas feed to Rr, no GC values,
-  feed argon not set). Converted rows are not stored (the unit, hidden columns and entered Ar values are, in
+  feed argon not set). Converted rows are not stored (the unit and hidden columns are, in
   `dhaOnlineState`). Loader fix: `ESTD_C6 Above` = `Area_C6 Above` when `Conc_C6 Above` is empty (export column shift).
 - Tests: `tests/test_online_units.py` reproduces R6_MB mass and carbon flows of `tests/fixtures/online/R6-C1-S1-MassBal_Ver2.2.xlsx`
   exactly and runs the R08 export (`tests/fixtures/online/Result_R08-…txt`) with `RunPlan_MassBalance_SS.xlsx`.
@@ -194,11 +194,11 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   aqueous phase, C wt% of the product). Do not ask for it in the Run Plan and do not flag empty Feed E6:E8 as missing
   for Mass Balance runs. The Run Plan gives: Ar / feed gas composition, DOE gas (and liquid) flows per condition and
   reactor, Feed Cut-In.
-- Done: Online Analysis units (g/h, Nl/h, g C/h) with gas feed from the export, entered values or the Run Plan DOE.
+- Done: Online Analysis units (g/h, Nl/h, g C/h) with gas feed from the export or the Run Plan DOE, Ar from the Run Plan.
 - Next (not built): liquid product data entry/import, mass balance closure, carbon balance (workbook R#_MB C9:C13,
   C-Balance), Summary; Plots / Custom table use of the converted online tables.
 - Ar in feed gas: the workbook uses the verified Ar (Gas!I35, e.g. 4.3 mol%), Run Plans may hold the target (5 mol%) →
-  16.8 % difference; the verified value belongs in the Run Plan gas composition (or is typed on the Online page).
+  16.8 % difference; the verified value belongs in the Run Plan gas composition (nothing is typed on the Online page).
 
 ## Working conventions seen in this codebase
 - One dashboard for every experiment (v6.6): no process gates in new code. `window.ILSProcess` is fixed to

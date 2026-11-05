@@ -9,12 +9,7 @@ const onlineState = {
     // Units of the GC values: 'mol' (as imported) or a conversion from /api/online-units (mass, volume, carbon)
     unit: 'mol',
     converted: null,
-    hiddenConverted: [],
-    arMol: '',
-    arWt: '',
-    gasFeed: {},
-    fi01: '',
-    molarVolume: ''
+    hiddenConverted: []
 };
 const online$ = (selector) => document.querySelector(selector);
 const formatOnlineValue = (value) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : (value ?? '');
@@ -154,7 +149,7 @@ function applyReactorMapMapping(rows, reactorRows) {
 
 // ---------------------------------------------------------------- Units (mol% → g/h, Nl/h, g C/h)
 const ONLINE_UNIT_FORMULAS = {
-    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar,   or without 01i14FI01: F_Ar,r = FIC_r/1000 / Vm · y_Ar,feed/100 · 39.948   (y = ESTD mol%)',
+    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar,   or without 01i14FI01: F_Ar,r = FIC_r/1000 / 22.414 · y_Ar,feed/100 · 39.948   (y = ESTD mol%; FIC from the export or the Run Plan DOE; Ar from the Run Plan)',
     volume: 'V_i [Nl/h] = y_i/100 · V_out   with   V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar   (argon balance)',
     carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS; m_i as for the mass flow rates)',
 };
@@ -208,11 +203,6 @@ async function refreshOnlineUnits() {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas, feed_cut_in: ctx.feedCutIn,
-                ar_mol_pct: onlineState.arMol === '' ? null : Number(onlineState.arMol),
-                ar_wt_pct: onlineState.arWt === '' ? null : Number(onlineState.arWt),
-                gas_feed: Object.fromEntries(Object.entries(onlineState.gasFeed).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])),
-                total_feed_g_h: onlineState.fi01 === '' ? null : Number(onlineState.fi01),
-                molar_volume: onlineState.molarVolume === '' ? null : Number(onlineState.molarVolume),
                 doe_rows: ctx.doeRows,
             }),
         });
@@ -241,18 +231,6 @@ function renderUnitsBar() {
     if (unit === 'mol') return;
     const data = onlineState.converted;
     const basis = data?.basis || {};
-    const arMol = online$('#onlineArMol'), arWt = online$('#onlineArWt');
-    if (arMol && document.activeElement !== arMol) arMol.value = onlineState.arMol;
-    if (arWt && document.activeElement !== arWt) arWt.value = onlineState.arWt;
-    document.querySelectorAll('.online-flow').forEach((input) => {
-        if (document.activeElement !== input) input.value = onlineState.gasFeed[input.dataset.reactor] ?? '';
-    });
-    const fi01 = online$('#onlineFi01'), vm = online$('#onlineVm');
-    if (fi01 && document.activeElement !== fi01) fi01.value = onlineState.fi01;
-    if (vm && document.activeElement !== vm) vm.value = onlineState.molarVolume;
-    const fromPlan = basis.ar_source !== 'entered';
-    if (arMol) arMol.placeholder = basis.ar_feed_mol_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_mol_pct)} (Run Plan)` : 'Run Plan';
-    if (arWt) arWt.placeholder = basis.ar_feed_wt_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_wt_pct)} (Run Plan)` : 'Run Plan';
     const parts = [];
     if (data) {
         parts.push(`<b>${escOnline(data.label)}</b> · ${data.ok_count} line${data.ok_count === 1 ? '' : 's'} calculated`
@@ -271,14 +249,15 @@ function renderUnitsBar() {
     if (data && !basis.export_has_flows) flowNote.push('This export has no gas flow columns.');
     if (basis.doe_flows) flowNote.push(`Run Plan DOE gas flows: ${basis.doe_flows} rows`);
     if (sources) flowNote.push(`Flow source of the calculated lines – ${sources}`);
-    if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Enter the gas feed of the reactors (NmL/h), or load a Run Plan with DOE gas flows.</span>');
+    if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Gas feed missing: load the Run Plan with the DOE gas flow of every condition (start date, duration, Total gas Nl/h).</span>');
+    if (basis.argon_missing) flowNote.push('<span class="online-cell-error">Ar missing: load the Run Plan with Argon in Feed → Gas feed composition.</span>');
     online$('#onlineFlowNote').innerHTML = flowNote.join(' · ');
-    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'gas feed per reactor' : ''].filter(Boolean);
+    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'DOE gas flows' : ''].filter(Boolean);
     bar.classList.toggle('needs-input', missingInputs.length > 0);
     if (missingInputs.length && !bar.dataset.autoOpened) { bar.open = true; bar.dataset.autoOpened = '1'; }
     // One line on the closed block: Ar basis and how many lines could be calculated
     online$('#onlineUnitsSummary').innerHTML = data
-        ? (missingInputs.length ? `· <span class="online-cell-error">${missingInputs.join(' and ')} missing – enter it here</span> ` : '')
+        ? (missingInputs.length ? `· <span class="online-cell-error">${missingInputs.join(' and ')} missing in the Run Plan</span> ` : '')
           + `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
           + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} · ${data.ok_count} calculated`
           + (data.error_count ? `, <span class="online-cell-error">${data.error_count} ERROR</span>` : '')
@@ -335,11 +314,6 @@ function saveOnlineState() {
             reactorMapActive: onlineState.reactorMapActive,
             unit: onlineState.unit,
             hiddenConverted: onlineState.hiddenConverted,
-            arMol: onlineState.arMol,
-            arWt: onlineState.arWt,
-            gasFeed: onlineState.gasFeed,
-            fi01: onlineState.fi01,
-            molarVolume: onlineState.molarVolume,
             path: online$('#onlineFile').value,
             summary: online$('#onlineSummary').textContent,
             from: from,
@@ -364,11 +338,6 @@ function restoreOnlineState() {
             onlineState.reactorMapActive = Boolean(saved.reactorMapActive);
             if (['mol', 'mass', 'volume', 'carbon'].includes(saved.unit)) onlineState.unit = saved.unit;
             if (Array.isArray(saved.hiddenConverted)) onlineState.hiddenConverted = saved.hiddenConverted;
-            onlineState.arMol = saved.arMol ?? '';
-            onlineState.arWt = saved.arWt ?? '';
-            onlineState.gasFeed = saved.gasFeed && typeof saved.gasFeed === 'object' ? saved.gasFeed : {};
-            onlineState.fi01 = saved.fi01 ?? '';
-            onlineState.molarVolume = saved.molarVolume ?? '';
             if (Array.isArray(saved.rows)) onlineState.rows = saved.rows;
             if (Array.isArray(saved.columns)) onlineState.columns = saved.columns;
             onlineState.allColumns = Array.isArray(saved.allColumns) ? saved.allColumns : [...onlineState.columns];
@@ -585,26 +554,6 @@ if (online$('#onlineUnit')) online$('#onlineUnit').onchange = () => {
     saveOnlineState();
     refreshOnlineUnits();
 };
-let unitInputTimer = null;
-const unitInputs = { '#onlineArMol': 'arMol', '#onlineArWt': 'arWt', '#onlineFi01': 'fi01', '#onlineVm': 'molarVolume' };
-const scheduleUnits = () => {
-    saveOnlineState();
-    clearTimeout(unitInputTimer);
-    unitInputTimer = setTimeout(refreshOnlineUnits, 400);
-};
-Object.entries(unitInputs).forEach(([selector, key]) => {
-    const input = online$(selector);
-    if (!input) return;
-    input.oninput = () => { onlineState[key] = input.value.trim(); scheduleUnits(); };
-});
-document.querySelectorAll('.online-flow').forEach((input) => {
-    input.oninput = () => {
-        const value = input.value.trim();
-        if (value === '') delete onlineState.gasFeed[input.dataset.reactor];
-        else onlineState.gasFeed[input.dataset.reactor] = value;
-        scheduleUnits();
-    };
-});
 online$('#onlineReactorFilter').onchange = renderOnlineTable;
 online$('#onlineRestoreColumns').onclick = () => {
     if (onlineState.unit !== 'mol' && onlineState.converted) onlineState.hiddenConverted = [];

@@ -5,8 +5,8 @@ The formulas follow the MassBal workbook (Ver2.2, sheets R#_MB, Gas, Run_Plan); 
 * Gas feed to reactor r   F_r [g/h]   = 01i14FI01 · V_r / ΣV            (Gas!B12; V = 01i14FIC01..08 [NmL/h])
 * Argon to reactor r      F_Ar,r      = F_r · w_Ar / 100                (Gas!G20; w_Ar = Ar wt% of the feed gas, Gas!I37)
                           without 01i14FI01: F_Ar,r = V_r/1000 / Vm · y_Ar,feed/100 · 39.948 (Vm = 22.414 Nl/mol)
-  V_r / 01i14FI01 come from the export line, else from the values entered per reactor (Gas!B11:I11, Gas!E5),
-  else from the Run Plan DOE condition running at that time ("Total gas (Nl/h)" / "Gas Flow (NmL/h)").
+  V_r / 01i14FI01 come from the export line, else from the Run Plan DOE condition running at that time
+  ("Total gas (Nl/h)" / "Gas Flow (NmL/h)"). Ar in the feed gas comes from the Run Plan (Feed → Gas feed composition).
 * Mass flow               m_i [g/h]   = y_i·MW_i / (y_Ar·MW_Ar) · F_Ar,r (R#_MB rows 52-80)
 * Volumetric flow         V_i [Nl/h]  = y_i/100 · V_out,  V_out = V_r/1000 · y_Ar,feed / y_Ar   (R#_MB rows 86-116)
 * Carbon flow             C_i [g C/h] = 12.011 · nC_i / MW_i · m_i       (R#_MB rows 121-150, "TOS Carbon of Each Molecule")
@@ -162,12 +162,13 @@ def _doe_flow(doe, reactor, when):
     return hits[-1] if hits else None
 
 
-def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=None, feed_cut_in=None,
-                        gas_feed=None, total_feed_g_h=None, molar_volume=None, doe_rows=None):
+def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=None, ar_mol_pct=None, ar_wt_pct=None):
     """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, flows) in the chosen unit.
 
-    Gas feed of a line, in this order: the export line (01i14FIC0r, 01i14FI01) → the values entered per reactor
-    (`gas_feed` {"R1": NmL/h, ...}, `total_feed_g_h` = 01i14FI01) → the Run Plan DOE condition running at that time.
+    Everything comes from the export and the Run Plan: Ar in the feed gas from `feed_gas` (Run Plan Feed → Gas feed
+    composition), the gas feed of a line from the export line (01i14FIC0r, 01i14FI01), else from the Run Plan DOE
+    condition running at that time (`doe_rows`). `ar_mol_pct` / `ar_wt_pct` override the feed gas for scripts and tests
+    only (the page does not send them).
     Argon to the reactor: with 01i14FI01 and the Ar wt% as in the workbook (F_r · w_Ar); without 01i14FI01 from the
     volume: FIC_r/1000 / molar volume · y_Ar,feed/100 · 39.948 (the same quantity: n_Ar · MW_Ar).
     """
@@ -177,26 +178,19 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
     feed = feed_argon(feed_gas)
     ar_mol = _num(ar_mol_pct) if _num(ar_mol_pct) else feed["ar_mol_pct"]
     ar_wt = _num(ar_wt_pct) if _num(ar_wt_pct) else feed["ar_wt_pct"]
-    vm = _num(molar_volume) or MOLAR_VOLUME
-    entered = {}
-    for key, value in (gas_feed or {}).items():
-        reactor = reactor_number(key)
-        if reactor and _num(value) is not None:
-            entered[reactor] = _num(value)
-    entered_total = _num(total_feed_g_h)
+    vm = MOLAR_VOLUME
     doe = doe_gas_flows(doe_rows)
     has_tags = any(_num(r.get(f"01i14FIC0{k}")) is not None or _num(r.get(f"02i2FIC0{k}")) is not None
                    for r in rows or [] for k in range(1, 9))
     basis = {"unit": unit, "label": UNITS[unit]["label"], "ar_feed_mol_pct": ar_mol, "ar_feed_wt_pct": ar_wt,
-             "ar_source": "entered" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
+             "ar_source": "override" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
              "excluded_feed_gas": feed["excluded"], "molar_volume": vm, "export_has_flows": has_tags,
-             "entered_flows": {f"R{k}": v for k, v in sorted(entered.items())}, "entered_total_g_h": entered_total,
              "doe_flows": len(doe)}
     missing = None
     if unit == "volume" and not ar_mol:
-        missing = "ERROR: Ar mol% of the feed gas is not set (Run Plan Feed → Gas feed composition, or enter it)"
+        missing = "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
     if unit in ("mass", "carbon") and not ar_mol and not ar_wt:
-        missing = "ERROR: Ar in the feed gas is not set (Run Plan Feed → Gas feed composition, or enter mol% / wt%)"
+        missing = "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
 
     present = []
     for row in rows or []:
@@ -254,20 +248,18 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
             if flow is not None:
                 fi01, v_r, v_sum = flow
                 source = "export"
-            elif reactor in entered:
-                fi01, v_r, v_sum = entered_total, entered[reactor], sum(v for v in entered.values() if v > 0)
-                source = "entered"
             else:
                 v_r = _doe_flow(doe, reactor, when)
                 fi01, source = None, "Run Plan DOE"
                 v_sum = sum(v for v in (_doe_flow(doe, k, when) for k in range(1, 9)) if v and v > 0) if v_r else 0
             flow = (fi01, v_r, v_sum, source)
             if v_r is None:
-                status = f"ERROR: no gas feed for R{reactor} (not in the export) – enter it under Conversion basis"
+                status = (f"ERROR: no gas feed for R{reactor} – not in the export and no Run Plan DOE condition "
+                          f"with a gas flow at this time")
             elif v_r <= 0 or not v_sum:
                 status = f"ERROR: no gas feed to R{reactor} ({source}: {v_r:g} NmL/h)"
             elif unit != "volume" and not (fi01 and fi01 > 0 and ar_wt) and not ar_mol:
-                status = "ERROR: no total gas feed 01i14FI01 and no Ar mol% – enter Ar mol% (or 01i14FI01 and Ar wt%)"
+                status = "ERROR: no Argon mol% in the Run Plan feed gas (needed without 01i14FI01)"
         if status != "OK":
             out["Status"] = status
             out_rows.append(out)
@@ -324,8 +316,8 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
     ok = sum(1 for r in out_rows if r["Status"] == "OK")
     flows_missing = any(r["Status"].startswith("ERROR: no gas feed for R") for r in out_rows)
     basis["flows_missing"] = flows_missing
-    # The export has no flows and nothing was entered / found in the DOE: the gas feed is needed as well
-    basis["flows_needed"] = not has_tags and not entered and not doe
+    # The export has no flows and the Run Plan DOE has no gas flows: the gas feed is missing
+    basis["flows_needed"] = not has_tags and not doe
     basis["argon_missing"] = bool(missing)
     return {"unit": unit, "label": UNITS[unit]["label"], "columns": columns, "rows": out_rows, "basis": basis,
             "components": components, "ok_count": ok, "error_count": len(out_rows) - ok}
