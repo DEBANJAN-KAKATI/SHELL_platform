@@ -1,3 +1,7 @@
+## Unreleased — 6.4.2 update package
+- `upgrade/6.4.2_online_units/`: step-by-step guide (with the formulas and workbook cells), checker and git patch that
+  bring the Online Analysis units to the offline 6.4.1 dashboard with the process selection kept.
+
 ## 6.8.0 (2026-11-05) — Online Analysis units; first Mass Balance removed
 - **Online Analysis → Units**: Normalised mol% (as imported), Mass flow rates (g/h), Volumetric flow rates (Nl/h) and
   TOS carbon of each molecule (g C/h) per GC injection, with argon as internal standard and the formulas and molecular
