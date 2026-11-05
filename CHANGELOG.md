@@ -1,3 +1,12 @@
+## 6.8.2 (2026-11-05) — Run Plans of the earlier template layout: gas feed composition
+- Run Plans made with the earlier template (Feed without Excel tables, e.g. `RunPlan_R6-C1-S1_MassBalance.xlsx`) keep the
+  gas feed in a "Gas composition (mol%)" block under "Gas feed". It is now read as the Gas feed composition (it was read
+  as gas feed settings and the gas table stayed empty, so the Online Analysis units had no Ar in feed gas). Header rows
+  inside the liquid range are no longer listed as components.
+- Test `test_run_plan_r6_earlier_layout_gives_feed_gas_and_doe_flows`: with the DOE gas flow (2.9999 Nl/h) and the
+  verified Ar of the workbook (4.3 mol%) the converted flows are within 0.5 % of R6_MB; with the Run Plan's target Ar
+  (5 mol%) they are 16.8 % higher.
+
 ## 6.8.1 (2026-11-05) — Online Analysis units for GC exports without gas flows
 - GC exports without the 01i14FIC0r / 01i14FI01 columns (e.g. `R3-C2-S1_9-06-23.txt`) showed "ERROR: no gas feed …
   = empty" on every line. The gas feed of a line now comes from the export, else from the values entered per reactor

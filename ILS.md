@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.8.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.8.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
@@ -116,7 +116,9 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Feed: Excel tables tbl_Feed (A1:F13 properties: label A, unit D, value E, note G), tbl_comp (A14:F45 liquid, Total row),
   tbl_compType (H14:K22), tbl_gas (M14:P31) + "Gas feed settings" (A46:E48) → `feed.tables`; flat `feed.rows` start
   with Carbon, Hydrogen, Molecular Weight (consumers read Carbon = row 1, MW = row 3), then other properties and filled
-  components. Totals checked to 100 ± 0.5.
+  components. Totals checked to 100 ± 0.5. Earlier template layout (e.g. `RunPlan_R6-C1-S1_MassBalance.xlsx`, no tables): the gas feed is
+  the "Gas composition (mol%)" block under "Gas feed" (component A, unit D, value E, down to Total), used when tbl_gas has
+  no values; header rows inside the liquid range ("Component (wt%)", "Group-type summary (wt%)") are skipped.
 - Open item: condition assignment (Calculation table, Plots) matches DOE dates only, not per block/reactor.
 
 ## Isomerization calculations

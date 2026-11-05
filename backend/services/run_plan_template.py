@@ -311,6 +311,8 @@ def parse_feed(ws_values, ws_formulas=None):
         if label.lower() == "total":
             liquid_total, liquid_check = number(r[4]), clean(r[5])
             continue
+        if label.lower().startswith("component") or _label(r[4] if len(r) > 4 else "").lower() == "weight":
+            continue                                     # header rows inside the range (earlier template layout)
         liquid.append({"component": label, "carbon_no": clean(r[1]), "type": clean(r[2]), "unit": clean(r[3]) or "wt%",
                        "weight": clean(r[4]), "mw": clean(r[5])})
     weights = [number(x["weight"]) for x in liquid if number(x["weight"]) is not None]
@@ -326,13 +328,28 @@ def parse_feed(ws_values, ws_formulas=None):
     gas_block, _, _ = _block(rows, ranges["tbl_gas"])
     gas = [{"component": _label(r[0]), "unit": clean(r[1]) or "mol%", "value": clean(r[2]), "check": clean(r[3])} for r in gas_block]
     gas_values = [number(g["value"]) for g in gas if number(g["value"]) is not None]
+    if not gas_values:
+        # Earlier template layout: a "Gas composition (mol%)" block under "Gas feed" (component A, unit D, value E).
+        start = next((i for i, r in enumerate(rows) if r and _label(r[0]).lower().startswith("gas composition")), None)
+        if start is not None:
+            legacy = []
+            for r in rows[start + 1:]:
+                label = _label(r[0]) if r else ""
+                if not label or label.lower() == "total":
+                    break
+                legacy.append({"component": label, "unit": (clean(r[3]) if len(r) > 3 else "") or "mol%",
+                               "value": clean(r[4]) if len(r) > 4 else "", "check": ""})
+            if any(number(g["value"]) is not None for g in legacy):
+                gas = legacy
+                gas_values = [number(g["value"]) for g in gas if number(g["value"]) is not None]
     gas_total = sum(gas_values) if gas_values else None
 
-    settings, start = [], next((i for i, r in enumerate(rows) if r and _label(r[0]).lower() == "gas feed settings"), None)
+    settings, start = [], next((i for i, r in enumerate(rows)                # "Gas feed settings" (template), "Gas feed"
+                                if r and _label(r[0]).lower() in ("gas feed settings", "gas feed")), None)
     if start is not None:
         for i in range(start + 1, len(rows)):
             label = _label(rows[i][0]) if rows[i] else ""
-            if not label:
+            if not label or label.lower().startswith("gas composition"):
                 break
             settings.append({"label": label, "unit": clean(rows[i][3]) if len(rows[i]) > 3 else "",
                              "value": clean(rows[i][4]) if len(rows[i]) > 4 else "", "note": note(i)})

@@ -159,3 +159,28 @@ def test_gas_feed_from_the_run_plan_doe():
     assert out["Gas feed to reactor [Nl/h]"] == pytest.approx(3.1262)            # DOE R5 Gas Flow 3126.2 NmL/h
     late = dict(row, DateTime="2024-10-28 10:00:00")                               # after the condition ended
     assert convert_online_rows([late], "volume", ar_mol_pct=5, doe_rows=doe)["rows"][0]["Status"].startswith("ERROR: no gas feed for R5")
+
+
+R6_RUN_PLAN = FIXTURES / "run_plan" / "RunPlan_R6-C1-S1_MassBalance.xlsx"   # earlier template: gas block A50:E63
+
+
+def test_run_plan_r6_earlier_layout_gives_feed_gas_and_doe_flows(workbook_case):
+    """Run Plan of R6-C1-S1: gas composition block (Ar 5 mol% target), DOE 2.9999 Nl/h, Feed Cut-In 13.05.2024 14:00."""
+    ws, _, names, _, rows = workbook_case
+    plan = process_run_plan_file(str(R6_RUN_PLAN))
+    gas = plan["feed"]["tables"]["gas"]
+    assert {r["component"]: r["value"] for r in gas["rows"]}["Argon"] == 5 and gas["check"] == "Not 100"
+    assert [s["label"] for s in gas["settings"]] == ["Diluent / internal standard", "Active gas fraction in feed gas"]
+    assert not [r for r in plan["feed"]["tables"]["liquid"]["rows"] if r["weight"] != ""]      # header rows skipped
+    cut = next(i["value"] for i in plan["plan"]["info"] if i["parameter"] == "Feed Cut-In")
+    export = [{k: v for k, v in r.items() if not k.startswith("01i14")} for r in rows]      # GC only, like a GC export
+    for r in export:
+        r["DateTime"] = "2024-05-14 07:52:00"
+    kw = dict(feed_gas=gas["rows"], feed_cut_in=cut, doe_rows=plan["doe"]["rows"])
+    target = convert_online_rows(export, "mass", **kw)["rows"][0]
+    assert target["Flow source"] == "Run Plan DOE, molar volume" and target["TOS (h)"] == pytest.approx(17.8667, abs=1e-4)
+    assert target["Ar to reactor [g/h]"] == pytest.approx(2.9999 / 22.414 * 0.05 * 39.948)   # DOE 2.9999 Nl/h as read
+    # with the verified Ar of the workbook (Gas!I35 = 4.3 mol%) the flows are within 0.5 % of R6_MB
+    verified = convert_online_rows(export, "mass", ar_mol_pct=4.3, **kw)["rows"][0]
+    assert verified["Acetylene [g/h]"] == pytest.approx(ws["D78"].value, rel=0.005)
+    assert verified["N2 [g/h]"] == pytest.approx(ws["D80"].value, rel=0.005)
