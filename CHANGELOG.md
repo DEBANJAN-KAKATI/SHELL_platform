@@ -16,6 +16,10 @@
 - The Conversion basis block opens by itself and says what is missing (Ar in feed gas, gas feed per reactor).
 - `ESTD_Etylene` (spelling of some GC methods) is read as Ethylene.
 
+## Unreleased — 6.4.3 update package
+- `upgrade/6.4.3_online_gas_feed/`: guide, checker and patch that bring 6.8.1–6.8.2 (gas feed for GC exports without
+  flows, Etylene, earlier Run Plan gas block) to the offline 6.4.2 dashboard with the process selection kept.
+
 ## Unreleased — 6.4.2 update package
 - `upgrade/6.4.2_online_units/`: step-by-step guide (with the formulas and workbook cells), checker and git patch that
   bring the Online Analysis units to the offline 6.4.1 dashboard with the process selection kept.
