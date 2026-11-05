@@ -97,7 +97,7 @@ def test_run_export_end_to_end_with_the_run_plan_feed_gas():
 def test_errors_are_explicit():
     row = {"DateTime": "2024-01-01 10:00:00", "Reactor": "R2", "01i14FI01": 5, "01i14FIC02": 1000,
            "ESTD_Argon": 5, "ESTD_Methane": 1, "ESTD_C3-C4": 0.2}
-    assert convert_online_rows([row], "mass")["rows"][0]["Status"].startswith("ERROR: Ar wt% of the feed gas is not set")
+    assert convert_online_rows([row], "mass")["rows"][0]["Status"].startswith("ERROR: Ar in the feed gas is not set")
     out = convert_online_rows([row], "mass", ar_wt_pct=10)["rows"][0]
     assert out["C3-C4 [g/h]"] == "ERROR: no MW for C3-C4" and out["Status"].startswith("ERROR: no MW for C3-C4")
     assert out["Methane [g/h]"] == pytest.approx(1 * 16.04 / (5 * 39.948) * 5 * 0.10)
@@ -111,3 +111,51 @@ def test_errors_are_explicit():
 
 def test_reactor_numbers():
     assert [reactor_number(v) for v in (1, 1.0, "1", "R6", "r8", 0, "", None, "R9")] == [1, 1, 1, 6, 8, 0, None, None, None]
+
+
+R3_EXPORT = FIXTURES / "online" / "R3-C2-S1_9-06-23.txt"     # GC export without gas flow columns, "Etylene"
+
+
+def test_export_without_flows_asks_for_the_gas_feed():
+    rows = process_online_file(R3_EXPORT)["rows"]
+    out = convert_online_rows(rows, "mass", ar_mol_pct=5)
+    assert out["basis"]["export_has_flows"] is False and out["basis"]["flows_needed"] and out["basis"]["flows_missing"]
+    assert out["ok_count"] == 0
+    r1 = next(r for r in out["rows"] if reactor_number(r["Reactor"]) == 1)
+    assert r1["Status"] == "ERROR: no gas feed for R1 (not in the export) – enter it under Conversion basis"
+    assert "Ethylene [g/h]" in out["columns"] and not any("Etylene" in c for c in out["columns"])
+
+
+def test_entered_gas_feed_like_the_workbook_gas_sheet():
+    rows = process_online_file(R3_EXPORT)["rows"]
+    gas = {f"R{k}": 3000 for k in range(1, 9)}
+    out = convert_online_rows(rows, "mass", ar_mol_pct=5, gas_feed=gas)
+    assert out["ok_count"] == 44 and out["basis"]["flow_sources"] == {"entered, molar volume": 44}
+    line = out["rows"][2]                                                        # R2, 08.06.2023 18:09:40
+    assert reactor_number(line["Reactor"]) == 2
+    ar = 3.0 / 22.414 * 0.05 * 39.948                                           # n_Ar · MW_Ar from 3000 NmL/h
+    assert line["Ar to reactor [g/h]"] == pytest.approx(ar)
+    assert line["Ethylene [g/h]"] == pytest.approx(rows[2]["ESTD_Etylene"] * 28.05 / (rows[2]["ESTD_Argon"] * 39.948) * ar)
+    # with 01i14FI01 the workbook route: FI01 · V_r/ΣV · w_Ar
+    wb = convert_online_rows(rows, "mass", ar_mol_pct=5, ar_wt_pct=9.4, gas_feed=gas, total_feed_g_h=19.5)
+    assert wb["rows"][2]["Ar to reactor [g/h]"] == pytest.approx(19.5 / 8 * 0.094)
+    assert wb["basis"]["flow_sources"] == {"entered, 01i14FI01": 44}
+
+
+def test_both_argon_routes_agree_for_consistent_inputs(workbook_case):
+    """Workbook R6: 01i14FI01 = 19.5 g/h for 7 × 3000 NmL/h; the molar-volume route gives the same Ar flow (0 °C)."""
+    _, gas, _, feed, rows = workbook_case
+    no_fi01 = [{k: v for k, v in r.items() if k != "01i14FI01"} for r in rows]
+    a = convert_online_rows(rows, "mass", feed_gas=feed)["rows"][0]["Ar to reactor [g/h]"]
+    b = convert_online_rows(no_fi01, "mass", feed_gas=feed)["rows"][0]["Ar to reactor [g/h]"]
+    assert b == pytest.approx(a, rel=0.01)
+
+
+def test_gas_feed_from_the_run_plan_doe():
+    doe = process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_Old_Format.xlsx"))["doe"]["rows"]
+    row = {"DateTime": "2024-10-25 10:00:00", "Reactor": 5, "ESTD_Argon": 5.4, "ESTD_Methane": 3.0}
+    out = convert_online_rows([row], "volume", ar_mol_pct=5, doe_rows=doe)["rows"][0]
+    assert out["Status"] == "OK" and out["Flow source"] == "Run Plan DOE"
+    assert out["Gas feed to reactor [Nl/h]"] == pytest.approx(3.1262)            # DOE R5 Gas Flow 3126.2 NmL/h
+    late = dict(row, DateTime="2024-10-28 10:00:00")                               # after the condition ended
+    assert convert_online_rows([late], "volume", ar_mol_pct=5, doe_rows=doe)["rows"][0]["Status"].startswith("ERROR: no gas feed for R5")

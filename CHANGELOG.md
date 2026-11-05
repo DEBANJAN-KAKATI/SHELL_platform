@@ -1,3 +1,12 @@
+## 6.8.1 (2026-11-05) — Online Analysis units for GC exports without gas flows
+- GC exports without the 01i14FIC0r / 01i14FI01 columns (e.g. `R3-C2-S1_9-06-23.txt`) showed "ERROR: no gas feed …
+  = empty" on every line. The gas feed of a line now comes from the export, else from the values entered per reactor
+  (R1–R8 NmL/h, optional total 01i14FI01 g/h — the workbook's Gas!B11:I11 / E5), else from the Run Plan DOE condition
+  running at that time. Without 01i14FI01 the argon flow is calculated from the volume (FIC_r / molar volume · Ar mol% ·
+  39.948, molar volume 22.414 Nl/mol, editable). New column "Flow source".
+- The Conversion basis block opens by itself and says what is missing (Ar in feed gas, gas feed per reactor).
+- `ESTD_Etylene` (spelling of some GC methods) is read as Ethylene.
+
 ## Unreleased — 6.4.2 update package
 - `upgrade/6.4.2_online_units/`: step-by-step guide (with the formulas and workbook cells), checker and git patch that
   bring the Online Analysis units to the offline 6.4.1 dashboard with the process selection kept.

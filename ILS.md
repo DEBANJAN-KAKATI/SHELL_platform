@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.8.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.8.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
@@ -172,7 +172,14 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook);
   Ar mol% / wt% can be entered on the page instead (collapsed "Conversion basis" block under the table, with the formula
   and the MW table; its summary line shows Ar mol% / wt% and the number of lines calculated / with ERROR). TOS from the Run Plan Feed Cut-In (else the first record).
-- Each line uses its own 01i14FI01 / 01i14FIC0r (else 02i2FIC0r); Reactor from `Sampled_reactor` or the Reactor Map
+- Gas feed of a line (v6.8.1), in this order: the export line (01i14FIC0r [NmL/h], 01i14FI01 [g/h]) → values entered per
+  reactor in the Conversion basis block (R1–R8 NmL/h + optional total 01i14FI01 g/h = workbook Gas!B11:I11 / E5) → the Run
+  Plan DOE condition running at that time ("Total gas (Nl/h)" × 1000, older files "Gas Flow (NmL/h)"). Argon to the
+  reactor: with 01i14FI01 and Ar wt% as in the workbook; otherwise from the volume, F_Ar,r = FIC_r/1000 / Vm · y_Ar,feed/100
+  · 39.948 (Vm 22.414 Nl/mol = 0 °C, editable; same quantity, agrees with the workbook within 1 %). Column "Flow source"
+  per line. Many GC exports (e.g. `R3-C2-S1_9-06-23.txt`) have no flow columns: the block opens and asks for the gas feed /
+  Ar in feed gas. Export spelling `ESTD_Etylene` = Ethylene (`ALIASES`).
+- With flows on the export each line uses its own 01i14FI01 / 01i14FIC0r (else 02i2FIC0r); Reactor from `Sampled_reactor` or the Reactor Map
   (1, 1.0, "R1"). Status per line: OK or `ERROR: …` (bypass / no reactor, no argon peak, no gas feed to Rr, no GC values,
   feed argon not set). Converted rows are not stored (the unit, hidden columns and entered Ar values are, in
   `dhaOnlineState`). Loader fix: `ESTD_C6 Above` = `Area_C6 Above` when `Conc_C6 Above` is empty (export column shift).
