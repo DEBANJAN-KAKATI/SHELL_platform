@@ -1,3 +1,19 @@
+## 6.8.0 (2026-11-05) — Online Analysis units; first Mass Balance removed
+- **Online Analysis → Units**: Normalised mol% (as imported), Mass flow rates (g/h), Volumetric flow rates (Nl/h) and
+  TOS carbon of each molecule (g C/h) per GC injection, with argon as internal standard and the formulas and molecular
+  weights of the MassBal workbook (Ver2.2): F_Ar,r = 01i14FI01 · FIC_r/ΣFIC · w_Ar, m_i = y_i·MW_i/(y_Ar·39.948)·F_Ar,r,
+  V_i = y_i/100 · FIC_r/1000 · y_Ar,feed/y_Ar, C_i = 12.011·nC_i/MW_i·m_i. Ar mol% / wt% of the feed gas from the Run Plan
+  gas table (or entered), TOS from the Run Plan Feed Cut-In. Explicit ERROR status for bypass lines, missing argon peak,
+  stopped gas feed and missing feed argon. The mass and carbon flows reproduce the workbook's R6_MB values exactly; the
+  workbook's total volumetric flow (R#_MB!D86) mixes g/h and NmL/h, so the argon balance it intends is used.
+- New `backend/services/online_units.py`, endpoint `POST /api/online-units`, tests `tests/test_online_units.py`.
+- Online loader: `ESTD_C6 Above` is taken from `Area_C6 Above` when the export shifts that column (`Conc_C6 Above`
+  empty); the import summary says so.
+- The first Mass Balance (v6.5: `backend/mass_balance`, its routes, GC map, tests, scripts and page hooks in Plots,
+  Custom table, History and Save Run Details) is removed; Mass Balance is rebuilt step by step. The R08 run export and
+  the MassBal workbook moved to `tests/fixtures/online/`; the older-layout Run Plan used by the tests is
+  `tests/fixtures/run_plan/RunPlan_Old_Format.xlsx`.
+
 ## 6.7.1 (2026-11-04) — Feed Cut-In from the pre-run; 6.4.1 update package
 - Template Run Plans now give the Plan info "Feed Cut-In" (TOS zero): the pre-run feed cut-in of the first active
   reactor's block, else the start of its first DOE condition; `doe.pretreatment.settings` holds the pre-run settings

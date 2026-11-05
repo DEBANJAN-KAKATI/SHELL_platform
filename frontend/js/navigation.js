@@ -26,7 +26,6 @@ window.ILSProcess = {
     get() { return 'isomerization'; },
     set() {},
     isReforming() { return false; },
-    isMassBalance() { return false; },
     label() { return 'Isomerization'; },
     runPlanUrl() { return '/frontend/run_plan.html'; }
 };
@@ -130,10 +129,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=3';
+        historianScript.src = '/frontend/js/historian_save.js?v=4';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
-            runDataScript.src = '/frontend/js/run_data.js?v=3';
+            runDataScript.src = '/frontend/js/run_data.js?v=4';
             document.head.appendChild(runDataScript);
         };
         document.head.appendChild(historianScript);

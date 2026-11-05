@@ -7,8 +7,9 @@
     <title>ILS GC and System Data | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=6" defer></script>
-    <script src="/frontend/js/online_analysis.js?v=5" defer></script>
+    <script src="/frontend/js/navigation.js?v=7" defer></script>
+    <link href="/frontend/css/online_units.css?v=1" rel="stylesheet">
+    <script src="/frontend/js/online_analysis.js?v=6" defer></script>
     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
 </head>
 
@@ -59,6 +60,15 @@
                             <h3>Reactor conditions</h3>
                         </div>
                         <div class="table-actions online-table-actions">
+                            <label class="online-unit-wrap" title="Show the GC values as normalised mol% or converted with argon as internal standard (MassBal workbook)">
+                                <span>Units</span>
+                                <select class="input online-filter" id="onlineUnit" aria-label="Units of the GC values">
+                                    <option value="mol">Normalised mol%</option>
+                                    <option value="mass">Mass flow rates (g/h)</option>
+                                    <option value="volume">Volumetric flow rates (Nl/h)</option>
+                                    <option value="carbon">TOS carbon of each molecule (g C/h)</option>
+                                </select>
+                            </label>
                             <button type="button" class="btn secondary reactor-toggle-btn" id="onlineReactorMapToggle" aria-pressed="false" title="Toggle Reactor Map hour - 1 mapping">
                                 <span class="reactor-dot closed" id="onlineToggleDot"></span>
                                 <span>Reactor Map:</span>
@@ -76,6 +86,18 @@
                         <label>To<input id="onlineTo" type="datetime-local" step="1"></label>
                         <button type="button" class="btn secondary online-clear-dates-btn" id="onlineClearDates" title="Clear date range">Clear dates</button>
                         <div class="online-filter-badge" id="onlineDateBadge"></div>
+                    </div>
+                    <div class="online-units-bar" id="onlineUnitsBar" hidden>
+                        <div class="online-units-inputs">
+                            <label>Ar in feed gas <small>mol%</small><input class="input" id="onlineArMol" type="number" step="any" min="0" placeholder="Run Plan"></label>
+                            <label>Ar in feed gas <small>wt%</small><input class="input" id="onlineArWt" type="number" step="any" min="0" placeholder="Run Plan"></label>
+                            <span class="online-units-basis" id="onlineUnitsBasis"></span>
+                        </div>
+                        <div class="online-units-formula" id="onlineUnitsFormula"></div>
+                        <details class="online-units-mw">
+                            <summary>Molecular weights used (experimental standards of the MassBal workbook)</summary>
+                            <table class="online-mw-table"><thead><tr><th>Component</th><th>MW (g/mol)</th><th>C atoms</th><th>Source</th></tr></thead><tbody id="onlineMwBody"></tbody></table>
+                        </details>
                     </div>
                     <div class="table-wrap online-table-wrap">
                         <table class="online-table" id="onlineTable">

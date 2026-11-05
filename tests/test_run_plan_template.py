@@ -7,7 +7,7 @@ from backend.services.run_plan_template import is_template
 FIXTURES = Path(__file__).parent / "fixtures"
 TEMPLATE = FIXTURES / "run_plan" / "RunPlan_Template.xlsx"
 FILLED = FIXTURES / "run_plan" / "RunPlan_Template_Filled.xlsx"
-OLD_FORMAT = FIXTURES / "mass_balance" / "RunPlan_MassBalance_R08.xlsx"      # Plan A4:J14 / DOE / Feed A2:E25 layout
+OLD_FORMAT = FIXTURES / "run_plan" / "RunPlan_Old_Format.xlsx"      # Plan A4:J14 / DOE / Feed A2:E25 layout
 
 
 def test_template_is_detected_and_old_files_are_not():
