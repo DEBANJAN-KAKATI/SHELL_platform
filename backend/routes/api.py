@@ -167,6 +167,19 @@ def process_online():
         return jsonify({"error": str(e)}), 400
 
 
+@api.post("/online-units")
+def online_units():
+    """Online Analysis rows in mass flow (g/h), volumetric flow (Nl/h) or carbon flow (g C/h) per molecule."""
+    from backend.services.online_units import convert_online_rows
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify(convert_online_rows(
+            body.get("rows") or [], body.get("unit"), feed_gas=body.get("feed_gas"),
+            ar_mol_pct=body.get("ar_mol_pct"), ar_wt_pct=body.get("ar_wt_pct"), feed_cut_in=body.get("feed_cut_in")))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @api.post("/apply-online-reactor-map")
 def apply_online_reactor_map():
     body = request.get_json(silent=True) or {}

@@ -1,0 +1,20 @@
+/* Online Analysis: units of the GC values (mol% / g/h / Nl/h / g C/h) */
+.online-unit-wrap{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--slate);white-space:nowrap}
+.online-units-bar{margin:12px 16px 16px;padding:12px 15px;border:1px solid var(--border);border-left:3px solid var(--burnt);border-radius:8px;background:#fffaf0;display:grid;gap:8px}
+.online-units-bar[hidden]{display:none}
+.online-units-inputs{display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px}
+.online-units-inputs label{display:grid;gap:4px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--slate)}
+.online-units-inputs label small{text-transform:none;font-weight:600}
+.online-units-inputs input{width:160px;padding:7px 9px}
+.online-units-basis{font-size:12px;color:var(--ink);line-height:1.5;flex:1 1 360px}
+.online-units-formula{font:12px "Fira Code","Segoe UI",monospace;color:var(--slate)}
+.online-mw-table{margin-top:6px;border-collapse:collapse;font-size:12px;width:auto;min-width:0;max-width:640px}
+.online-mw-table th{position:static;background:transparent;color:var(--slate);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.online-mw-table th,.online-mw-table td{padding:4px 12px;border-bottom:1px solid var(--border);text-align:left}
+.online-mw-table td:nth-child(2),.online-mw-table td:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}
+.online-table td.online-status-ok{color:#166534;font-weight:700}
+.online-table td.online-status-error{color:#991b1b;font-weight:600;white-space:normal;min-width:220px}
+.online-table td .online-cell-error{color:#991b1b;font-weight:600}
+.online-units-bar summary{cursor:pointer;font-size:12px;color:var(--slate);list-style-position:inside}
+.online-units-bar:not([open]){padding:9px 15px}
+.online-units-title{font-size:12px;font-weight:700;color:var(--burnt)}

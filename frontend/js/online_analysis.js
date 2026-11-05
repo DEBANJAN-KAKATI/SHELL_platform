@@ -5,7 +5,13 @@ const onlineState = {
     columns: [],
     allColumns: [],
     reactorMapActive: false,
-    reactorRows: []
+    reactorRows: [],
+    // Units of the GC values: 'mol' (as imported) or a conversion from /api/online-units (mass, volume, carbon)
+    unit: 'mol',
+    converted: null,
+    hiddenConverted: [],
+    arMol: '',
+    arWt: ''
 };
 const online$ = (selector) => document.querySelector(selector);
 const formatOnlineValue = (value) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : (value ?? '');
@@ -143,6 +149,139 @@ function applyReactorMapMapping(rows, reactorRows) {
     });
 }
 
+// ---------------------------------------------------------------- Units (mol% → g/h, Nl/h, g C/h)
+const ONLINE_UNIT_FORMULAS = {
+    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar   (y = ESTD mol%)',
+    volume: 'V_i [Nl/h] = y_i/100 · V_out   with   V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar   (argon balance)',
+    carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS)',
+};
+const escOnline = (value) => String(value ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+function formatConvertedValue(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return value ?? '';
+    const a = Math.abs(value);
+    if (a === 0) return '0';
+    if (a >= 100) return value.toFixed(2);
+    if (a >= 1) return value.toFixed(4);
+    return String(Number(value.toPrecision(4)));
+}
+
+const formatBasisValue = (value) => (typeof value === 'number' && Number.isFinite(value) ? String(Number(value.toFixed(4))) : '–');
+
+function onlineRunPlanContext() {
+    try {
+        const rp = JSON.parse(sessionStorage.getItem('runPlanDashboardState') || 'null') || {};
+        const info = rp.planData?.info || [];
+        const cutIn = info.find(i => String(i.parameter).trim().toLowerCase() === 'feed cut-in')?.value || '';
+        return { feedGas: rp.feedTables?.gas?.rows || [], feedCutIn: cutIn };
+    } catch (e) {
+        return { feedGas: [], feedCutIn: '' };
+    }
+}
+
+function compactUnitRows(rows) {
+    const keep = key => key === 'DateTime' || key === 'Reactor' || key.startsWith('ESTD_') || key === '01i14FI01'
+        || /^01i14FIC0\d$/.test(key) || /^02i2FIC0\d$/.test(key);
+    return rows.map(row => Object.fromEntries(Object.entries(row).filter(([key]) => keep(key))));
+}
+
+let unitRequest = 0;
+async function refreshOnlineUnits() {
+    const unit = onlineState.unit;
+    renderUnitsBar();
+    if (unit === 'mol' || !onlineState.rows.length) {
+        onlineState.converted = null;
+        renderOnlineTable();
+        return;
+    }
+    const ticket = ++unitRequest;
+    const ctx = onlineRunPlanContext();
+    online$('#onlineStatus').textContent = 'Converting...';
+    try {
+        const response = await fetch('/api/online-units', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas, feed_cut_in: ctx.feedCutIn,
+                ar_mol_pct: onlineState.arMol === '' ? null : Number(onlineState.arMol),
+                ar_wt_pct: onlineState.arWt === '' ? null : Number(onlineState.arWt),
+            }),
+        });
+        const data = await onlineJson(response);
+        if (!response.ok) throw Error(data.error);
+        if (ticket !== unitRequest) return;
+        onlineState.converted = data;
+        onlineError();
+    } catch (error) {
+        if (ticket !== unitRequest) return;
+        onlineState.converted = null;
+        onlineError(`Unit conversion failed: ${error.message}`);
+    } finally {
+        if (ticket === unitRequest) online$('#onlineStatus').textContent = 'Ready';
+    }
+    renderUnitsBar();
+    renderOnlineTable();
+}
+
+function renderUnitsBar() {
+    const bar = online$('#onlineUnitsBar');
+    if (!bar) return;
+    const unit = onlineState.unit;
+    if (online$('#onlineUnit')) online$('#onlineUnit').value = unit;
+    bar.hidden = unit === 'mol';
+    if (unit === 'mol') return;
+    const data = onlineState.converted;
+    const basis = data?.basis || {};
+    const arMol = online$('#onlineArMol'), arWt = online$('#onlineArWt');
+    if (arMol && document.activeElement !== arMol) arMol.value = onlineState.arMol;
+    if (arWt && document.activeElement !== arWt) arWt.value = onlineState.arWt;
+    const fromPlan = basis.ar_source !== 'entered';
+    if (arMol) arMol.placeholder = basis.ar_feed_mol_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_mol_pct)} (Run Plan)` : 'Run Plan';
+    if (arWt) arWt.placeholder = basis.ar_feed_wt_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_wt_pct)} (Run Plan)` : 'Run Plan';
+    const parts = [];
+    if (data) {
+        parts.push(`<b>${escOnline(data.label)}</b> · ${data.ok_count} line${data.ok_count === 1 ? '' : 's'} calculated`
+            + (data.error_count ? `, <span class="online-cell-error">${data.error_count} with ERROR</span> (see Status)` : ''));
+        parts.push(`Ar in feed gas: ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
+            + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} (${escOnline(basis.ar_source || '')})`);
+        if ((basis.excluded_feed_gas || []).length) parts.push(`no MW, left out of the feed gas mass: ${escOnline(basis.excluded_feed_gas.join(', '))}`);
+        if (basis.tos_zero) parts.push(`TOS from ${escOnline(basis.tos_zero)} (${escOnline(basis.tos_zero_source)})`);
+    } else {
+        parts.push(onlineState.rows.length ? 'Converting…' : 'Import a SystemTxt file first.');
+    }
+    online$('#onlineUnitsBasis').innerHTML = parts.join(' · ');
+    // One line on the closed block: Ar basis and how many lines could be calculated
+    online$('#onlineUnitsSummary').innerHTML = data
+        ? `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
+          + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} · ${data.ok_count} calculated`
+          + (data.error_count ? `, <span class="online-cell-error">${data.error_count} ERROR</span>` : '')
+        : '';
+    online$('#onlineUnitsFormula').textContent = ONLINE_UNIT_FORMULAS[unit] || '';
+    online$('#onlineMwBody').innerHTML = (data?.components || []).map(c => `<tr><td>${escOnline(c.component)}</td>`
+        + `<td>${c.mw ?? '–'}</td><td>${c.carbon_atoms ?? '–'}</td><td>${escOnline(c.source)}</td></tr>`).join('');
+}
+
+function currentOnlineView() {
+    if (onlineState.unit !== 'mol' && onlineState.converted) {
+        const hidden = new Set(onlineState.hiddenConverted);
+        const all = onlineState.converted.columns;
+        return { rows: onlineState.converted.rows, columns: all.filter(c => !hidden.has(c)), all, converted: true };
+    }
+    return { rows: onlineState.rows, columns: onlineState.columns, all: onlineState.allColumns, converted: false };
+}
+
+function onlineCellHtml(column, row, converted) {
+    const value = row[column];
+    if (column === 'Reactor') return `<td>${escOnline(String(value ?? ''))}</td>`;
+    if (!converted) return `<td>${formatOnlineValue(value)}</td>`;
+    if (column === 'Status') {
+        const ok = value === 'OK';
+        return `<td class="${ok ? 'online-status-ok' : 'online-status-error'}">${escOnline(value)}</td>`;
+    }
+    if (typeof value === 'string' && value.startsWith('ERROR')) return `<td><span class="online-cell-error">${escOnline(value)}</span></td>`;
+    if (column === 'TOS (h)' && typeof value === 'number') return `<td>${value.toFixed(2)}</td>`;
+    return `<td>${escOnline(formatConvertedValue(value))}</td>`;
+}
+
 function updateToggleButtonVisuals() {
     const btn = online$('#onlineReactorMapToggle');
     const dot = online$('#onlineToggleDot');
@@ -166,6 +305,10 @@ function saveOnlineState() {
             columns: onlineState.columns,
             allColumns: onlineState.allColumns,
             reactorMapActive: onlineState.reactorMapActive,
+            unit: onlineState.unit,
+            hiddenConverted: onlineState.hiddenConverted,
+            arMol: onlineState.arMol,
+            arWt: onlineState.arWt,
             path: online$('#onlineFile').value,
             summary: online$('#onlineSummary').textContent,
             from: from,
@@ -188,6 +331,10 @@ function restoreOnlineState() {
                 onlineState.rawRows = saved.rows;
             }
             onlineState.reactorMapActive = Boolean(saved.reactorMapActive);
+            if (['mol', 'mass', 'volume', 'carbon'].includes(saved.unit)) onlineState.unit = saved.unit;
+            if (Array.isArray(saved.hiddenConverted)) onlineState.hiddenConverted = saved.hiddenConverted;
+            onlineState.arMol = saved.arMol ?? '';
+            onlineState.arWt = saved.arWt ?? '';
             if (Array.isArray(saved.rows)) onlineState.rows = saved.rows;
             if (Array.isArray(saved.columns)) onlineState.columns = saved.columns;
             onlineState.allColumns = Array.isArray(saved.allColumns) ? saved.allColumns : [...onlineState.columns];
@@ -234,7 +381,8 @@ function renderOnlineTable() {
         toTime += 59999;
     }
 
-    const rows = onlineState.rows.filter((row) => {
+    const view = currentOnlineView();
+    const rows = view.rows.filter((row) => {
         if (reactor && String(row.Reactor) !== reactor) return false;
 
         if (fromTime !== null || toTime !== null) {
@@ -250,7 +398,7 @@ function renderOnlineTable() {
     });
 
     const header = online$('#onlineThead');
-    header.replaceChildren(...onlineState.columns.map((column) => {
+    header.replaceChildren(...view.columns.map((column) => {
         const cell = document.createElement('th');
         const label = document.createElement('span');
         label.textContent = column;
@@ -263,7 +411,8 @@ function renderOnlineTable() {
             removeButton.title = `Remove ${column} column`;
             removeButton.setAttribute('aria-label', `Remove ${column} column`);
             removeButton.onclick = () => {
-                onlineState.columns = onlineState.columns.filter((visibleColumn) => visibleColumn !== column);
+                if (view.converted) onlineState.hiddenConverted = [...new Set([...onlineState.hiddenConverted, column])];
+                else onlineState.columns = onlineState.columns.filter((visibleColumn) => visibleColumn !== column);
                 saveOnlineState();
                 renderOnlineTable();
             };
@@ -271,18 +420,18 @@ function renderOnlineTable() {
         }
         return cell;
     }));
-    online$('#onlineTbody').innerHTML = rows.map((row) => `<tr>${onlineState.columns.map((column) => `<td>${column === 'Reactor' ? String(row[column] ?? '') : formatOnlineValue(row[column])}</td>`).join('')}</tr>`).join('');
+    online$('#onlineTbody').innerHTML = rows.map((row) => `<tr>${view.columns.map((column) => onlineCellHtml(column, row, view.converted)).join('')}</tr>`).join('');
     online$('#onlineEmpty').style.display = rows.length ? 'none' : 'block';
 
     const restoreButton = online$('#onlineRestoreColumns');
-    if (restoreButton) restoreButton.hidden = onlineState.columns.length === onlineState.allColumns.length;
+    if (restoreButton) restoreButton.hidden = view.converted ? !onlineState.hiddenConverted.length : onlineState.columns.length === onlineState.allColumns.length;
 
     const badge = online$('#onlineDateBadge');
     if (badge) {
         if (fromVal || toVal) {
-            badge.textContent = `Showing ${rows.length} of ${onlineState.rows.length} records`;
+            badge.textContent = `Showing ${rows.length} of ${view.rows.length} records`;
         } else {
-            badge.textContent = onlineState.rows.length ? `${onlineState.rows.length} records` : '';
+            badge.textContent = view.rows.length ? `${view.rows.length} records` : '';
         }
     }
 }
@@ -352,10 +501,12 @@ online$('#onlineProcess').onclick = async () => {
         }
 
         renderReactorFilter();
-        online$('#onlineSummary').textContent = `${data.record_count} records loaded from ${data.source_file}`;
+        online$('#onlineSummary').textContent = `${data.record_count} records loaded from ${data.source_file}`
+            + ((data.notes || []).length ? ` · ${data.notes.join(' · ')}` : '');
         saveOnlineState();
         renderOnlineTable();
         online$('#onlineStatus').textContent = 'Ready';
+        if (onlineState.unit !== 'mol') await refreshOnlineUnits();
     } catch (error) {
         onlineError(error.message);
         online$('#onlineStatus').textContent = 'Failed';
@@ -390,12 +541,31 @@ online$('#onlineReactorMapToggle').onclick = async () => {
     renderReactorFilter();
     renderOnlineTable();
     saveOnlineState();
+    if (onlineState.unit !== 'mol') refreshOnlineUnits();
 };
 
 online$('#onlineSearch').oninput = renderOnlineTable;
+if (online$('#onlineUnit')) online$('#onlineUnit').onchange = () => {
+    onlineState.unit = online$('#onlineUnit').value;
+    onlineState.converted = null;
+    saveOnlineState();
+    refreshOnlineUnits();
+};
+let unitInputTimer = null;
+['#onlineArMol', '#onlineArWt'].forEach((selector) => {
+    const input = online$(selector);
+    if (!input) return;
+    input.oninput = () => {
+        onlineState[selector === '#onlineArMol' ? 'arMol' : 'arWt'] = input.value.trim();
+        saveOnlineState();
+        clearTimeout(unitInputTimer);
+        unitInputTimer = setTimeout(refreshOnlineUnits, 400);
+    };
+});
 online$('#onlineReactorFilter').onchange = renderOnlineTable;
 online$('#onlineRestoreColumns').onclick = () => {
-    onlineState.columns = [...onlineState.allColumns];
+    if (onlineState.unit !== 'mol' && onlineState.converted) onlineState.hiddenConverted = [];
+    else onlineState.columns = [...onlineState.allColumns];
     saveOnlineState();
     renderOnlineTable();
 };
@@ -418,6 +588,8 @@ if (onlineState.reactorMapActive && onlineState.rawRows.length) {
 updateToggleButtonVisuals();
 renderReactorFilter();
 renderOnlineTable();
+renderUnitsBar();
+if (onlineState.unit !== 'mol' && onlineState.rows.length) refreshOnlineUnits();
 if (shouldRefreshOnlineSchema) {
     online$('#onlineProcess').click();
 }

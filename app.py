@@ -7,7 +7,6 @@ from backend.routes.api import api
 from backend.routes.historian_api import historian_api
 from backend.routes.run_data_api import run_data_api
 from backend.reforming.routes import reforming_api
-from backend.mass_balance.routes import mass_balance_api
 
 BASE = Path(__file__).resolve().parent
 
@@ -40,7 +39,6 @@ def create_app(test_config=None):
     app.register_blueprint(historian_api)
     app.register_blueprint(run_data_api)
     app.register_blueprint(reforming_api)
-    app.register_blueprint(mass_balance_api)
 
     integrity_file = BASE / "features" / "data_integrity" / "feature.py"
     integrity_enabled = app.config.get(
@@ -124,18 +122,6 @@ def create_app(test_config=None):
     @app.get("/plots.html")
     def plots_view():
         return send_from_directory(BASE / "frontend", "plots.html")
-
-    # Pages of the retired process selection (v6.5): old bookmarks open the standard pages.
-    @app.get("/mass-balance")
-    @app.get("/mass_balance")
-    @app.get("/frontend/mb_calculation.html")
-    def mass_balance_view():
-        return redirect("/frontend/calculation_table.html")
-
-    @app.get("/zmb")
-    @app.get("/frontend/zmb.html")
-    def zmb_view():
-        return redirect("/frontend/index.html")
 
     @app.get("/history")
     def history_view():

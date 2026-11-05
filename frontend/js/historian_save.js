@@ -5,8 +5,7 @@
         'runPlanDashboardState', 'ils_feed_properties', 'dhaDashboardState', 'dhaOnlineState',
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
-        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state',
-        'ils_mb_inputs', 'ils_mb_imports', 'ils_mb_results', 'ils_mb_rep_table', 'ils_mb_summary_table'
+        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.
     const LOCAL_FALLBACK_KEYS = ['dhaDashboardState', 'dhaOnlineState'];
@@ -94,12 +93,6 @@
         addTable('calculation.reforming_carbon', 'Calculation · Reforming CARBON_TABULAR(%WGT)', 'Calculation table', reforming.rows, reforming.columns);
         const reformingSummary = readJson('ils_reforming_summary_state') || {};
         addTable('calculation.reforming_summary', 'Calculation · Reforming Component Summary', 'Calculation table', reformingSummary.rows, reformingSummary.columns);
-
-        const mbSummary = readJson('ils_mb_summary_table') || {};
-        addTable('mass_balance.summary', 'Mass Balance · Summary', 'Calculation table', mbSummary.rows, mbSummary.columns);
-        const mbReps = readJson('ils_mb_rep_table') || {};
-        addTable('mass_balance.gc_reps', 'Mass Balance · GC reps', 'Calculation table', mbReps.rows, mbReps.columns);
-        addKpi('mass_balance.samples', 'Mass Balance Samples', 'Calculation table', (readJson('ils_mb_results') || {}).samples?.length);
 
         // Custom table computed rows only exist in memory while the Custom table page is open.
         if (typeof customState !== 'undefined' && Array.isArray(customState.computedRows) && customState.computedRows.length) {

@@ -7,7 +7,7 @@ from backend.services.run_plan_template import is_template
 FIXTURES = Path(__file__).parent / "fixtures"
 TEMPLATE = FIXTURES / "run_plan" / "RunPlan_Template.xlsx"
 FILLED = FIXTURES / "run_plan" / "RunPlan_Template_Filled.xlsx"
-OLD_FORMAT = FIXTURES / "mass_balance" / "RunPlan_MassBalance_R08.xlsx"      # Plan A4:J14 / DOE / Feed A2:E25 layout
+OLD_FORMAT = FIXTURES / "run_plan" / "RunPlan_Old_Format.xlsx"      # Plan A4:J14 / DOE / Feed A2:E25 layout
 
 
 def test_template_is_detected_and_old_files_are_not():
@@ -161,3 +161,11 @@ def test_prerun_profile_breaks_lines_between_phase_parts():
     assert b["total_h"] == 7.0
     assert b["temperature"]["Drying"][3] is None                      # gap while reducing
     assert b["right"][3:5] == [[4.0, 10], [4.0, 20]]                   # flow changes at the step start
+
+
+def test_feed_cut_in_in_the_plan_info():
+    """Plan info 'Feed Cut-In' (TOS zero) = pre-run feed cut-in of the first active reactor's block."""
+    info = {i["parameter"]: i["value"] for i in
+            process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_Isomerisation_Rheinland.xlsx"))["plan"]["info"]}
+    assert info["Feed Cut-In"] == "2026-09-04 14:00:00"
+    assert info["Feed molecular weight"] == 89

@@ -1,12 +1,13 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.7.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.8.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
 and the pages work in the Isomerization format for now (calculation table and import analysis to be generalised later).
-Reforming (v6.4) and Mass Balance (v6.5) code is **dormant**: backend packages and tests stay, their UI is removed.
+Reforming (v6.4) code is **dormant** (backend and tests stay, UI removed). The first Mass Balance (v6.5) was **removed in
+v6.8**; Mass Balance is being rebuilt step by step, starting with the Online Analysis units (below).
 
 ## Run / stack
 - Python 3, Flask 3, pandas 2, olefile + xlrd (legacy `.XLS` read via the OLE `Workbook`/`Book` stream), openpyxl.
@@ -42,7 +43,7 @@ Reforming (v6.4) and Mass Balance (v6.5) code is **dormant**: backend packages a
   "C3 & Below", "C3-C4" … "C8+" decided by elution position between n-paraffins, not RI);
   `yield_table.py` (Yield wof%).
 - `backend/services/` — `dashboard_service.py` (process DHA folder, cumulative TOS), `online_analysis_service.py`
-  (online `.txt` → `ONLINE_COLUMNS`, reactor mapping by `Sampled_reactor`), `reactor_map_service.py`
+  (online `.txt` → `ONLINE_COLUMNS`, reactor mapping by `Sampled_reactor`), `online_units.py` (GC mol% → g/h, Nl/h, g C/h), `reactor_map_service.py`
   (valve-opening R1–R8 states), `run_plan_service.py` (+ root `RunPlan.py`), `calculation_table_service.py`
   (Base table), `custom_table_service.py` (safe AST formula engine), `excel_export_service.py`, `run_data.py`
   (RunData snapshots), `historian.py` (SQLite per run).
@@ -62,17 +63,15 @@ Reforming (v6.4) and Mass Balance (v6.5) code is **dormant**: backend packages a
 Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
 (`index.html`), Online (`online_analysis.html`) → Calculation: Calculation table, Custom table → Data Integrity
 (`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
-No process selector; `/zmb` and `/mass-balance` redirect to Offline Analysis / Calculation table.
+No process selector.
 
 ## API
 - `/api`: `health`, `settings`, `run-number` (GET/POST), `browse-folder`, `process` (DHA folder),
-  `browse-reactor-folder`, `process-reactor-map`, `browse-online-file`, `process-online`,
+  `browse-reactor-folder`, `process-reactor-map`, `browse-online-file`, `process-online`, `online-units`,
   `apply-online-reactor-map`, `browse-run-plan-file`, `process-run-plan`, `feed-properties`,
   `process-calculation-base`, `calculate-yield-table`, `custom-table/{validate-formula,calculate,inspect-cell}`,
   `export-xlsx`.
 - `/api/reforming`: `process`, `settings`, `sync-source` (GET/POST), `process-run-plan`, `operating-data`.
-- `/api/mass-balance`: `browse-file`, `import-txt`, `import-workbook`, `gc-map` (GET/POST), `calculate` (results, views,
-  flat `tables`), `export-xlsx`.
 - `/api/run-data/runs` (GET list, POST save), `/api/run-data/runs/<run_id>` (GET).
 - `/api/historian`: `runs`, `runs/<n>/exists`, `runs/<n>`, `save`, `compare`.
 - `/api/data-integrity/{config,analyze}`.
@@ -82,7 +81,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_mb_inputs`, `ils_mb_imports`, `ils_mb_results`; localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
+`ils_reforming_sync`; localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
 new version. History stores runs in `Historian/Run_<n>.sqlite` and compares tables between runs.
@@ -161,25 +160,24 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%
   (Reactor1 sheet) not done; History / Summary Dashboard plan tables assume R1–R8 columns.
 
-## Mass Balance (v6.5, dormant since v6.6: frontend removed, backend + tests kept) — `MASS_BALANCE_PROGRESS.md`
-- `window.ILSProcess` values `isomerization | reforming | massbalance`. Same main tabs for every process; for
-  massbalance: Run Plan → Plan/Liq/Gas (`mb_run_plan.js`), Analysis → ZMB (`zmb.html`, replaces Offline) + Online
-  Analysis (run export), Calculation table → `mb_calculation.html` (R#_MB / C-Balance / Summary). `mb_core.js` keeps
-  `ils_mb_inputs` and publishes `ils_mb_rep_table` / `ils_mb_summary_table` for Plots, Data Integrity, Custom table,
-  Summary Dashboard and History. navigation.js redirects index↔zmb and calculation_table↔mb_calculation by process.
-- `backend/mass_balance/` (self-contained): `txt_loader` (ZMB export 152 cols, run export 161 cols; by header name;
-  `ÿ` = none; C6 Above raw ESTD in `Area_`; `Conc_C8 Unknowns` = GC total), `workbook` (blue cells + GC tables of a
-  MassBal Ver2.x .xlsx), `engine` (formulas, workbook cell refs in comments), `service`, `views`, `export`, `routes`
-  (`/api/mass-balance/*`). GC map `config/mass_balance_gc_map.json`.
-- Key formulas: m_i = y_i·MW_i/(y_Ar·39.948)·Ar_r with y = ESTD mol%; Ar_r = FI01·V_r/ΣV·w_Ar; MB closure
-  = 100·(gas product w/o Ar + aq + HC)/(gas feed w/o Ar + liquid feed); C in gas feed from C2H2/CH4/C2H6/C2H4 only;
-  mixed gas = ZMB R1 block (ESTD, not normalised). Golden tests: `tests/test_mass_balance_*.py` (Ver2.2, 1 811 cells).
-- State keys `ils_mb_inputs`, `ils_mb_imports`, `ils_mb_results`, `ils_mb_rep_table`, `ils_mb_summary_table`.
-- Run Plan for Mass Balance = shared RunPlan.xlsx format (Plan, DOE, Feed) + **Liq** sheet (`backend/mass_balance/run_plan.py`;
-  DOE Gas/Liquid Flow per reactor, Feed liquid + gas feed, Liq samples + ZMB liquid reps). Example built by
-  `scripts/build_mass_balance_run_plan.py` → `tests/fixtures/mass_balance/RunPlan_MassBalance_R08.xlsx`.
-- TLP flow divides by hours since the sample window start (= Run Start for the first sample, as in the workbook).
-  Reactors with GC but 01i14FIC0r = 0 in the window get `ERROR: no gas feed …`. Tables use fixed column widths.
+## Online Analysis units (v6.8) — `backend/services/online_units.py`, `/api/online-units`
+- Units selector on the Online Analysis table: **Normalised mol%** (the imported ESTD values), **Mass flow rates (g/h)**,
+  **Volumetric flow rates (Nl/h)**, **TOS carbon of each molecule (g C/h)**. Formulas of the MassBal workbook (Ver2.2,
+  R#_MB / Gas / Run_Plan), argon = internal standard, y = ESTD mol% of the injection:
+  F_r = 01i14FI01 · FIC_r / ΣFIC (Gas!B12); F_Ar,r = F_r · w_Ar (Gas!G20); m_i = y_i·MW_i/(y_Ar·39.948) · F_Ar,r (rows 52-80);
+  V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar, V_i = y_i/100 · V_out (rows 86-116; the workbook's D86 mixes g/h and NmL/h:
+  159.7 Nl/h for 3 Nl/h feed, so the argon balance it intends is used); C_i = 12.011 · nC_i / MW_i · m_i (rows 121-150).
+- MWs and carbon atoms = experimental standards of the workbook (R#_MB columns B and AD; H2S, Propadiene: standard
+  values; lumped peaks C3-C4, C4-C5, C5-C6, C6-C8 have no MW → `ERROR: no MW`). Feed gas MWs (Run_Plan row 37) give
+  w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook);
+  Ar mol% / wt% can be entered on the page instead (collapsed "Conversion basis" block under the table, with the formula
+  and the MW table; its summary line shows Ar mol% / wt% and the number of lines calculated / with ERROR). TOS from the Run Plan Feed Cut-In (else the first record).
+- Each line uses its own 01i14FI01 / 01i14FIC0r (else 02i2FIC0r); Reactor from `Sampled_reactor` or the Reactor Map
+  (1, 1.0, "R1"). Status per line: OK or `ERROR: …` (bypass / no reactor, no argon peak, no gas feed to Rr, no GC values,
+  feed argon not set). Converted rows are not stored (the unit, hidden columns and entered Ar values are, in
+  `dhaOnlineState`). Loader fix: `ESTD_C6 Above` = `Area_C6 Above` when `Conc_C6 Above` is empty (export column shift).
+- Tests: `tests/test_online_units.py` reproduces R6_MB mass and carbon flows of `tests/fixtures/online/R6-C1-S1-MassBal_Ver2.2.xlsx`
+  exactly and runs the R08 export (`tests/fixtures/online/Result_R08-…txt`) with `RunPlan_MassBalance_SS.xlsx`.
 
 ## Working conventions seen in this codebase
 - One dashboard for every experiment (v6.6): no process gates in new code. `window.ILSProcess` is fixed to

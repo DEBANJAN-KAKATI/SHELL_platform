@@ -63,6 +63,14 @@ def process_online_file(file_path):
             "Date/Time values must use the format DD.MM.YYYY HH:MM:SS."
         ) from error
 
+    notes = []
+    # Export column shift for "C6 Above": Conc_ is empty, ESTD_ holds the normalised value and Area_ the raw ESTD
+    # (checked against the MassBal workbook). Use the raw ESTD like every other component.
+    if {"Conc_C6 Above", "ESTD_C6 Above", "Area_C6 Above"} <= set(frame.columns) \
+            and frame["Conc_C6 Above"].isna().all() and frame["Area_C6 Above"].notna().any():
+        frame["ESTD_C6 Above"] = frame["Area_C6 Above"]
+        notes.append("ESTD_C6 Above taken from Area_C6 Above (export column shift: ESTD_ holds the normalised value)")
+
     frame = frame.sort_values(
         "Date/Time", kind="stable", na_position="last"
     ).reset_index(drop=True)
@@ -88,6 +96,7 @@ def process_online_file(file_path):
         "columns": columns,
         "record_count": len(frame),
         "source_file": str(path),
+        "notes": notes,
     }
 
 
