@@ -11,7 +11,10 @@ const onlineState = {
     converted: null,
     hiddenConverted: [],
     arMol: '',
-    arWt: ''
+    arWt: '',
+    gasFeed: {},
+    fi01: '',
+    molarVolume: ''
 };
 const online$ = (selector) => document.querySelector(selector);
 const formatOnlineValue = (value) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : (value ?? '');
@@ -151,9 +154,9 @@ function applyReactorMapMapping(rows, reactorRows) {
 
 // ---------------------------------------------------------------- Units (mol% → g/h, Nl/h, g C/h)
 const ONLINE_UNIT_FORMULAS = {
-    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar   (y = ESTD mol%)',
+    mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar,   or without 01i14FI01: F_Ar,r = FIC_r/1000 / Vm · y_Ar,feed/100 · 39.948   (y = ESTD mol%)',
     volume: 'V_i [Nl/h] = y_i/100 · V_out   with   V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar   (argon balance)',
-    carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS)',
+    carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS; m_i as for the mass flow rates)',
 };
 const escOnline = (value) => String(value ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
 
@@ -173,9 +176,12 @@ function onlineRunPlanContext() {
         const rp = JSON.parse(sessionStorage.getItem('runPlanDashboardState') || 'null') || {};
         const info = rp.planData?.info || [];
         const cutIn = info.find(i => String(i.parameter).trim().toLowerCase() === 'feed cut-in')?.value || '';
-        return { feedGas: rp.feedTables?.gas?.rows || [], feedCutIn: cutIn };
+        // DOE gas flow per reactor and condition (template "Total gas (Nl/h)", older files "Gas Flow (NmL/h)")
+        const doeRows = (rp.doeData?.rows || []).map(row => Object.fromEntries(Object.entries(row).filter(([key]) =>
+            /^(Reactor ID|Start Date|End Date)$/.test(key) || /^total gas/i.test(key) || /^gas flow/i.test(key))));
+        return { feedGas: rp.feedTables?.gas?.rows || [], feedCutIn: cutIn, doeRows };
     } catch (e) {
-        return { feedGas: [], feedCutIn: '' };
+        return { feedGas: [], feedCutIn: '', doeRows: [] };
     }
 }
 
@@ -204,6 +210,10 @@ async function refreshOnlineUnits() {
                 unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas, feed_cut_in: ctx.feedCutIn,
                 ar_mol_pct: onlineState.arMol === '' ? null : Number(onlineState.arMol),
                 ar_wt_pct: onlineState.arWt === '' ? null : Number(onlineState.arWt),
+                gas_feed: Object.fromEntries(Object.entries(onlineState.gasFeed).filter(([, v]) => v !== '').map(([k, v]) => [k, Number(v)])),
+                total_feed_g_h: onlineState.fi01 === '' ? null : Number(onlineState.fi01),
+                molar_volume: onlineState.molarVolume === '' ? null : Number(onlineState.molarVolume),
+                doe_rows: ctx.doeRows,
             }),
         });
         const data = await onlineJson(response);
@@ -234,6 +244,12 @@ function renderUnitsBar() {
     const arMol = online$('#onlineArMol'), arWt = online$('#onlineArWt');
     if (arMol && document.activeElement !== arMol) arMol.value = onlineState.arMol;
     if (arWt && document.activeElement !== arWt) arWt.value = onlineState.arWt;
+    document.querySelectorAll('.online-flow').forEach((input) => {
+        if (document.activeElement !== input) input.value = onlineState.gasFeed[input.dataset.reactor] ?? '';
+    });
+    const fi01 = online$('#onlineFi01'), vm = online$('#onlineVm');
+    if (fi01 && document.activeElement !== fi01) fi01.value = onlineState.fi01;
+    if (vm && document.activeElement !== vm) vm.value = onlineState.molarVolume;
     const fromPlan = basis.ar_source !== 'entered';
     if (arMol) arMol.placeholder = basis.ar_feed_mol_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_mol_pct)} (Run Plan)` : 'Run Plan';
     if (arWt) arWt.placeholder = basis.ar_feed_wt_pct != null && fromPlan ? `${formatBasisValue(basis.ar_feed_wt_pct)} (Run Plan)` : 'Run Plan';
@@ -249,9 +265,21 @@ function renderUnitsBar() {
         parts.push(onlineState.rows.length ? 'Converting…' : 'Import a SystemTxt file first.');
     }
     online$('#onlineUnitsBasis').innerHTML = parts.join(' · ');
+    // Gas feed: where the flows of the calculated lines came from, and what is missing
+    const sources = Object.entries(basis.flow_sources || {}).map(([k, n]) => `${escOnline(k)}: ${n}`).join(', ');
+    const flowNote = [];
+    if (data && !basis.export_has_flows) flowNote.push('This export has no gas flow columns.');
+    if (basis.doe_flows) flowNote.push(`Run Plan DOE gas flows: ${basis.doe_flows} rows`);
+    if (sources) flowNote.push(`Flow source of the calculated lines – ${sources}`);
+    if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Enter the gas feed of the reactors (NmL/h), or load a Run Plan with DOE gas flows.</span>');
+    online$('#onlineFlowNote').innerHTML = flowNote.join(' · ');
+    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'gas feed per reactor' : ''].filter(Boolean);
+    bar.classList.toggle('needs-input', missingInputs.length > 0);
+    if (missingInputs.length && !bar.dataset.autoOpened) { bar.open = true; bar.dataset.autoOpened = '1'; }
     // One line on the closed block: Ar basis and how many lines could be calculated
     online$('#onlineUnitsSummary').innerHTML = data
-        ? `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
+        ? (missingInputs.length ? `· <span class="online-cell-error">${missingInputs.join(' and ')} missing – enter it here</span> ` : '')
+          + `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
           + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} · ${data.ok_count} calculated`
           + (data.error_count ? `, <span class="online-cell-error">${data.error_count} ERROR</span>` : '')
         : '';
@@ -309,6 +337,9 @@ function saveOnlineState() {
             hiddenConverted: onlineState.hiddenConverted,
             arMol: onlineState.arMol,
             arWt: onlineState.arWt,
+            gasFeed: onlineState.gasFeed,
+            fi01: onlineState.fi01,
+            molarVolume: onlineState.molarVolume,
             path: online$('#onlineFile').value,
             summary: online$('#onlineSummary').textContent,
             from: from,
@@ -335,6 +366,9 @@ function restoreOnlineState() {
             if (Array.isArray(saved.hiddenConverted)) onlineState.hiddenConverted = saved.hiddenConverted;
             onlineState.arMol = saved.arMol ?? '';
             onlineState.arWt = saved.arWt ?? '';
+            onlineState.gasFeed = saved.gasFeed && typeof saved.gasFeed === 'object' ? saved.gasFeed : {};
+            onlineState.fi01 = saved.fi01 ?? '';
+            onlineState.molarVolume = saved.molarVolume ?? '';
             if (Array.isArray(saved.rows)) onlineState.rows = saved.rows;
             if (Array.isArray(saved.columns)) onlineState.columns = saved.columns;
             onlineState.allColumns = Array.isArray(saved.allColumns) ? saved.allColumns : [...onlineState.columns];
@@ -552,14 +586,23 @@ if (online$('#onlineUnit')) online$('#onlineUnit').onchange = () => {
     refreshOnlineUnits();
 };
 let unitInputTimer = null;
-['#onlineArMol', '#onlineArWt'].forEach((selector) => {
+const unitInputs = { '#onlineArMol': 'arMol', '#onlineArWt': 'arWt', '#onlineFi01': 'fi01', '#onlineVm': 'molarVolume' };
+const scheduleUnits = () => {
+    saveOnlineState();
+    clearTimeout(unitInputTimer);
+    unitInputTimer = setTimeout(refreshOnlineUnits, 400);
+};
+Object.entries(unitInputs).forEach(([selector, key]) => {
     const input = online$(selector);
     if (!input) return;
+    input.oninput = () => { onlineState[key] = input.value.trim(); scheduleUnits(); };
+});
+document.querySelectorAll('.online-flow').forEach((input) => {
     input.oninput = () => {
-        onlineState[selector === '#onlineArMol' ? 'arMol' : 'arWt'] = input.value.trim();
-        saveOnlineState();
-        clearTimeout(unitInputTimer);
-        unitInputTimer = setTimeout(refreshOnlineUnits, 400);
+        const value = input.value.trim();
+        if (value === '') delete onlineState.gasFeed[input.dataset.reactor];
+        else onlineState.gasFeed[input.dataset.reactor] = value;
+        scheduleUnits();
     };
 });
 online$('#onlineReactorFilter').onchange = renderOnlineTable;

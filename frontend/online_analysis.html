@@ -8,8 +8,8 @@
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
     <script src="/frontend/js/navigation.js?v=7" defer></script>
-    <link href="/frontend/css/online_units.css?v=3" rel="stylesheet">
-    <script src="/frontend/js/online_analysis.js?v=7" defer></script>
+    <link href="/frontend/css/online_units.css?v=4" rel="stylesheet">
+    <script src="/frontend/js/online_analysis.js?v=9" defer></script>
     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
 </head>
 
@@ -103,6 +103,24 @@
                             <label>Ar in feed gas <small>mol%</small><input class="input" id="onlineArMol" type="number" step="any" min="0" placeholder="Run Plan"></label>
                             <label>Ar in feed gas <small>wt%</small><input class="input" id="onlineArWt" type="number" step="any" min="0" placeholder="Run Plan"></label>
                             <span class="online-units-basis" id="onlineUnitsBasis"></span>
+                        </div>
+                        <div class="online-units-flows" id="onlineFlowInputs">
+                            <div class="online-units-title">Gas feed (used when the export has no 01i14FIC0r / 01i14FI01 columns, like the workbook's Gas sheet)</div>
+                            <div class="online-units-inputs">
+                                <label>R1 <small>NmL/h</small><input class="input online-flow" data-reactor="R1" type="number" step="any" min="0"></label>
+                                <label>R2 <small>NmL/h</small><input class="input online-flow" data-reactor="R2" type="number" step="any" min="0"></label>
+                                <label>R3 <small>NmL/h</small><input class="input online-flow" data-reactor="R3" type="number" step="any" min="0"></label>
+                                <label>R4 <small>NmL/h</small><input class="input online-flow" data-reactor="R4" type="number" step="any" min="0"></label>
+                                <label>R5 <small>NmL/h</small><input class="input online-flow" data-reactor="R5" type="number" step="any" min="0"></label>
+                                <label>R6 <small>NmL/h</small><input class="input online-flow" data-reactor="R6" type="number" step="any" min="0"></label>
+                                <label>R7 <small>NmL/h</small><input class="input online-flow" data-reactor="R7" type="number" step="any" min="0"></label>
+                                <label>R8 <small>NmL/h</small><input class="input online-flow" data-reactor="R8" type="number" step="any" min="0"></label>
+                            </div>
+                            <div class="online-units-inputs">
+                                <label>Total gas feed 01i14FI01 <small>g/h (optional)</small><input class="input" id="onlineFi01" type="number" step="any" min="0" placeholder="not used"></label>
+                                <label>Molar volume <small>Nl/mol</small><input class="input" id="onlineVm" type="number" step="any" min="0" placeholder="22.414 (0 °C)"></label>
+                                <span class="online-units-basis" id="onlineFlowNote"></span>
+                            </div>
                         </div>
                         <div class="online-units-formula" id="onlineUnitsFormula"></div>
                         <div class="online-units-mw">

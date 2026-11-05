@@ -4,6 +4,9 @@ The formulas follow the MassBal workbook (Ver2.2, sheets R#_MB, Gas, Run_Plan); 
 
 * Gas feed to reactor r   F_r [g/h]   = 01i14FI01 · V_r / ΣV            (Gas!B12; V = 01i14FIC01..08 [NmL/h])
 * Argon to reactor r      F_Ar,r      = F_r · w_Ar / 100                (Gas!G20; w_Ar = Ar wt% of the feed gas, Gas!I37)
+                          without 01i14FI01: F_Ar,r = V_r/1000 / Vm · y_Ar,feed/100 · 39.948 (Vm = 22.414 Nl/mol)
+  V_r / 01i14FI01 come from the export line, else from the values entered per reactor (Gas!B11:I11, Gas!E5),
+  else from the Run Plan DOE condition running at that time ("Total gas (Nl/h)" / "Gas Flow (NmL/h)").
 * Mass flow               m_i [g/h]   = y_i·MW_i / (y_Ar·MW_Ar) · F_Ar,r (R#_MB rows 52-80)
 * Volumetric flow         V_i [Nl/h]  = y_i/100 · V_out,  V_out = V_r/1000 · y_Ar,feed / y_Ar   (R#_MB rows 86-116)
 * Carbon flow             C_i [g C/h] = 12.011 · nC_i / MW_i · m_i       (R#_MB rows 121-150, "TOS Carbon of Each Molecule")
@@ -11,8 +14,8 @@ The formulas follow the MassBal workbook (Ver2.2, sheets R#_MB, Gas, Run_Plan); 
 y = ESTD mol% of the GC injection (not normalised, as in the workbook), y_Ar,feed = Ar mol% of the feed gas.
 R#_MB!D86 computes V_out as m_Ar / Gas!I35 · Gas!B11, which mixes g/h and NmL/h (3 Nl/h of feed gives 159.7 Nl/h);
 the argon balance above (feed volume × Ar in / Ar out) is what that row intends and is used here.
-Every row is calculated with the 01i14FI01 / 01i14FIC0r values of the same line (the workbook averages them over the
-sampling window). Rows that cannot be calculated get an explicit "ERROR: ..." status, never zero.
+With flows on the export, every row uses the 01i14FI01 / 01i14FIC0r values of the same line (the workbook averages them
+over the sampling window). Rows that cannot be calculated get an explicit "ERROR: ..." status, never zero.
 """
 from datetime import datetime
 
@@ -108,68 +111,137 @@ def feed_argon(feed_gas):
     return {"ar_mol_pct": ar_mol, "ar_wt_pct": wt, "excluded": excluded}
 
 
-def _flows(row, reactor):
-    """Total gas feed 01i14FI01 [g/h], reactor flow V_r and ΣV [NmL/h] of one line (01i14FIC0r, else 02i2FIC0r)."""
-    fi01 = _num(row.get("01i14FI01"))
+# Spellings of GC method peak names → the molecule (the export of some methods writes "Etylene")
+ALIASES = {"Etylene": "Ethylene"}
+MOLAR_VOLUME = 22.414          # Nl/mol at 0 °C, 1.01325 bar (normal conditions of NmL/h)
+
+
+def _line_flows(row, reactor):
+    """Total gas feed 01i14FI01 [g/h], reactor flow FIC_r and ΣFIC [NmL/h] written on the export line (else None)."""
     flows = []
     for k in range(1, 9):
         value = _num(row.get(f"01i14FIC0{k}"))
         if value is None:
             value = _num(row.get(f"02i2FIC0{k}"))
         flows.append(value)
-    total = sum(v for v in flows if v and v > 0)
-    return fi01, flows[reactor - 1], total
+    if flows[reactor - 1] is None:
+        return None
+    return _num(row.get("01i14FI01")), flows[reactor - 1], sum(v for v in flows if v and v > 0)
 
 
-def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=None, feed_cut_in=None):
-    """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, 01i14FI01, 01i14FIC0r) in the chosen unit."""
+def doe_gas_flows(doe_rows):
+    """Gas feed per reactor and condition from the Run Plan DOE: [(reactor, start, end, NmL/h)].
+
+    Universal template: "Total gas (Nl/h)"; older RunPlan.xlsx: "Gas Flow (NmL/h)".
+    """
+    out = []
+    for row in doe_rows or []:
+        reactor = reactor_number(row.get("Reactor ID"))
+        if not reactor:
+            continue
+        value = None
+        for key, raw in row.items():
+            label = " ".join(str(key).split()).lower()
+            if label.startswith("total gas") and "nl/h" in label:
+                value = _num(raw) * 1000 if _num(raw) is not None else None
+            elif label.startswith("gas flow") and "nml/h" in label:
+                value = _num(raw)
+            if value is not None:
+                break
+        start, end = _date(row.get("Start Date")), _date(row.get("End Date"))
+        if value is not None and start:
+            out.append((reactor, start, end, value))
+    return out
+
+
+def _doe_flow(doe, reactor, when):
+    """NmL/h of the DOE condition running for this reactor at this time (start ≤ time < end)."""
+    if not when:
+        return None
+    hits = [v for r, start, end, v in doe if r == reactor and start <= when and (end is None or when < end)]
+    return hits[-1] if hits else None
+
+
+def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=None, feed_cut_in=None,
+                        gas_feed=None, total_feed_g_h=None, molar_volume=None, doe_rows=None):
+    """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, flows) in the chosen unit.
+
+    Gas feed of a line, in this order: the export line (01i14FIC0r, 01i14FI01) → the values entered per reactor
+    (`gas_feed` {"R1": NmL/h, ...}, `total_feed_g_h` = 01i14FI01) → the Run Plan DOE condition running at that time.
+    Argon to the reactor: with 01i14FI01 and the Ar wt% as in the workbook (F_r · w_Ar); without 01i14FI01 from the
+    volume: FIC_r/1000 / molar volume · y_Ar,feed/100 · 39.948 (the same quantity: n_Ar · MW_Ar).
+    """
     if unit not in UNITS or unit == "mol":
         raise ValueError(f"Unknown unit '{unit}'. Use one of: mass, volume, carbon.")
     suffix = UNITS[unit]["suffix"]
     feed = feed_argon(feed_gas)
     ar_mol = _num(ar_mol_pct) if _num(ar_mol_pct) else feed["ar_mol_pct"]
     ar_wt = _num(ar_wt_pct) if _num(ar_wt_pct) else feed["ar_wt_pct"]
+    vm = _num(molar_volume) or MOLAR_VOLUME
+    entered = {}
+    for key, value in (gas_feed or {}).items():
+        reactor = reactor_number(key)
+        if reactor and _num(value) is not None:
+            entered[reactor] = _num(value)
+    entered_total = _num(total_feed_g_h)
+    doe = doe_gas_flows(doe_rows)
+    has_tags = any(_num(r.get(f"01i14FIC0{k}")) is not None or _num(r.get(f"02i2FIC0{k}")) is not None
+                   for r in rows or [] for k in range(1, 9))
     basis = {"unit": unit, "label": UNITS[unit]["label"], "ar_feed_mol_pct": ar_mol, "ar_feed_wt_pct": ar_wt,
              "ar_source": "entered" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
-             "excluded_feed_gas": feed["excluded"]}
+             "excluded_feed_gas": feed["excluded"], "molar_volume": vm, "export_has_flows": has_tags,
+             "entered_flows": {f"R{k}": v for k, v in sorted(entered.items())}, "entered_total_g_h": entered_total,
+             "doe_flows": len(doe)}
     missing = None
-    if unit in ("mass", "carbon") and not ar_wt:
-        missing = "ERROR: Ar wt% of the feed gas is not set (Run Plan Feed → Gas feed composition, or enter it)"
     if unit == "volume" and not ar_mol:
         missing = "ERROR: Ar mol% of the feed gas is not set (Run Plan Feed → Gas feed composition, or enter it)"
+    if unit in ("mass", "carbon") and not ar_mol and not ar_wt:
+        missing = "ERROR: Ar in the feed gas is not set (Run Plan Feed → Gas feed composition, or enter mol% / wt%)"
 
     present = []
     for row in rows or []:
         for key in row:
-            if key.startswith("ESTD_") and key[5:] not in present:
-                present.append(key[5:])
+            if key.startswith("ESTD_"):
+                name = ALIASES.get(key[5:], key[5:])
+                if name not in present:
+                    present.append(name)
     order = list(COMPONENTS) + sorted(NO_MW)
     names = [n for n in order if n in present] + [n for n in present if n not in COMPONENTS and n not in NO_MW]
     if unit == "carbon":           # only molecules that contain carbon
         names = [n for n in names if n in NO_MW or n not in COMPONENTS or COMPONENTS[n][1] > 0]
+    spelled = {n: [k for k, v in ALIASES.items() if v == n] + [n] for n in names}
+
+    def value_of(row, name):
+        for key in spelled[name]:
+            v = _num(row.get(f"ESTD_{key}"))
+            if v is not None:
+                return v
+        return None
+
     # Components that have a value in at least one row
-    names = [n for n in names if any(_num(r.get(f"ESTD_{n}")) is not None for r in rows or [])]
+    names = [n for n in names if any(value_of(r, n) is not None for r in rows or [])]
 
     times = [_date(r.get("DateTime")) for r in rows or []]
     t0 = _date(feed_cut_in) or min((t for t in times if t), default=None)
     basis["tos_zero"] = t0.strftime("%Y-%m-%d %H:%M:%S") if t0 else ""
     basis["tos_zero_source"] = "Run Plan Feed Cut-In" if _date(feed_cut_in) else "first record"
 
-    extra = {"mass": ["Gas feed to reactor [g/h]", "Ar to reactor [g/h]", "Total w/o Ar [g/h]"],
+    extra = {"mass": ["Gas feed to reactor [NmL/h]", "Ar to reactor [g/h]", "Total w/o Ar [g/h]"],
              "volume": ["Gas feed to reactor [Nl/h]", "Total out [Nl/h]"],
-             "carbon": ["Total C [g C/h]"]}[unit]
-    columns = ["DateTime", "TOS (h)", "Reactor", "Status"] + [f"{n} [{suffix}]" for n in names] + extra
+             "carbon": ["Gas feed to reactor [NmL/h]", "Total C [g C/h]"]}[unit]
+    columns = ["DateTime", "TOS (h)", "Reactor", "Status", "Flow source"] + [f"{n} [{suffix}]" for n in names] + extra
+    sources = {}
     out_rows = []
     for row, when in zip(rows or [], times):
         out = {"DateTime": row.get("DateTime"), "TOS (h)": round((when - t0).total_seconds() / 3600, 4) if when and t0 else None,
                "Reactor": row.get("Reactor")}
         for column in columns[4:]:
             out[column] = None
-        y = {n: _num(row.get(f"ESTD_{n}")) for n in names}
+        y = {n: value_of(row, n) for n in names}
         y_ar = _num(row.get("ESTD_Argon"))
         reactor = reactor_number(row.get("Reactor"))
-        status = "OK"
-        if all(v is None for v in y.values()) and y_ar is None:
+        status, flow = "OK", None
+        if all(v is None or v == 0 for v in y.values()) and not y_ar:
             status = "ERROR: no GC values in this line"
         elif missing:
             status = missing
@@ -178,19 +250,38 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
         elif not y_ar or y_ar <= 0:
             status = "ERROR: no argon peak (ESTD_Argon) – argon is the internal standard"
         else:
-            fi01, v_r, v_sum = _flows(row, reactor)
-            if not v_r or v_r <= 0 or not v_sum:
-                status = f"ERROR: no gas feed to R{reactor} (01i14FIC0{reactor} = {v_r if v_r is not None else 'empty'})"
-            elif unit != "volume" and (not fi01 or fi01 <= 0):
-                status = f"ERROR: no total gas feed (01i14FI01 = {fi01 if fi01 is not None else 'empty'})"
+            flow = _line_flows(row, reactor)
+            if flow is not None:
+                fi01, v_r, v_sum = flow
+                source = "export"
+            elif reactor in entered:
+                fi01, v_r, v_sum = entered_total, entered[reactor], sum(v for v in entered.values() if v > 0)
+                source = "entered"
+            else:
+                v_r = _doe_flow(doe, reactor, when)
+                fi01, source = None, "Run Plan DOE"
+                v_sum = sum(v for v in (_doe_flow(doe, k, when) for k in range(1, 9)) if v and v > 0) if v_r else 0
+            flow = (fi01, v_r, v_sum, source)
+            if v_r is None:
+                status = f"ERROR: no gas feed for R{reactor} (not in the export) – enter it under Conversion basis"
+            elif v_r <= 0 or not v_sum:
+                status = f"ERROR: no gas feed to R{reactor} ({source}: {v_r:g} NmL/h)"
+            elif unit != "volume" and not (fi01 and fi01 > 0 and ar_wt) and not ar_mol:
+                status = "ERROR: no total gas feed 01i14FI01 and no Ar mol% – enter Ar mol% (or 01i14FI01 and Ar wt%)"
         if status != "OK":
             out["Status"] = status
             out_rows.append(out)
             continue
 
-        fi01, v_r, v_sum = _flows(row, reactor)
-        feed_r = fi01 * v_r / v_sum if fi01 is not None else None
-        ar_r = feed_r * ar_wt / 100 if feed_r is not None and ar_wt else None
+        fi01, v_r, v_sum, source = flow
+        if unit != "volume" and fi01 and fi01 > 0 and ar_wt:
+            ar_r = fi01 * v_r / v_sum * ar_wt / 100            # workbook: Gas!G20 = 01i14FI01 · V_r/ΣV · w_Ar
+            route = f"{source}, 01i14FI01"
+        else:
+            ar_r = v_r / 1000 / vm * (ar_mol or 0) / 100 * MW_AR   # n_Ar · MW_Ar from the volumetric feed
+            route = f"{source}, molar volume" if unit != "volume" else source
+        sources[route] = sources.get(route, 0) + 1
+        out["Flow source"] = route
         v_out = v_r / 1000 * ar_mol / y_ar if ar_mol else None
         problems, total = [], 0.0
         for n in names:
@@ -216,17 +307,25 @@ def convert_online_rows(rows, unit, feed_gas=None, ar_mol_pct=None, ar_wt_pct=No
             out[f"{n} [{suffix}]"] = result
             total += result
         if unit == "mass":
-            out.update({"Gas feed to reactor [g/h]": feed_r, "Ar to reactor [g/h]": ar_r, "Total w/o Ar [g/h]": total})
+            out.update({"Gas feed to reactor [NmL/h]": v_r, "Ar to reactor [g/h]": ar_r, "Total w/o Ar [g/h]": total})
         elif unit == "volume":
             out.update({"Gas feed to reactor [Nl/h]": v_r / 1000, "Total out [Nl/h]": v_out})
         else:
-            out["Total C [g C/h]"] = total
+            out.update({"Gas feed to reactor [NmL/h]": v_r, "Total C [g C/h]": total})
         out["Status"] = "OK" if not problems else f"ERROR: no MW for {', '.join(problems)} (total without them)"
         out_rows.append(out)
 
+    basis["flow_sources"] = sources
     components = [{"component": n, "mw": COMPONENTS[n][0] if n in COMPONENTS else None,
                    "carbon_atoms": COMPONENTS[n][1] if n in COMPONENTS else None,
-                   "source": COMPONENTS[n][2] if n in COMPONENTS else "no MW (lumped peak)"} for n in names]
+                   "source": (COMPONENTS[n][2] if n in COMPONENTS else "no MW (lumped peak)")
+                             + (f"; export spelling {', '.join(k for k in spelled[n] if k != n)}" if len(spelled[n]) > 1 else "")}
+                  for n in names]
     ok = sum(1 for r in out_rows if r["Status"] == "OK")
+    flows_missing = any(r["Status"].startswith("ERROR: no gas feed for R") for r in out_rows)
+    basis["flows_missing"] = flows_missing
+    # The export has no flows and nothing was entered / found in the DOE: the gas feed is needed as well
+    basis["flows_needed"] = not has_tags and not entered and not doe
+    basis["argon_missing"] = bool(missing)
     return {"unit": unit, "label": UNITS[unit]["label"], "columns": columns, "rows": out_rows, "basis": basis,
             "components": components, "ok_count": ok, "error_count": len(out_rows) - ok}
