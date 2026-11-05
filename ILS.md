@@ -183,7 +183,7 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   exports without flow columns (e.g. `R3-C2-S1_9-06-23.txt`) need the DOE gas flows. `ESTD_Etylene` = Ethylene (`ALIASES`).
 - With flows on the export each line uses its own 01i14FI01 / 01i14FIC0r (else 02i2FIC0r); Reactor from `Sampled_reactor` or the Reactor Map
   (1, 1.0, "R1"). Status per line: OK or `ERROR: …` (bypass / no reactor, no argon peak, no gas feed to Rr, no GC values,
-  feed argon not set). Converted rows are not stored (the unit, hidden columns and entered Ar values are, in
+  feed argon not set). Converted rows are not stored (the unit and hidden columns are, in
   `dhaOnlineState`). Loader fix: `ESTD_C6 Above` = `Area_C6 Above` when `Conc_C6 Above` is empty (export column shift).
 - Tests: `tests/test_online_units.py` reproduces R6_MB mass and carbon flows of `tests/fixtures/online/R6-C1-S1-MassBal_Ver2.2.xlsx`
   exactly and runs the R08 export (`tests/fixtures/online/Result_R08-…txt`) with `RunPlan_MassBalance_SS.xlsx`.
