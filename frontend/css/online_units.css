@@ -18,7 +18,5 @@
 .online-units-bar summary{cursor:pointer;font-size:12px;color:var(--slate);list-style-position:inside}
 .online-units-bar:not([open]){padding:9px 15px}
 .online-units-title{font-size:12px;font-weight:700;color:var(--burnt)}
-.online-units-flows{display:grid;gap:8px;padding-top:6px;border-top:1px dashed var(--border)}
-.online-units-flows .online-flow{width:110px}
 .online-units-bar.needs-input{border-left-color:#991b1b}
 .online-units-bar.needs-input summary .online-units-title{color:#991b1b}

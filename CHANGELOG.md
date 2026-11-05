@@ -16,6 +16,13 @@
 - The Conversion basis block opens by itself and says what is missing (Ar in feed gas, gas feed per reactor).
 - `ESTD_Etylene` (spelling of some GC methods) is read as Ethylene.
 
+## 6.8.3 (2026-11-05) — Online Analysis units: Ar and gas feed only from the Run Plan
+- The Ar inputs (mol%, wt%) and the gas feed inputs (R1–R8, 01i14FI01, molar volume) are removed from the Online
+  Analysis page: Ar comes from the Run Plan Feed → Gas feed composition, the gas feed from the export or else the Run
+  Plan DOE. The Conversion basis block is read-only and says what is missing in the Run Plan; status messages point to
+  the Run Plan ("no Argon in the Run Plan feed gas", "no gas feed for Rr – not in the export and no Run Plan DOE
+  condition with a gas flow at this time"). Molar volume fixed at 22.414 Nl/mol (0 °C).
+
 ## Unreleased — 6.4.3 update package
 - `upgrade/6.4.3_online_gas_feed/`: guide, checker and patch that bring 6.8.1–6.8.2 (gas feed for GC exports without
   flows, Etylene, earlier Run Plan gas block) to the offline 6.4.2 dashboard with the process selection kept.
