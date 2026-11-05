@@ -188,6 +188,18 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Tests: `tests/test_online_units.py` reproduces R6_MB mass and carbon flows of `tests/fixtures/online/R6-C1-S1-MassBal_Ver2.2.xlsx`
   exactly and runs the R08 export (`tests/fixtures/online/Result_R08-…txt`) with `RunPlan_MassBalance_SS.xlsx`.
 
+## Mass Balance rebuild — decisions and what comes later
+- **Liquid feed analysis is not part of the Run Plan.** In the Mass Balance the liquid (Carbon, Hydrogen, MW, density of
+  the liquid feed / product) comes later with the liquid product data (as the workbook's Liq sheet: TLP mass, HC and
+  aqueous phase, C wt% of the product). Do not ask for it in the Run Plan and do not flag empty Feed E6:E8 as missing
+  for Mass Balance runs. The Run Plan gives: Ar / feed gas composition, DOE gas (and liquid) flows per condition and
+  reactor, Feed Cut-In.
+- Done: Online Analysis units (g/h, Nl/h, g C/h) with gas feed from the export, entered values or the Run Plan DOE.
+- Next (not built): liquid product data entry/import, mass balance closure, carbon balance (workbook R#_MB C9:C13,
+  C-Balance), Summary; Plots / Custom table use of the converted online tables.
+- Ar in feed gas: the workbook uses the verified Ar (Gas!I35, e.g. 4.3 mol%), Run Plans may hold the target (5 mol%) →
+  16.8 % difference; the verified value belongs in the Run Plan gas composition (or is typed on the Online page).
+
 ## Working conventions seen in this codebase
 - One dashboard for every experiment (v6.6): no process gates in new code. `window.ILSProcess` is fixed to
   'isomerization' only to keep the dormant reforming checks off.

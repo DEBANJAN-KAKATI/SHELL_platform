@@ -83,3 +83,6 @@ Windows replace the files. For a git checkout of 6.4.2: `git apply --binary --wh
 With the target 5 mol% every flow is 16.8 % higher than in the MassBal workbook; with the verified 4.3 mol% the R6
 flows are within 0.5 % of R6_MB. Put the verified value in the Run Plan (Argon 4.3, mixed-gas components × 0.956), or
 type 4.3 in *Ar in feed gas mol%* of the Conversion basis block.
+
+The liquid (Carbon, Hydrogen, MW of the liquid feed / product) is **not** a Run Plan entry: it comes later with the
+liquid product data of the Mass Balance.
