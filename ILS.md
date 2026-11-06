@@ -1,13 +1,14 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.8.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
-**One universal dashboard (v6.6):** no process selection; the universal Run Plan template describes every experiment
-and the pages work in the Isomerization format for now (calculation table and import analysis to be generalised later).
-Reforming (v6.4) code is **dormant** (backend and tests stay, UI removed). The first Mass Balance (v6.5) was **removed in
-v6.8**; Mass Balance is being rebuilt step by step, starting with the Online Analysis units (below).
+**Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
+**Reforming** (v6.4, Reactor 1; its UI was switched off in v6.6–6.8.3 and is active again) and **General_MB** (Isomerization
+pages + Internal Standard mass balance on Online Analysis, below). The universal Run Plan template (v6.6) describes every
+experiment for all three. The first Mass Balance (v6.5) was removed in v6.8; the Mass Balance is rebuilt step by step in
+General_MB.
 
 ## Run / stack
 - Python 3, Flask 3, pandas 2, olefile + xlrd (legacy `.XLS` read via the OLE `Workbook`/`Book` stream), openpyxl.
@@ -63,7 +64,8 @@ v6.8**; Mass Balance is being rebuilt step by step, starting with the Online Ana
 Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
 (`index.html`), Online (`online_analysis.html`) → Calculation: Calculation table, Custom table → Data Integrity
 (`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
-No process selector.
+Process tabs (Isomerization / Reforming / General_MB) after the Run Number on the Run Plan page (locked until a Run Number
+is entered); a read-only Process badge on the other pages.
 
 ## API
 - `/api`: `health`, `settings`, `run-number` (GET/POST), `browse-folder`, `process` (DHA folder),
@@ -139,8 +141,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   cell lineage inspector, CSV and JSON template import/export.
 - Data Integrity: per Run/Condition/Reactor/Parameter stats and MAD-based outlier flags; never modifies data.
 
-## Reforming (v6.4, dormant since v6.6) — details in `REFORMING_PROGRESS.md`
-- Process selector after Run Number on the shared Run Plan page; switching clears the loaded Run Plan and stays on
+## Reforming (v6.4; switched off v6.6–6.8.3, active again in v6.9) — details in `REFORMING_PROGRESS.md`
+- Reforming tab of the process tabs on the shared Run Plan page; switching clears the loaded Run Plan and stays on
   `run_plan.html`. The process is never inferred from the workbook.
 - **Unified Run Plan** (2026-10-28): both processes use one `RunPlan.xlsx` format — `Plan` (objective, R1–R8 Catalyst
   Loading Plan, optional column-A labels with values in column C: `Feed SL ID`, `Feed Cut-In`, `Feed molecular weight`),
@@ -162,7 +164,23 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%
   (Reactor1 sheet) not done; History / Summary Dashboard plan tables assume R1–R8 columns.
 
-## Online Analysis units (v6.8) — `backend/services/online_units.py`, `/api/online-units`
+## General_MB (v6.9; offline 6.5.0) — Internal Standard from the bypass lines
+- `window.ILSProcess` values `isomerization`, `reforming`, `general_mb` (`isGeneralMB()`); General_MB uses the
+  Isomerization pipeline everywhere except Online Analysis. Isomerization / Reforming: Online shows mol% only.
+- Online (General_MB): Internal Standard — / Argon / N2 (`dhaOnlineState.internalStandard`, side-panel data in `mbPanels`);
+  units other than mol% need an IS. `/api/online-units` takes `internal_standard`; returns `feed_gas_is[]` (per DOE
+  condition "Block · C<n>": bypass_lines, is_mol_pct, mixed_mol_pct, sum, mixed_mw, is_wt_pct, is_rsd_pct, error) and
+  `avg_is_flow[]` (condition × R1–R8: g/h or `ERROR …`). y_IS,feed = avg ESTD_IS; y_mix = avg Σ other gases (N2 counts
+  for Argon-IS, Argon for N2-IS); MW_mix = Σ avg_j·MW_j / Σ avg_j; w_IS = y_IS·MW_IS/(y_IS·MW_IS + y_mix·MW_mix);
+  F_IS,r = 01i14FI01·FIC_r/ΣFIC·w_IS, else FIC_r/1000/22.414·y_IS,feed/100·MW_IS; the unit formulas below with IS for Ar.
+- Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;
+  bypass lines = Reactor 0 with GC values inside the condition's window (parallel blocks share them); bypass lines stay
+  the bypass with the Reactor Map ON. Side panel next to the table; Conversion basis collapsed at the bottom.
+  Errors: no DOE condition, no bypass line in a condition, IS peak missing.
+- R08 + `RunPlan_MassBalance_SS_filled.xlsx`, Argon: Block-1 C1 44 lines 5.1572 / 95.9625 mol%, 9.2933 wt%, R1 0.1267 g/h;
+  Block-2 C1 36 lines 5.0994 mol%, R5 0.2520, R6 0.2455 g/h. Offline 6.4.3 → 6.5.0 package: `upgrade/6.5.0_general_mb/`.
+
+## Online Analysis units (v6.8; General_MB only since v6.9) — `backend/services/online_units.py`, `/api/online-units`
 - Units selector on the Online Analysis table: **Normalised mol%** (the imported ESTD values), **Mass flow rates (g/h)**,
   **Volumetric flow rates (Nl/h)**, **TOS carbon of each molecule (g C/h)**. Formulas of the MassBal workbook (Ver2.2,
   R#_MB / Gas / Run_Plan), argon = internal standard, y = ESTD mol% of the injection:
@@ -201,8 +219,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   16.8 % difference; the verified value belongs in the Run Plan gas composition (nothing is typed on the Online page).
 
 ## Working conventions seen in this codebase
-- One dashboard for every experiment (v6.6): no process gates in new code. `window.ILSProcess` is fixed to
-  'isomerization' only to keep the dormant reforming checks off.
+- Process gates: `window.ILSProcess.isReforming()` / `isGeneralMB()`; Isomerization is the default. One Run Plan
+  template for all processes.
 - Make previous versions recoverable (versioned folders, `backups/<date>_<topic>/`); record changes in
   `CHANGELOG.md`, `README.md` and, for reforming, `REFORMING_PROGRESS.md`.
 - Errors are shown explicitly in tables rather than silently replaced with zero.

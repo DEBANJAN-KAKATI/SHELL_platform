@@ -189,3 +189,125 @@ def test_run_plan_r6_earlier_layout_gives_feed_gas_and_doe_flows(workbook_case):
     verified = convert_online_rows(export, "mass", ar_mol_pct=4.3, **kw)["rows"][0]
     assert verified["Acetylene [g/h]"] == pytest.approx(ws["D78"].value, rel=0.005)
     assert verified["N2 [g/h]"] == pytest.approx(ws["D80"].value, rel=0.005)
+
+
+# ---------------------------------------------------------------- General_MB (6.5.0): Internal Standard from the bypass
+from backend.services.online_units import internal_standard_name  # noqa: E402
+
+R3_EXPORT = FIXTURES / "online" / "R3-C2-S1_9-06-23.txt"
+MB_RUN_PLAN_FILLED = FIXTURES / "run_plan" / "RunPlan_MassBalance_SS_filled.xlsx"
+GC_NAME = {"Hydrogen": "H2", "Nitrogen": "N2"}
+
+
+def _doe_all(flow_nl_h=3, start="2023-01-01 00:00:00", end=""):
+    return [{"Condition No.": 1, "Block": "", "Reactor ID": f"R{k}", "Start Date": start, "End Date": end,
+             "Total gas (Nl/h)": flow_nl_h} for k in range(1, 9)]
+
+
+def test_internal_standard_names():
+    assert internal_standard_name("argon") == "Argon" and internal_standard_name("Ar") == "Argon"
+    assert internal_standard_name("N2") == "N2" and internal_standard_name("nitrogen") == "N2"
+    assert internal_standard_name("") is None and internal_standard_name(None) is None
+    with pytest.raises(ValueError):
+        internal_standard_name("helium")
+
+
+def test_bypass_feed_gas_reproduces_the_workbook_gas_sheet(workbook_case):
+    """A bypass line with the workbook feed gas (Gas!I35 Ar, mixed gas Run_Plan) gives Gas!I37 and Gas!G20 (R6)."""
+    ws, gas, names, feed, rows = workbook_case
+    bypass = {"DateTime": "2024-05-14 07:00:00", "Reactor": 0}
+    bypass.update({f"ESTD_{GC_NAME.get(f['component'], f['component'])}": f["value"] for f in feed if f["value"]})
+    doe = _doe_all(start="2024-05-14 06:00:00")
+    out = convert_online_rows([bypass] + rows, "mass", doe_rows=doe, internal_standard="Argon")
+    f = out["feed_gas_is"][0]
+    assert f["bypass_lines"] == 1 and f["is_mol_pct"] == pytest.approx(gas["I35"].value)
+    assert f["is_wt_pct"] == pytest.approx(gas["I37"].value, rel=1e-4)         # MWs: R#_MB vs Run_Plan row 37
+    line = next(r for r in out["rows"] if r["Reactor"] == 6)
+    assert line["Status"] == "OK" and line["Argon to reactor [g/h]"] == pytest.approx(ws["F5"].value, rel=2e-3)
+    assert out["avg_is_flow"][0]["R6"] == pytest.approx(ws["F5"].value, rel=2e-3)
+
+
+@pytest.mark.parametrize("ist, y_is, y_mix, mw_mix, w_is, f_is", [
+    ("Argon", 5.1077, 96.0090, 27.911, 7.0757, 0.273103),
+    ("N2", 88.5583, 12.5584, 32.082, 86.0285, 3.320451),
+])
+def test_r3_bypass_feed_gas_and_is_flow(ist, y_is, y_mix, mw_mix, w_is, f_is):
+    rows = process_online_file(R3_EXPORT)["rows"]
+    out = convert_online_rows(rows, "mass", doe_rows=_doe_all(3), internal_standard=ist)
+    f = out["feed_gas_is"][0]
+    assert f["bypass_lines"] == 1
+    assert (f["is_mol_pct"], f["mixed_mol_pct"]) == (pytest.approx(y_is, abs=1e-4), pytest.approx(y_mix, abs=1e-4))
+    assert f["sum_mol_pct"] == pytest.approx(101.1167, abs=1e-4)
+    assert f["mixed_mw"] == pytest.approx(mw_mix, abs=1e-3) and f["is_wt_pct"] == pytest.approx(w_is, abs=1e-4)
+    assert all(out["avg_is_flow"][0][f"R{k}"] == pytest.approx(f_is, abs=1e-6) for k in range(1, 9))
+    assert out["bypass_count"] == 1 and out["ok_count"] == 44
+    assert f"{ist} to reactor [g/h]" in out["columns"] and "Condition" in out["columns"]
+
+
+@pytest.fixture(scope="module")
+def r08_general_mb():
+    rows = process_online_file(EXPORT)["rows"]
+    plan = process_run_plan_file(str(MB_RUN_PLAN_FILLED))
+    return rows, plan["feed"]["tables"]["gas"]["rows"], plan["doe"]["rows"]
+
+
+def test_r08_feed_gas_per_block_condition(r08_general_mb):
+    rows, gas, doe = r08_general_mb
+    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, internal_standard="Argon")
+    b1, b2 = out["feed_gas_is"]
+    assert (b1["condition"], b1["bypass_lines"], b2["condition"], b2["bypass_lines"]) == ("Block-1 · C1", 44, "Block-2 · C1", 36)
+    assert b1["is_mol_pct"] == pytest.approx(5.1572, abs=1e-4) and b1["mixed_mol_pct"] == pytest.approx(95.9625, abs=1e-4)
+    assert b1["is_wt_pct"] == pytest.approx(9.2933, abs=1e-4) and b2["is_mol_pct"] == pytest.approx(5.0994, abs=1e-4)
+    assert b1["run_plan_argon_mol_pct"] == pytest.approx(5.1001)                         # filled Run Plan: measured
+    avg = {r["condition"]: r for r in out["avg_is_flow"]}
+    assert avg["Block-1 · C1"]["R1"] == pytest.approx(0.1267, abs=1e-4)
+    assert avg["Block-2 · C1"]["R5"] == pytest.approx(0.2520, abs=1e-4)
+    assert avg["Block-2 · C1"]["R6"] == pytest.approx(0.2455, abs=1e-4)
+    assert avg["Block-1 · C1"]["R2"] is None                                            # not used
+    assert (out["ok_count"], out["bypass_count"]) == (107, 45)
+    statuses = Counter(r["Status"] for r in out["rows"])
+    assert statuses["BYPASS – feed gas of Block-1 · C1, Block-2 · C1"] == 36            # parallel blocks share it
+
+
+@pytest.mark.parametrize("unit, column, value", [
+    ("mass", "Methane [g/h]", 0.02323), ("volume", "Methane [Nl/h]", 0.03703), ("carbon", "Methane [g C/h]", 0.01739),
+])
+def test_r08_reactor_line_in_every_unit(r08_general_mb, unit, column, value):
+    rows, gas, doe = r08_general_mb
+    out = convert_online_rows(rows, unit, feed_gas=gas, doe_rows=doe, internal_standard="Argon")
+    line = next(r for r in out["rows"] if r["DateTime"] == "2024-10-24 15:09:23")
+    assert line["Status"] == "OK" and line["Condition"] == "Block-1 · C1"
+    assert line[column] == pytest.approx(value, abs=1e-5)
+    assert out["avg_is_flow"][0]["R1"] == pytest.approx(0.1267, abs=1e-4)              # same in every unit
+
+
+def test_r08_with_n2_as_internal_standard(r08_general_mb):
+    rows, gas, doe = r08_general_mb
+    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, internal_standard="N2")
+    b1 = out["feed_gas_is"][0]
+    assert b1["is_mol_pct"] == pytest.approx(58.3231, abs=1e-4) and b1["mixed_mol_pct"] == pytest.approx(42.7966, abs=1e-4)
+    assert b1["is_wt_pct"] == pytest.approx(73.6999, abs=1e-4)
+    assert "N2 to reactor [g/h]" in out["columns"] and "Total w/o N2 [g/h]" in out["columns"]
+
+
+def test_general_mb_errors_are_explicit():
+    base = {"DateTime": "2024-01-01 10:00:00", "Reactor": 1, "01i14FIC01": 3000, "ESTD_Argon": 5.0, "ESTD_Methane": 1.0}
+    # no DOE conditions at all
+    out = convert_online_rows([base], "mass", internal_standard="Argon")
+    assert out["basis"]["no_conditions"] and out["rows"][0]["Status"] == "ERROR: no Run Plan DOE condition for R1 at this time"
+    # a condition without a bypass line
+    out = convert_online_rows([base], "mass", doe_rows=_doe_all(start="2024-01-01 09:00:00"), internal_standard="Argon")
+    assert out["feed_gas_is"][0]["bypass_lines"] == 0
+    assert out["rows"][0]["Status"].startswith("ERROR: no bypass (reactor 0) GC line in condition C1")
+    assert out["avg_is_flow"][0]["R1"].startswith("ERROR: no bypass")
+    # IS peak missing in the reactor line, empty cells and bypass lines without values never crash
+    bypass = {"DateTime": "2024-01-01 09:30:00", "Reactor": 0.0, "ESTD_Argon": 5.0, "ESTD_N2": 95.0}
+    empty_bypass = {"DateTime": "2024-01-01 09:40:00", "Reactor": "0", "ESTD_Argon": None, "ESTD_N2": ""}
+    no_is = dict(base, ESTD_Argon=None, ESTD_Ethane="")
+    for unit in ("mass", "volume", "carbon"):
+        out = convert_online_rows([bypass, empty_bypass, base, no_is], unit,
+                                  doe_rows=_doe_all(start="2024-01-01 09:00:00"), internal_standard="Argon")
+        status = [r["Status"] for r in out["rows"]]
+        assert status[0] == "BYPASS – feed gas of C1" and status[1] == "BYPASS – no GC values in this line (not used)"
+        assert status[2] == "OK"
+        assert status[3] == "ERROR: no Argon peak (ESTD_Argon) – Argon is the internal standard"

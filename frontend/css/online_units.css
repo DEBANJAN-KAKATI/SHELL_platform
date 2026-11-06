@@ -20,3 +20,23 @@
 .online-units-title{font-size:12px;font-weight:700;color:var(--burnt)}
 .online-units-bar.needs-input{border-left-color:#991b1b}
 .online-units-bar.needs-input summary .online-units-title{color:#991b1b}
+/* General_MB (6.5.0): Internal Standard side panel next to the table */
+.online-unit-wrap[hidden]{display:none}
+.online-mb-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.online-mb-layout.with-side{grid-template-columns:minmax(0,1fr) 330px;padding-right:16px}
+.online-mb-side{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;max-height:72vh;overflow:auto;padding:12px 0}
+.online-mb-side[hidden]{display:none}
+.online-mb-card{border:1px solid var(--border);border-left:3px solid var(--burnt);border-radius:8px;background:#fffaf0;padding:10px 12px;font-size:12px}
+.online-mb-note{color:var(--slate);font-size:11px;margin:2px 0 8px}
+.online-mb-cond{border-top:1px solid var(--border);padding-top:8px;margin-top:8px}
+.online-mb-cond:first-child{border-top:0;margin-top:0;padding-top:0}
+.online-mb-cond-head{font-weight:700;color:var(--ink)}
+.online-mb-cond-window{color:var(--slate);font-size:11px;margin-bottom:4px}
+.online-mb-kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0}
+.online-mb-kv dt{color:var(--slate)}
+.online-mb-kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.online-mb-kv dd b{color:var(--ink)}
+.online-mb-error{color:#991b1b;font-weight:600}
+.online-mb-warn{color:#92400e;font-size:11px;margin-top:4px}
+.online-table td.online-status-bypass{color:var(--slate);font-style:italic;white-space:normal;min-width:200px}
+@media (max-width:1280px){.online-mb-layout.with-side{grid-template-columns:1fr;padding-right:0}.online-mb-side{position:static;max-height:none;padding:0 16px}}

@@ -17,16 +17,22 @@ function sortDateTimeRows(rows, column = 'DateTime') {
     })).sort((left, right) => left.time === right.time ? 0 : left.time - right.time).map(entry => entry.row);
 }
 
-// One universal dashboard: there is no process selection any more. The Run Plan template describes every experiment;
-// the pages work in the Isomerization format for now. ILSProcess stays as a fixed answer so the dormant Reforming code
-// (process checks in older scripts) stays switched off; a process saved by an older version is cleared.
-try { sessionStorage.removeItem('ils_process'); } catch {}
+// Process of the current run (Isomerization, Reforming or General_MB), chosen with the process tabs on the Run Plan page.
+// Kept per browser tab like the Run Number; cleared by the reset button. General_MB uses the Isomerization pages and adds
+// the Internal Standard mass balance (bypass feed gas, IS flow per reactor) on Online Analysis.
 window.ILSProcess = {
     KEY: 'ils_process',
-    get() { return 'isomerization'; },
-    set() {},
-    isReforming() { return false; },
-    label() { return 'Isomerization'; },
+    LABELS: { isomerization: 'Isomerization', reforming: 'Reforming', general_mb: 'General_MB' },
+    normalize(value) { return Object.prototype.hasOwnProperty.call(this.LABELS, value) ? value : 'isomerization'; },
+    get() {
+        try { return this.normalize(sessionStorage.getItem(this.KEY)); } catch { return 'isomerization'; }
+    },
+    set(value) {
+        try { sessionStorage.setItem(this.KEY, this.normalize(value)); } catch {}
+    },
+    isReforming() { return this.get() === 'reforming'; },
+    isGeneralMB() { return this.get() === 'general_mb'; },
+    label() { return this.LABELS[this.get()]; },
     runPlanUrl() { return '/frontend/run_plan.html'; }
 };
 
@@ -129,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=4';
+        historianScript.src = '/frontend/js/historian_save.js?v=5';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
             runDataScript.src = '/frontend/js/run_data.js?v=4';
@@ -238,7 +244,58 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    const refreshProcessLock = () => {};
+    // Process tabs (Run Plan page) or read-only process badge (other pages)
+    if (!document.getElementById('ilsProcessCss')) {
+        document.head.insertAdjacentHTML('beforeend', '<style id="ilsProcessCss">'
+            + '.process-tabs{display:inline-flex;border:1px solid var(--border,#d6cbb8);border-radius:9px;overflow:hidden;background:#fffaf0}'
+            + '.process-tab{border:0;background:transparent;padding:7px 13px;font:inherit;font-size:12px;font-weight:700;color:var(--slate,#475569);cursor:pointer;white-space:nowrap}'
+            + '.process-tab+.process-tab{border-left:1px solid var(--border,#d6cbb8)}'
+            + '.process-tab.active{background:var(--navy,#0b1b2b);color:#fff}'
+            + '.process-tab:disabled{opacity:.5;cursor:not-allowed}'
+            + '.process-badge{width:130px}</style>');
+    }
+    let refreshProcessLock = () => {};
+    const processHost = (document.getElementById('runNumberInput') || document.getElementById('runNumberDisplay'))?.closest('.run-number-group');
+    if (isRunPlan && processHost) {
+        const current = window.ILSProcess.get();
+        processHost.insertAdjacentHTML('afterend',
+            '<div class="run-number-group process-group">' +
+            '<span class="run-number-label" id="processLabel">Process</span>' +
+            '<div class="process-tabs" role="tablist" aria-labelledby="processLabel">' +
+            Object.entries(window.ILSProcess.LABELS).map(([value, label]) =>
+                `<button type="button" role="tab" class="process-tab${value === current ? ' active' : ''}" data-process="${value}" aria-selected="${value === current}">${label}</button>`).join('') +
+            '</div></div>');
+        const tabsEl = processHost.parentElement.querySelectorAll('.process-tab');
+        const runField = document.getElementById('runNumberInput');
+        const syncProcessLock = () => {
+            const hasRun = !!(runField?.value || '').trim();
+            tabsEl.forEach(tab => {
+                tab.disabled = !hasRun && tab.dataset.process !== current;
+                tab.title = hasRun ? `Process of this run: ${tab.textContent}` : 'Enter the Run Number first';
+            });
+        };
+        refreshProcessLock = syncProcessLock;
+        syncProcessLock();
+        runField?.addEventListener('input', syncProcessLock);
+        runField?.addEventListener('change', syncProcessLock);
+        tabsEl.forEach(tab => tab.addEventListener('click', () => {
+            const value = tab.dataset.process;
+            if (value === window.ILSProcess.get()) return;
+            // The loaded Run Plan belongs to the previous process.
+            try {
+                sessionStorage.removeItem('runPlanDashboardState');
+                sessionStorage.removeItem('ils_feed_properties');
+            } catch {}
+            window.ILSProcess.set(value);
+            window.location.assign(window.ILSProcess.runPlanUrl());
+        }));
+    } else if (processHost) {
+        processHost.insertAdjacentHTML('afterend',
+            '<div class="run-number-group process-group">' +
+            '<span class="run-number-label">Process</span>' +
+            `<input type="text" class="input run-number-input run-number-readonly process-badge" id="processDisplay" readonly disabled title="Process selected on the Run Plan page" value="${window.ILSProcess.label()}" />` +
+            '</div>');
+    }
 
     if (isRunPlan) {
         const runInput = document.getElementById('runNumberInput');

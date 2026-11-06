@@ -79,6 +79,21 @@
         const onl = readJson('dhaOnlineState') || {};
         addTable('online.analysis', 'Online Analysis', 'Online Analysis', onl.rows, onl.columns);
         addKpi('online.record_count', 'Online Records', 'Online Analysis', Array.isArray(onl.rows) ? onl.rows.length : null);
+        // General_MB: feed gas measured in the bypass lines and the average IS flow to each reactor (side panel)
+        const mb = onl.mbPanels;
+        if (mb && onl.internalStandard) {
+            const isName = mb.internal_standard || onl.internalStandard;
+            addTable('online.feed_gas_is', `Online · Feed Gas Composition IS (${isName}, bypass)`, 'Online Analysis',
+                (mb.feed_gas_is || []).map(f => ({
+                    Condition: f.condition, Start: f.start, End: f.end, Reactors: (f.reactors || []).join(', '),
+                    'Bypass lines': f.bypass_lines, [`${isName} mol%`]: f.is_mol_pct, [`${isName} wt%`]: f.is_wt_pct,
+                    'Mixed gas mol%': f.mixed_mol_pct, 'Sum mol%': f.sum_mol_pct, 'Mixed gas MW': f.mixed_mw,
+                    [`${isName} RSD %`]: f.is_rsd_pct, 'Run Plan Argon mol%': f.run_plan_argon_mol_pct, Error: f.error || ''
+                })));
+            addTable('online.avg_is_flow', `Online · Average ${isName} Flow to Reactor [g/h]`, 'Online Analysis',
+                (mb.avg_is_flow || []).map(r => ({ Condition: r.condition,
+                    ...Object.fromEntries(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'].map(k => [k, r[k] ?? ''])) })));
+        }
 
         const base = readJson('ils_base_table_state') || {};
         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);

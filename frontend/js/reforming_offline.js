@@ -38,11 +38,12 @@ window.ILSReformingOffline = (() => {
         try {
             const saved = JSON.parse(sessionStorage.getItem('dhaDashboardState') || localStorage.getItem('dhaDashboardState') || 'null');
             if (!saved || !Array.isArray(saved.r1) || !saved.r1.length) return;
+            // General_MB processes the offline DHA files as Isomerization: only Reforming differs.
             const savedProcess = saved.process === 'reforming' ? 'reforming' : 'isomerization';
-            const current = window.ILSProcess?.get() || 'isomerization';
+            const current = window.ILSProcess?.isReforming() ? 'reforming' : 'isomerization';
             if (savedProcess !== current) {
                 const error = document.getElementById('error');
-                const label = { isomerization: 'Isomerization', reforming: 'Reforming' };
+                const label = { isomerization: 'Isomerization / General_MB', reforming: 'Reforming' };
                 if (error) {
                     error.textContent = `The tables below were processed as ${label[savedProcess]} but the Run Plan process is ${label[current]}. Click Process again to reload them.`;
                     error.classList.add('show');
