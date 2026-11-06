@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -116,7 +116,10 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   rows 1-107 are not touched. Template: `tests/fixtures/run_plan/RunPlan_Template_Feed_SS.xlsx`; filled test file:
   `RunPlan_Isomerisation_Rheinland.xlsx`.
 - Feed: Excel tables tbl_Feed (A1:F13 properties: label A, unit D, value E, note G), tbl_comp (A14:F45 liquid, Total row),
-  tbl_compType (H14:K22), tbl_gas (M14:P31) + "Gas feed settings" (A46:E48) → `feed.tables`; flat `feed.rows` start
+  tbl_compType (H14:K22), tbl_gas (M14:R31: … Check, MW (g/mol), Carbon #) + "Gas feed settings" (A46:E48), and (6.9.1)
+  tbl_MW "Molecular weights" (T14:W61: Component as in the GC export, MW, Carbon #, Note; spare rows for new molecules)
+  → `feed.tables` (`mw` = tbl_MW rows; gas rows carry `mw`, `carbon_no`). Add both to an older Run Plan with
+  `scripts/run_plan_examples/add_molecular_weights.py` (XML-level edit, keeps charts); flat `feed.rows` start
   with Carbon, Hydrogen, Molecular Weight (consumers read Carbon = row 1, MW = row 3), then other properties and filled
   components. Totals checked to 100 ± 0.5. Earlier template layout (e.g. `RunPlan_R6-C1-S1_MassBalance.xlsx`, no tables): the gas feed is
   the "Gas composition (mol%)" block under "Gas feed" (component A, unit D, value E, down to Total), used when tbl_gas has
@@ -187,8 +190,11 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   F_r = 01i14FI01 · FIC_r / ΣFIC (Gas!B12); F_Ar,r = F_r · w_Ar (Gas!G20); m_i = y_i·MW_i/(y_Ar·39.948) · F_Ar,r (rows 52-80);
   V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar, V_i = y_i/100 · V_out (rows 86-116; the workbook's D86 mixes g/h and NmL/h:
   159.7 Nl/h for 3 Nl/h feed, so the argon balance it intends is used); C_i = 12.011 · nC_i / MW_i · m_i (rows 121-150).
-- MWs and carbon atoms = experimental standards of the workbook (R#_MB columns B and AD; H2S, Propadiene: standard
-  values; lumped peaks C3-C4, C4-C5, C5-C6, C6-C8 have no MW → `ERROR: no MW`). Feed gas MWs (Run_Plan row 37) give
+- **MWs and carbon atoms come from the Run Plan (6.9.1)**: `molecular_weights` = tbl_MW rows, then gas-table rows, then
+  liquid rows (`molecular_weights_from_feed`, same order as online_analysis.js); `component_table` / `resolve_component`
+  match names without case/spaces/hyphens (`NAME_KEYS`: Hydrogen=H2, CH4=Methane, n-Butane=Butane …). The built-in
+  `COMPONENTS` (workbook R#_MB columns B and AD) only fill gaps, labelled "built-in … (not in the Run Plan)"; no MW
+  anywhere → `ERROR: no MW for X – add it to the Run Plan (Feed → Molecular weights)`; basis `mw_missing`, `mw_built_in`. Feed gas MWs (Run_Plan row 37) give
   w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook).
   **Everything comes from the export and the Run Plan (v6.8.3): no inputs on the page.** The collapsed "Conversion
   basis" block under the table is read-only (Ar mol% / wt% from the Run Plan, flow sources, formula, MW table); it opens

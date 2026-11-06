@@ -1,3 +1,20 @@
+## 6.9.1 (2026-11-06) — Molecular weights from the Run Plan
+- **The Run Plan now holds every molar mass and carbon number** used by the dashboard, so a new molecule only needs a
+  row in the Run Plan. On the Feed sheet:
+  - the gas feed table (tbl_gas) has two new columns, **MW (g/mol)** and **Carbon #**;
+  - a new table **tbl_MW "Molecular weights"** (T14:W61) lists every analysed component as it is named in the GC
+    export (ESTD_<name>), pre-filled with the MassBal workbook standards, with 12 spare rows for new components.
+- Online Analysis (g/h, Nl/h, g C/h, feed gas composition, internal-standard and mixed-gas MW) takes MW and carbon
+  number from the Run Plan: Molecular weights table first, then the gas feed table, then the liquid components.
+  Built-in workbook values only fill gaps and are labelled "built-in … (not in the Run Plan)"; a component without an
+  MW anywhere shows "ERROR: no MW for X – add it to the Run Plan (Feed → Molecular weights)". Names are matched without
+  case, spaces and hyphens (CH4 = Methane, Hydrogen = H2, n-Butane = Butane …).
+- Run Plan page: MW and C# columns in the gas feed card (a used gas without MW shows "missing" in red) and a new
+  Molecular weights card. Conversion basis lists the source of every MW and the components still missing one.
+- `scripts/run_plan_examples/add_molecular_weights.py RunPlan.xlsx [out.xlsx]` adds the columns and the table to any
+  existing Run Plan (charts, formulas and comments kept; does nothing if tbl_MW exists). All template and test Run
+  Plans in `tests/fixtures/run_plan/` were updated with it; results are unchanged.
+
 ## 6.9.0 (2026-11-06) — Process tabs Isomerization / Reforming / General_MB
 - **Process selection is back**, as three tabs next to the Run Number on the Run Plan page: **Isomerization**,
   **Reforming** and **General_MB**. The other pages show the process as a badge. The tabs are locked until a Run Number

@@ -187,9 +187,17 @@ function onlineRunPlanContext() {
         const doeRows = (rp.doeData?.rows || []).map(row => Object.fromEntries(Object.entries(row).filter(([key]) =>
             /^(Reactor ID|Start Date|End Date|Condition No\.|Block)$/.test(key) || /^duration/i.test(key)
             || /^total gas/i.test(key) || /^gas flow/i.test(key))));
-        return { feedGas: rp.feedTables?.gas?.rows || [], feedCutIn: cutIn, doeRows };
+        // Molar masses and carbon numbers from the Run Plan (6.9.1): Molecular weights table first, then the gas feed
+        // table, then the liquid components; the server uses built-in standards only for components not listed here.
+        const t = rp.feedTables || {};
+        const mw = [
+            ...(t.mw?.rows || []).map(r => ({ component: r.component, mw: r.mw, carbon_no: r.carbon_no, source: 'Run Plan · Molecular weights' })),
+            ...(t.gas?.rows || []).map(r => ({ component: r.component, mw: r.mw, carbon_no: r.carbon_no, source: 'Run Plan · Gas feed composition' })),
+            ...(t.liquid?.rows || []).map(r => ({ component: r.component, mw: r.mw, carbon_no: r.carbon_no, source: 'Run Plan · Liquid components' })),
+        ].filter(r => r.component && r.mw !== '' && r.mw != null);
+        return { feedGas: t.gas?.rows || [], feedCutIn: cutIn, doeRows, molecularWeights: mw };
     } catch (e) {
-        return { feedGas: [], feedCutIn: '', doeRows: [] };
+        return { feedGas: [], feedCutIn: '', doeRows: [], molecularWeights: [] };
     }
 }
 
@@ -222,6 +230,7 @@ async function refreshOnlineUnits() {
                 // mol% with an Internal Standard: the side panel needs the bypass values (table stays in mol%)
                 unit: unit === 'mol' ? 'mass' : unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas,
                 feed_cut_in: ctx.feedCutIn, doe_rows: ctx.doeRows, internal_standard: internalStandard || null,
+                molecular_weights: ctx.molecularWeights,
             }),
         });
         const data = await onlineJson(response);
@@ -355,11 +364,14 @@ function renderUnitsBar() {
     if (sources) flowNote.push(`Flow source of the calculated lines – ${sources}`);
     if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Gas feed missing: load the Run Plan with the DOE gas flow of every condition (start date, duration, Total gas Nl/h).</span>');
     if (basis.argon_missing) flowNote.push('<span class="online-cell-error">Ar missing: load the Run Plan with Argon in Feed → Gas feed composition.</span>');
+    if ((basis.mw_missing || []).length) flowNote.push(`<span class="online-cell-error">No MW in the Run Plan for: ${escOnline(basis.mw_missing.join(', '))} – add them to Run Plan → Feed → Molecular weights.</span>`);
+    if ((basis.mw_built_in || []).length) flowNote.push(`Built-in MW used (not in the Run Plan): ${escOnline(basis.mw_built_in.join(', '))}`);
+    if (data && !basis.mw_from_run_plan) flowNote.push('<span class="online-cell-error">This Run Plan has no molecular weights: add them with scripts/run_plan_examples/add_molecular_weights.py.</span>');
     if (basis.no_conditions) flowNote.push('<span class="online-cell-error">No Run Plan DOE conditions: the bypass lines cannot be grouped per condition.</span>');
     if ((basis.no_bypass || []).length) flowNote.push(`<span class="online-cell-error">No bypass (reactor 0) line in: ${escOnline(basis.no_bypass.join(', '))}</span>`);
     online$('#onlineFlowNote').innerHTML = flowNote.join(' · ');
     const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'DOE gas flows' : '',
-        basis.no_conditions ? 'DOE conditions' : ''].filter(Boolean);
+        basis.no_conditions ? 'DOE conditions' : '', (basis.mw_missing || []).length ? 'MW of ' + basis.mw_missing.join(', ') : ''].filter(Boolean);
     bar.classList.toggle('needs-input', missingInputs.length > 0);
     if (missingInputs.length && !bar.dataset.autoOpened) { bar.open = true; bar.dataset.autoOpened = '1'; }
     // One line on the closed block: Ar basis and how many lines could be calculated

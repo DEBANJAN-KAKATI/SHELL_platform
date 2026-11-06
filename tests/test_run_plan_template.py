@@ -42,7 +42,7 @@ def test_doe_keeps_filled_conditions_and_separates_step0():
 
 def test_feed_has_four_tables_with_totals():
     tables = process_run_plan_file(str(FILLED))["feed"]["tables"]
-    assert set(tables) == {"properties", "liquid", "groups", "gas"}
+    assert set(tables) == {"properties", "liquid", "groups", "gas", "mw"}       # mw: Molecular weights (6.9.1)
     liquid = [(r["component"], r["weight"]) for r in tables["liquid"]["rows"] if r["weight"] != ""]
     assert liquid == [("n-Hexane", 84.5), ("Methylcyclopentane", 0.5), ("n-Heptane", 10), ("n-Octane", 5)]
     assert (tables["liquid"]["total"], tables["liquid"]["check"]) == (100, "OK")

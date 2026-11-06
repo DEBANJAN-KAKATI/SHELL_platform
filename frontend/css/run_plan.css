@@ -75,3 +75,7 @@
 .rp-prerun-charts:empty{display:none}
 .rp-chart-box{position:relative;height:360px;padding:10px 14px 14px}
 @media(max-width:700px){.rp-prerun-charts{grid-template-columns:1fr}}
+
+/* Molecular weights (6.9.1) */
+.rp-mw-note{padding:8px 15px;font-size:12px;color:var(--slate);border-bottom:1px solid var(--border)}
+.rp-mw-missing{color:#991b1b;font-weight:700}
