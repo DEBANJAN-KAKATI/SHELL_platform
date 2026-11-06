@@ -9,8 +9,8 @@
   Built-in workbook values only fill gaps and are labelled "built-in … (not in the Run Plan)"; a component without an
   MW anywhere shows "ERROR: no MW for X – add it to the Run Plan (Feed → Molecular weights)". Names are matched without
   case, spaces and hyphens (CH4 = Methane, Hydrogen = H2, n-Butane = Butane …).
-- Run Plan page: MW and C# columns in the gas feed card (a used gas without MW shows "missing" in red) and a new
-  Molecular weights card. Conversion basis lists the source of every MW and the components still missing one.
+- The molecular weights are used by the calculations only: the Run Plan page does not show them. Online Analysis →
+  Conversion basis (collapsed) lists the source of every MW, and a missing MW appears as an ERROR in the Status column.
 - `scripts/run_plan_examples/add_molecular_weights.py RunPlan.xlsx [out.xlsx]` adds the columns and the table to any
   existing Run Plan (charts, formulas and comments kept; does nothing if tbl_MW exists). All template and test Run
   Plans in `tests/fixtures/run_plan/` were updated with it; results are unchanged.

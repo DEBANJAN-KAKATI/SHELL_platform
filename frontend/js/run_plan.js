@@ -128,9 +128,6 @@ function renderFeedTemplate(q) {
                 || '<tr><td colspan="3" class="rp-empty">No group-type values.</td></tr>'}</tbody>
         </table>`;
 
-    // MW cell: a named component that is used but has no MW is shown in red (the dashboard cannot convert it)
-    const mwCell = (mw, needed) => hasValue(mw) ? fmtAmount(mw) : (needed ? '<span class="rp-mw-missing" title="No MW in the Run Plan: add it">missing</span>' : '');
-
     // Gas feed composition + gas feed settings
     const gas = (t.gas?.rows || []).filter(g => (g.component || feedShowEmpty) && keep(g.value, g.component));
     const maxGas = Math.max(0, ...gas.map(g => Number(g.value)).filter(Number.isFinite));
@@ -140,29 +137,10 @@ function renderFeedTemplate(q) {
             ${checkBadge(t.gas?.check, t.gas?.total, t.gas?.unit || 'mol%')}</header>
         ${settings.length ? `<div class="rp-settings">${settings.map(x => `<div class="rp-chip"${x.note ? ` title="${esc(x.note)}"` : ''}><span>${esc(x.label)}</span><b>${hasValue(x.value) ? fmtAmount(x.value) : '—'}${hasValue(x.unit) && x.unit !== '--' ? ` ${esc(x.unit)}` : ''}</b></div>`).join('')}</div>` : ''}
         <table class="rp-table">
-            <thead><tr><th>Component</th><th class="rp-num">Value (${esc(t.gas?.unit || 'mol%')})</th><th class="rp-num">MW (g/mol)</th><th class="rp-num">C#</th><th>Check</th></tr></thead>
-            <tbody>${gas.map(g => `<tr><td>${esc(g.component) || '<span class="rp-dash">(free row)</span>'}</td>${barCell(g.value, maxGas)}`
-                + `<td class="rp-num">${mwCell(g.mw, g.component && hasValue(g.value) && !/^other/i.test(g.component))}</td><td class="rp-num rp-muted">${esc(g.carbon_no)}</td>`
-                + `<td class="rp-muted">${esc(g.check)}</td></tr>`).join('')
-                || '<tr><td colspan="5" class="rp-empty">No gas composition values.</td></tr>'}</tbody>
+            <thead><tr><th>Component</th><th class="rp-num">Value (${esc(t.gas?.unit || 'mol%')})</th><th>Check</th></tr></thead>
+            <tbody>${gas.map(g => `<tr><td>${esc(g.component) || '<span class="rp-dash">(free row)</span>'}</td>${barCell(g.value, maxGas)}<td class="rp-muted">${esc(g.check)}</td></tr>`).join('')
+                || '<tr><td colspan="3" class="rp-empty">No gas composition values.</td></tr>'}</tbody>
         </table>`;
-
-    // Molecular weights of the analysed components (used by Online Analysis and every MW-based calculation)
-    const mwRows = (t.mw?.rows || []).filter(m => (m.component || feedShowEmpty) && keep(m.mw, m.component, m.note));
-    if ($('#feedMw')) {
-        const missing = mwRows.filter(m => m.component && !hasValue(m.mw) && !/lumped/i.test(m.note || '')).length;
-        $('#feedMw').hidden = !(t.mw?.rows || []).length;
-        $('#feedMw').innerHTML = `
-        <header><div><div class="eyebrow">ANALYSED COMPONENTS</div><h4>Molecular weights <small>(g/mol)</small></h4></div>
-            <span class="rp-badge ${missing ? 'warn' : 'ok'}">${missing ? `${missing} without MW` : `${mwRows.filter(m => hasValue(m.mw)).length} with MW`}</span></header>
-        <div class="rp-mw-note">Name as in the GC export (ESTD_&lt;name&gt;). Used by Online Analysis (g/h, Nl/h, g C/h) and the feed gas mass; add new molecules in the spare rows.</div>
-        <table class="rp-table">
-            <thead><tr><th>Component</th><th class="rp-num">MW (g/mol)</th><th class="rp-num">C#</th><th>Note</th></tr></thead>
-            <tbody>${mwRows.map(m => `<tr><td>${esc(m.component) || '<span class="rp-dash">(spare row)</span>'}</td>`
-                + `<td class="rp-num">${mwCell(m.mw, m.component && !/lumped/i.test(m.note || ''))}</td><td class="rp-num rp-muted">${esc(m.carbon_no)}</td>`
-                + `<td class="rp-muted">${esc(m.note)}</td></tr>`).join('') || '<tr><td colspan="4" class="rp-empty">No molecular weights.</td></tr>'}</tbody>
-        </table>`;
-    }
 
     const filled = rows => rows.filter(r => hasValue(r.weight ?? r.value)).length;
     if ($('#feedSummary')) {

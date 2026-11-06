@@ -194,7 +194,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   liquid rows (`molecular_weights_from_feed`, same order as online_analysis.js); `component_table` / `resolve_component`
   match names without case/spaces/hyphens (`NAME_KEYS`: Hydrogen=H2, CH4=Methane, n-Butane=Butane …). The built-in
   `COMPONENTS` (workbook R#_MB columns B and AD) only fill gaps, labelled "built-in … (not in the Run Plan)"; no MW
-  anywhere → `ERROR: no MW for X – add it to the Run Plan (Feed → Molecular weights)`; basis `mw_missing`, `mw_built_in`. Feed gas MWs (Run_Plan row 37) give
+  anywhere → `ERROR: no MW for X – add it to the Run Plan (Feed → Molecular weights)`; basis `mw_missing`, `mw_built_in`.
+  The MWs are backend-only: the Run Plan page does not display them (user's choice). Feed gas MWs (Run_Plan row 37) give
   w_Ar from the Run Plan Feed → Gas feed composition (Argon mol%; 'Other' has no MW and adds no mass, as in the workbook).
   **Everything comes from the export and the Run Plan (v6.8.3): no inputs on the page.** The collapsed "Conversion
   basis" block under the table is read-only (Ar mol% / wt% from the Run Plan, flow sources, formula, MW table); it opens
