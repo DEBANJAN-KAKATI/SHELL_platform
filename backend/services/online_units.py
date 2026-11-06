@@ -17,6 +17,7 @@ the argon balance above (feed volume × Ar in / Ar out) is what that row intends
 With flows on the export, every row uses the 01i14FI01 / 01i14FIC0r values of the same line (the workbook averages them
 over the sampling window). Rows that cannot be calculated get an explicit "ERROR: ..." status, never zero.
 """
+import re
 from datetime import datetime, timedelta
 from statistics import pstdev
 
@@ -89,32 +90,97 @@ def reactor_number(value):
     return number if 0 <= number <= 8 else None
 
 
-def feed_argon(feed_gas):
-    """Ar mol% and wt% of the feed gas from the Run Plan gas table [{component, value}] (total feed gas, mol%).
+def feed_argon(feed_gas, table=None):
+    """Ar mol% and wt% of the feed gas from the Run Plan gas table [{component, value, mw}] (total feed gas, mol%).
+
+    MW of each gas: the "MW (g/mol)" of that row of the Run Plan gas table, else the Run Plan Molecular weights table
+    (`table`, see component_table), else the feed gas MWs of the workbook (Run_Plan row 37).
 
     As in the workbook (Gas!I37 from Run_Plan rows 35-38), the mass is Σ y_j·MW_j over the components with a known MW;
     'Other' rows have no MW and add no mass (the workbook treats the unanalysed rest of the mixed gas the same way).
     """
-    ar_mol, mass, excluded = None, 0.0, []
+    ar_mol, mass, excluded, mw_ar = None, 0.0, [], MW_AR
     for row in feed_gas or []:
         name = str(row.get("component") or "").replace("(gas)", "").strip()
         value = _num(row.get("value"))
         if not name or not value:
             continue
-        mw = FEED_GAS_MW.get(name.lower())
+        mw = _num(row.get("mw"))
+        if not mw and table is not None and _key(name) in table:
+            mw = table[_key(name)][0]
+        if not mw:
+            mw = FEED_GAS_MW.get(name.lower())
         if mw is None:
             excluded.append(f"{name} {value:g} mol%")
             continue
         mass += value * mw
         if name.lower() in ("argon", "ar"):
-            ar_mol = value
-    wt = 100 * ar_mol * MW_AR / mass if ar_mol and mass > 0 else None
+            ar_mol, mw_ar = value, mw
+    wt = 100 * ar_mol * mw_ar / mass if ar_mol and mass > 0 else None
     return {"ar_mol_pct": ar_mol, "ar_wt_pct": wt, "excluded": excluded}
 
 
 # Spellings of GC method peak names → the molecule (the export of some methods writes "Etylene")
 ALIASES = {"Etylene": "Ethylene"}
-MOLAR_VOLUME = 22.414          # Nl/mol at 0 °C, 1.01325 bar (normal conditions of NmL/h)
+MOLAR_VOLUME = 22.414
+
+# Molar masses and carbon numbers come from the Run Plan (6.9.1): Feed → "Molecular weights" table (every analysed
+# component, with spare rows for new molecules), the MW / Carbon # columns of the gas feed table and the MW / Carbon #
+# of the liquid components. The built-in values above (MassBal workbook standards) are only a fallback for Run Plans
+# without them and are labelled as such. Names are matched without case, spaces, hyphens and "(gas)".
+NAME_KEYS = {"hydrogen": "h2", "nitrogen": "n2", "ar": "argon", "ch4": "methane", "etylene": "ethylene",
+             "ibutane": "isobutane", "nbutane": "butane", "npentane": "pentane", "nhexane": "hexane",
+             "carbondioxide": "co2", "carbonmonoxide": "co", "hydrogensulfide": "h2s", "hydrogensulphide": "h2s"}
+
+
+def _key(name):
+    text = re.sub(r"\(gas\)", "", str(name or ""), flags=re.I)
+    key = re.sub(r"[^a-z0-9]+", "", text.lower())
+    return NAME_KEYS.get(key, key)
+
+
+def component_table(rows):
+    """{name key: (MW, carbon atoms or None, source, name)} from Run Plan rows [{component, mw, carbon_no, source}].
+
+    The first row of a component wins (the page sends the Molecular weights table first, then the gas feed table, then
+    the liquid components)."""
+    out = {}
+    for row in rows or []:
+        name, mw = row.get("component"), _num(row.get("mw"))
+        if not name or not mw or mw <= 0:
+            continue
+        key = _key(name)
+        if key in out:
+            continue
+        carbons = _num(row.get("carbon_no"))
+        out[key] = (mw, int(round(carbons)) if carbons is not None else None, row.get("source") or "Run Plan", str(name))
+    return out
+
+
+def molecular_weights_from_feed(feed_tables):
+    """Run Plan rows for component_table in the order the Online page sends them: Molecular weights table, gas feed
+    table, liquid components (`feed_tables` = the parsed Run Plan feed.tables)."""
+    out = []
+    for key, source in (("mw", "Run Plan · Molecular weights"), ("gas", "Run Plan · Gas feed composition"),
+                        ("liquid", "Run Plan · Liquid components")):
+        for row in (feed_tables or {}).get(key, {}).get("rows", []):
+            if row.get("component") and _num(row.get("mw")):
+                out.append({"component": row["component"], "mw": row["mw"], "carbon_no": row.get("carbon_no"), "source": source})
+    return out
+
+
+def resolve_component(name, table):
+    """(MW, carbon atoms, source) of a GC component: Run Plan first, then the built-in workbook standard; None if none."""
+    hit = (table or {}).get(_key(name))
+    if hit:
+        mw, carbons, source, _ = hit
+        if carbons is None and name in COMPONENTS:
+            carbons, source = COMPONENTS[name][1], f"{source} (carbon # built-in)"
+        return mw, carbons, source
+    if name in COMPONENTS and name not in NO_MW:
+        mw, carbons, _ = COMPONENTS[name]
+        return mw, carbons, "built-in workbook standard (not in the Run Plan)"
+    return None          # Nl/mol at 0 °C, 1.01325 bar (normal conditions of NmL/h)
 
 
 def _line_flows(row, reactor):
@@ -229,13 +295,14 @@ def _in_window(when, start, end):
     return when is not None and start <= when and (end is None or when < end)
 
 
-def bypass_feed_gas(rows, conditions, internal_standard, names, value_of, run_plan_argon=None):
+def bypass_feed_gas(rows, conditions, internal_standard, names, value_of, run_plan_argon=None, comp=None, mw_is=None):
     """Feed Gas Composition IS per DOE condition from the bypass (reactor 0) GC lines (raw ESTD averages).
 
     y_IS,feed = avg ESTD_IS;  y_mix,feed = avg Σ ESTD_j of every other gas (N2 counts for Argon-IS, Argon for N2-IS);
     MW_mix = Σ avg_j·MW_j / Σ avg_j (gases with a MW);  w_IS = y_IS·MW_IS / (y_IS·MW_IS + y_mix·MW_mix).
     """
-    mw_is = INTERNAL_STANDARDS[internal_standard]
+    mw_is = mw_is or INTERNAL_STANDARDS[internal_standard]
+    comp = comp if comp is not None else {n: resolve_component(n, None) for n in names}
     out = []
     for c in conditions:
         lines = []
@@ -260,8 +327,8 @@ def bypass_feed_gas(rows, conditions, internal_standard, names, value_of, run_pl
         y_is = avg.get(internal_standard, 0.0)
         others = {n: v for n, v in avg.items() if n != internal_standard and v}
         y_mix = sum(others.values())
-        with_mw = {n: v for n, v in others.items() if n in COMPONENTS and n not in NO_MW}
-        mix_mass = sum(v * COMPONENTS[n][0] for n, v in with_mw.items())
+        with_mw = {n: v for n, v in others.items() if comp.get(n)}
+        mix_mass = sum(v * comp[n][0] for n, v in with_mw.items())
         mw_mix = mix_mass / sum(with_mw.values()) if with_mw else None
         series = [line.get(internal_standard, 0.0) for line in lines]
         entry.update({
@@ -280,7 +347,7 @@ def bypass_feed_gas(rows, conditions, internal_standard, names, value_of, run_pl
 
 
 def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=None, ar_mol_pct=None, ar_wt_pct=None,
-                        internal_standard=None):
+                        internal_standard=None, molecular_weights=None):
     """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, flows) in the chosen unit.
 
     Without `internal_standard` (6.4.3 behaviour): argon is the internal standard and Ar in the feed gas comes from
@@ -292,15 +359,21 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
     running at that time (`doe_rows`).
     IS to the reactor: with 01i14FI01 and the IS wt% as in the workbook (F_r · w_IS); without 01i14FI01 from the volume:
     FIC_r/1000 / molar volume · y_IS,feed/100 · MW_IS (the same quantity: n_IS · MW_IS).
+    Molar masses and carbon numbers: `molecular_weights` (Run Plan Feed → Molecular weights, gas feed and liquid
+    component rows) and the MW column of `feed_gas`; the built-in workbook standards only fill gaps (see component_table).
     """
     if unit not in UNITS or unit == "mol":
         raise ValueError(f"Unknown unit '{unit}'. Use one of: mass, volume, carbon.")
     is_name = internal_standard_name(internal_standard)
     general = is_name is not None
     ist = is_name or "Argon"
-    mw_is = INTERNAL_STANDARDS[ist]
+    run_plan_mw = list(molecular_weights or []) + [dict(g, source=g.get("source") or "Run Plan · Gas feed composition")
+                                                  for g in feed_gas or [] if _num(g.get("mw"))]
+    mw_table = component_table(run_plan_mw)
+    is_hit = resolve_component(ist, mw_table)
+    mw_is = is_hit[0] if is_hit else INTERNAL_STANDARDS[ist]
     suffix = UNITS[unit]["suffix"]
-    feed = feed_argon(feed_gas)
+    feed = feed_argon(feed_gas, mw_table)
     ar_mol = _num(ar_mol_pct) if _num(ar_mol_pct) else feed["ar_mol_pct"]
     ar_wt = _num(ar_wt_pct) if _num(ar_wt_pct) else feed["ar_wt_pct"]
     vm = MOLAR_VOLUME
@@ -340,9 +413,10 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
 
     # Components that have a value in at least one row
     all_names = [n for n in all_names if any(value_of(r, n) is not None for r in rows or [])]
+    comp = {n: resolve_component(n, mw_table) for n in all_names}
     names = list(all_names)
-    if unit == "carbon":           # only molecules that contain carbon
-        names = [n for n in names if n in NO_MW or n not in COMPONENTS or COMPONENTS[n][1] > 0]
+    if unit == "carbon":           # only molecules that contain carbon (or whose carbon number is not known)
+        names = [n for n in names if not comp[n] or comp[n][1] is None or comp[n][1] > 0]
 
     times = [_date(r.get("DateTime")) for r in rows or []]
     t0 = _date(feed_cut_in) or min((t for t in times if t), default=None)
@@ -354,7 +428,7 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
     if general:
         data_end = max((t for t in times if t), default=None)
         conditions, reactor_windows = doe_conditions(doe_rows, data_end + timedelta(seconds=1) if data_end else None)
-        feed_is = bypass_feed_gas(rows, conditions, ist, all_names, value_of, feed["ar_mol_pct"])
+        feed_is = bypass_feed_gas(rows, conditions, ist, all_names, value_of, feed["ar_mol_pct"], comp, mw_is)
     feed_by_label = {f["condition"]: f for f in feed_is}
 
     def condition_of(reactor, when):
@@ -457,14 +531,15 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
             value = y[n]
             if value is None:
                 continue
-            if n in NO_MW or n not in COMPONENTS:
+            if not comp[n] or (unit == "carbon" and comp[n][1] is None):
+                what = "MW" if not comp[n] else "carbon #"
                 if value:
-                    problems.append(n)
-                    out[f"{n} [{suffix}]"] = f"ERROR: no MW for {n}"
+                    problems.append(n if what == "MW" else f"{n} (carbon #)")
+                    out[f"{n} [{suffix}]"] = f"ERROR: no {what} for {n} in the Run Plan"
                 else:
                     out[f"{n} [{suffix}]"] = 0.0
                 continue
-            mw, carbons, _ = COMPONENTS[n]
+            mw, carbons, _ = comp[n]
             if unit == "volume":
                 result = value / 100 * v_out
             else:
@@ -484,13 +559,14 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
         if general:
             out[is_col] = is_r
             is_flows.setdefault((cond, reactor), {"ok": [], "errors": []})["ok"].append(is_r)
-        out["Status"] = "OK" if not problems else f"ERROR: no MW for {', '.join(problems)} (total without them)"
+        out["Status"] = "OK" if not problems else (f"ERROR: no MW for {', '.join(problems)} – add it to the Run Plan "
+                                                     f"(Feed → Molecular weights); total without it")
         out_rows.append(out)
 
     basis["flow_sources"] = sources
-    components = [{"component": n, "mw": COMPONENTS[n][0] if n in COMPONENTS else None,
-                   "carbon_atoms": COMPONENTS[n][1] if n in COMPONENTS else None,
-                   "source": (COMPONENTS[n][2] if n in COMPONENTS else "no MW (lumped peak)")
+    components = [{"component": n, "mw": comp[n][0] if comp[n] else None,
+                   "carbon_atoms": comp[n][1] if comp[n] else None,
+                   "source": (comp[n][2] if comp[n] else "ERROR: no MW – add it to the Run Plan (Feed → Molecular weights)")
                              + (f"; export spelling {', '.join(k for k in spelled[n] if k != n)}" if len(spelled[n]) > 1 else "")}
                   for n in names]
     ok = sum(1 for r in out_rows if r["Status"] == "OK")
@@ -500,6 +576,9 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
     # The export has no flows and the Run Plan DOE has no gas flows: the gas feed is missing
     basis["flows_needed"] = not has_tags and not doe
     basis["argon_missing"] = bool(missing)
+    basis["mw_missing"] = [n for n in names if not comp[n]]
+    basis["mw_from_run_plan"] = bool(mw_table)
+    basis["mw_built_in"] = [n for n in names if comp[n] and comp[n][2].startswith("built-in")]
     result = {"unit": unit, "label": UNITS[unit]["label"], "columns": columns, "rows": out_rows, "basis": basis,
               "components": components, "ok_count": ok, "bypass_count": bypass,
               "error_count": len(out_rows) - ok - bypass}

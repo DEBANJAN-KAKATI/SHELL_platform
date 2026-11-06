@@ -325,8 +325,14 @@ def parse_feed(ws_values, ws_formulas=None):
     group_weights = [number(g["weight"]) for g in groups if number(g["weight"]) is not None]
     group_total = sum(group_weights) if group_weights else None
 
-    gas_block, _, _ = _block(rows, ranges["tbl_gas"])
-    gas = [{"component": _label(r[0]), "unit": clean(r[1]) or "mol%", "value": clean(r[2]), "check": clean(r[3])} for r in gas_block]
+    gas_block, gas_first, gas_col = _block(rows, ranges["tbl_gas"])
+    gas_head = [_label(x).lower() for x in (rows[gas_first - 1][gas_col - 1:gas_col - 1 + len(gas_block[0])]
+                                            if gas_block and gas_first - 1 < len(rows) else [])]
+    gas_mw = next((i for i, h in enumerate(gas_head) if h.startswith("mw") or "molecular" in h), None)
+    gas_c = next((i for i, h in enumerate(gas_head) if h.startswith("carbon")), None)
+    gas = [{"component": _label(r[0]), "unit": clean(r[1]) or "mol%", "value": clean(r[2]), "check": clean(r[3]),
+            "mw": clean(r[gas_mw]) if gas_mw is not None and gas_mw < len(r) else "",
+            "carbon_no": clean(r[gas_c]) if gas_c is not None and gas_c < len(r) else ""} for r in gas_block]
     gas_values = [number(g["value"]) for g in gas if number(g["value"]) is not None]
     if not gas_values:
         # Earlier template layout: a "Gas composition (mol%)" block under "Gas feed" (component A, unit D, value E).
@@ -354,6 +360,17 @@ def parse_feed(ws_values, ws_formulas=None):
             settings.append({"label": label, "unit": clean(rows[i][3]) if len(rows[i]) > 3 else "",
                              "value": clean(rows[i][4]) if len(rows[i]) > 4 else "", "note": note(i)})
 
+    # Molecular weights of the analysed components (6.9.1): one row per component as named in the GC export, with
+    # spare rows for new molecules; used by the Online Analysis units and every other MW-based calculation.
+    mw_rows = []
+    if "tbl_MW" in ranges:
+        mw_block, mw_first, mw_col = _block(rows, ranges["tbl_MW"])
+        for r in mw_block:
+            label = _label(r[0])
+            if label:
+                mw_rows.append({"component": label, "mw": clean(r[1]) if len(r) > 1 else "",
+                                "carbon_no": clean(r[2]) if len(r) > 2 else "", "note": clean(r[3]) if len(r) > 3 else ""})
+
     tables = {
         "properties": {"title": "Feed properties", "rows": properties},
         "liquid": {"title": "Liquid components", "unit": "wt%", "rows": liquid, "total": liquid_total, "check": liquid_check},
@@ -361,6 +378,7 @@ def parse_feed(ws_values, ws_formulas=None):
                    "check": _check(group_total) if group_weights else ""},
         "gas": {"title": "Gas feed composition", "unit": "mol%", "rows": gas, "total": gas_total,
                 "check": _check(gas_total) if gas_values else "", "settings": settings},
+        "mw": {"title": "Molecular weights", "rows": mw_rows},
     }
 
     # Flat rows for the rest of the dashboard: Carbon, Hydrogen and Molecular Weight first (the Calculation table, Plots

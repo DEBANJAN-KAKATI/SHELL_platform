@@ -100,7 +100,7 @@ def test_errors_are_explicit():
     assert convert_online_rows([row], "mass")["rows"][0]["Status"] == \
         "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
     out = convert_online_rows([row], "mass", ar_wt_pct=10)["rows"][0]
-    assert out["C3-C4 [g/h]"] == "ERROR: no MW for C3-C4" and out["Status"].startswith("ERROR: no MW for C3-C4")
+    assert out["C3-C4 [g/h]"].startswith("ERROR: no MW for C3-C4") and out["Status"].startswith("ERROR: no MW for C3-C4")
     assert out["Methane [g/h]"] == pytest.approx(1 * 16.04 / (5 * 39.948) * 5 * 0.10)
     stopped = dict(row, **{"01i14FIC02": 0})
     assert convert_online_rows([stopped], "mass", ar_wt_pct=10)["rows"][0]["Status"].startswith("ERROR: no gas feed to R2")
@@ -192,7 +192,7 @@ def test_run_plan_r6_earlier_layout_gives_feed_gas_and_doe_flows(workbook_case):
 
 
 # ---------------------------------------------------------------- General_MB (6.5.0): Internal Standard from the bypass
-from backend.services.online_units import internal_standard_name  # noqa: E402
+from backend.services.online_units import internal_standard_name, molecular_weights_from_feed  # noqa: E402
 
 R3_EXPORT = FIXTURES / "online" / "R3-C2-S1_9-06-23.txt"
 MB_RUN_PLAN_FILLED = FIXTURES / "run_plan" / "RunPlan_MassBalance_SS_filled.xlsx"
@@ -248,12 +248,12 @@ def test_r3_bypass_feed_gas_and_is_flow(ist, y_is, y_mix, mw_mix, w_is, f_is):
 def r08_general_mb():
     rows = process_online_file(EXPORT)["rows"]
     plan = process_run_plan_file(str(MB_RUN_PLAN_FILLED))
-    return rows, plan["feed"]["tables"]["gas"]["rows"], plan["doe"]["rows"]
+    return rows, plan["feed"]["tables"]["gas"]["rows"], plan["doe"]["rows"], molecular_weights_from_feed(plan["feed"]["tables"])
 
 
 def test_r08_feed_gas_per_block_condition(r08_general_mb):
-    rows, gas, doe = r08_general_mb
-    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, internal_standard="Argon")
+    rows, gas, doe, mws = r08_general_mb
+    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, molecular_weights=mws, internal_standard="Argon")
     b1, b2 = out["feed_gas_is"]
     assert (b1["condition"], b1["bypass_lines"], b2["condition"], b2["bypass_lines"]) == ("Block-1 · C1", 44, "Block-2 · C1", 36)
     assert b1["is_mol_pct"] == pytest.approx(5.1572, abs=1e-4) and b1["mixed_mol_pct"] == pytest.approx(95.9625, abs=1e-4)
@@ -273,8 +273,8 @@ def test_r08_feed_gas_per_block_condition(r08_general_mb):
     ("mass", "Methane [g/h]", 0.02323), ("volume", "Methane [Nl/h]", 0.03703), ("carbon", "Methane [g C/h]", 0.01739),
 ])
 def test_r08_reactor_line_in_every_unit(r08_general_mb, unit, column, value):
-    rows, gas, doe = r08_general_mb
-    out = convert_online_rows(rows, unit, feed_gas=gas, doe_rows=doe, internal_standard="Argon")
+    rows, gas, doe, mws = r08_general_mb
+    out = convert_online_rows(rows, unit, feed_gas=gas, doe_rows=doe, molecular_weights=mws, internal_standard="Argon")
     line = next(r for r in out["rows"] if r["DateTime"] == "2024-10-24 15:09:23")
     assert line["Status"] == "OK" and line["Condition"] == "Block-1 · C1"
     assert line[column] == pytest.approx(value, abs=1e-5)
@@ -282,8 +282,8 @@ def test_r08_reactor_line_in_every_unit(r08_general_mb, unit, column, value):
 
 
 def test_r08_with_n2_as_internal_standard(r08_general_mb):
-    rows, gas, doe = r08_general_mb
-    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, internal_standard="N2")
+    rows, gas, doe, mws = r08_general_mb
+    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, molecular_weights=mws, internal_standard="N2")
     b1 = out["feed_gas_is"][0]
     assert b1["is_mol_pct"] == pytest.approx(58.3231, abs=1e-4) and b1["mixed_mol_pct"] == pytest.approx(42.7966, abs=1e-4)
     assert b1["is_wt_pct"] == pytest.approx(73.6999, abs=1e-4)
@@ -311,3 +311,67 @@ def test_general_mb_errors_are_explicit():
         assert status[0] == "BYPASS – feed gas of C1" and status[1] == "BYPASS – no GC values in this line (not used)"
         assert status[2] == "OK"
         assert status[3] == "ERROR: no Argon peak (ESTD_Argon) – Argon is the internal standard"
+
+
+# ---------------------------------------------------------------- Molecular weights from the Run Plan (6.9.1)
+def _x_rows():
+    base = {"Reactor": 1, "01i14FIC01": 3000, "ESTD_Argon": 5.0, "ESTD_Methane": 1.0, "ESTD_X": 2.0}
+    return [{"DateTime": "2024-01-01 09:30:00", "Reactor": 0, "ESTD_Argon": 5.0, "ESTD_N2": 90.0, "ESTD_X": 5.0},
+            dict(base, DateTime="2024-01-01 10:00:00")]
+
+
+def test_run_plan_reads_molecular_weights():
+    tables = process_run_plan_file(str(MB_RUN_PLAN_FILLED))["feed"]["tables"]
+    gas = {g["component"]: (g["mw"], g["carbon_no"]) for g in tables["gas"]["rows"] if g["component"]}
+    assert gas["Argon"] == (39.948, 0) and gas["Methane"] == (16.043, 1) and gas["Other (gas)"] == ("", "")
+    mw = {m["component"]: (m["mw"], m["carbon_no"]) for m in tables["mw"]["rows"]}
+    assert mw["Methane"] == (16.04, 1) and mw["Toluene"] == (92.14, 7) and mw["C3-C4"] == ("", "")
+    assert len(tables["mw"]["rows"]) == 35                                     # + 12 spare rows without a name
+
+
+def test_new_molecule_needs_its_mw_from_the_run_plan():
+    doe = _doe_all(start="2024-01-01 09:00:00")
+    out = convert_online_rows(_x_rows(), "mass", doe_rows=doe, internal_standard="Argon")
+    line = out["rows"][1]
+    assert line["X [g/h]"].startswith("ERROR: no MW for X") and "Molecular weights" in line["Status"]
+    assert out["basis"]["mw_missing"] == ["X"] and out["feed_gas_is"][0]["no_mw"] == ["X"]
+    mws = [{"component": "X", "mw": 50.0, "carbon_no": 3, "source": "Run Plan · Molecular weights"}]
+    out = convert_online_rows(_x_rows(), "mass", doe_rows=doe, internal_standard="Argon", molecular_weights=mws)
+    line = out["rows"][1]
+    assert line["Status"] == "OK" and line["X [g/h]"] / line["Methane [g/h]"] == pytest.approx(2.0 * 50.0 / (1.0 * 16.04))
+    carbon = convert_online_rows(_x_rows(), "carbon", doe_rows=doe, internal_standard="Argon", molecular_weights=mws)["rows"][1]
+    assert carbon["X [g C/h]"] == pytest.approx(12.011 * 3 / 50.0 * line["X [g/h]"])
+    x = next(c for c in out["components"] if c["component"] == "X")
+    assert (x["mw"], x["carbon_atoms"], x["source"]) == (50.0, 3, "Run Plan · Molecular weights")
+    assert out["feed_gas_is"][0]["no_mw"] == []                                # X now counts in the mixed gas MW
+
+
+def test_run_plan_mw_overrides_the_built_in_value():
+    doe = _doe_all(start="2024-01-01 09:00:00")
+    rows = [dict(r) for r in _x_rows()]
+    for r in rows:
+        r.pop("ESTD_X")
+    std = convert_online_rows(rows, "mass", doe_rows=doe, internal_standard="Argon")["rows"][1]["Methane [g/h]"]
+    mws = [{"component": "CH4", "mw": 16.04 * 1.1, "carbon_no": 1, "source": "Run Plan · Molecular weights"}]
+    out = convert_online_rows(rows, "mass", doe_rows=doe, internal_standard="Argon", molecular_weights=mws)
+    assert out["rows"][1]["Methane [g/h]"] == pytest.approx(std * 1.1)   # CH4 = Methane (name matching)
+    assert next(c for c in out["components"] if c["component"] == "Methane")["source"] == "Run Plan · Molecular weights"
+    assert "Methane" not in out["basis"]["mw_built_in"] and "Argon" in out["basis"]["mw_built_in"]
+
+
+def test_feed_gas_mw_column_is_used_for_the_argon_mass_fraction():
+    feed = [{"component": "Argon", "value": 5, "mw": 39.948}, {"component": "X", "value": 95, "mw": 20.0}]
+    assert feed_argon(feed)["ar_wt_pct"] == pytest.approx(100 * 5 * 39.948 / (5 * 39.948 + 95 * 20.0))
+    assert feed_argon([{"component": "Argon", "value": 5}, {"component": "X", "value": 95}])["excluded"] == ["X 95 mol%"]
+
+
+def test_add_molecular_weights_script_is_idempotent(tmp_path):
+    import shutil
+    import subprocess
+    import sys
+    from pathlib import Path
+    script = Path(__file__).parents[1] / "scripts" / "run_plan_examples" / "add_molecular_weights.py"
+    done = tmp_path / "done.xlsx"
+    shutil.copy(MB_RUN_PLAN_FILLED, done)
+    out = subprocess.run([sys.executable, str(script), str(done)], capture_output=True, text=True)
+    assert "already present" in out.stdout
