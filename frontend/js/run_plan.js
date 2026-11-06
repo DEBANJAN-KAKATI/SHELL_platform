@@ -426,6 +426,7 @@ function saveState() {
     try {
         const state = {
             activeSubtab,
+            process: window.ILSProcess?.get?.() || 'isomerization',
             filePath: $('#runPlanFile')?.value || '',
             feedRows,
             feedTables,
@@ -450,7 +451,8 @@ function restoreState() {
         const raw = sessionStorage.getItem('runPlanDashboardState');
         if (!raw) return false;
         const saved = JSON.parse(raw);
-        if (saved) {
+        // A Run Plan loaded under another process is not restored (switching the process clears it).
+        if (saved && (!saved.process || saved.process === (window.ILSProcess?.get?.() || 'isomerization'))) {
             if (saved.filePath && $('#runPlanFile')) $('#runPlanFile').value = saved.filePath;
             if (Array.isArray(saved.feedRows)) feedRows = saved.feedRows;
             feedTables = saved.feedTables || null;

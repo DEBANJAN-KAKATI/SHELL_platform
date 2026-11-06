@@ -7,9 +7,9 @@
     <title>ILS GC and System Data | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=7" defer></script>
-    <link href="/frontend/css/online_units.css?v=5" rel="stylesheet">
-    <script src="/frontend/js/online_analysis.js?v=10" defer></script>
+    <script src="/frontend/js/navigation.js?v=8" defer></script>
+    <link href="/frontend/css/online_units.css?v=6" rel="stylesheet">
+    <script src="/frontend/js/online_analysis.js?v=11" defer></script>
     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
 </head>
 
@@ -60,7 +60,15 @@
                             <h3>Reactor conditions</h3>
                         </div>
                         <div class="table-actions online-table-actions">
-                            <label class="online-unit-wrap" title="Show the GC values as normalised mol% or converted with argon as internal standard (MassBal workbook)">
+                            <label class="online-unit-wrap" id="onlineIsWrap" hidden title="General_MB: internal standard measured in the bypass (reactor 0) GC lines">
+                                <span>Internal Standard</span>
+                                <select class="input online-filter" id="onlineInternalStandard" aria-label="Internal Standard">
+                                    <option value="">—</option>
+                                    <option value="Argon">Argon</option>
+                                    <option value="N2">N2</option>
+                                </select>
+                            </label>
+                            <label class="online-unit-wrap" id="onlineUnitWrap" hidden title="General_MB: GC values as normalised mol% or converted with the Internal Standard (MassBal workbook)">
                                 <span>Units</span>
                                 <select class="input online-filter" id="onlineUnit" aria-label="Units of the GC values">
                                     <option value="mol">Normalised mol%</option>
@@ -87,6 +95,7 @@
                         <button type="button" class="btn secondary online-clear-dates-btn" id="onlineClearDates" title="Clear date range">Clear dates</button>
                         <div class="online-filter-badge" id="onlineDateBadge"></div>
                     </div>
+                    <div class="online-mb-layout" id="onlineMbLayout">
                     <div class="table-wrap online-table-wrap">
                         <table class="online-table" id="onlineTable">
                             <thead>
@@ -95,6 +104,20 @@
                             <tbody id="onlineTbody"></tbody>
                         </table>
                         <div class="empty" id="onlineEmpty">Import a SystemTxt file to load Online Analysis data.</div>
+                    </div>
+                    <!-- General_MB: feed gas measured in the bypass lines and the IS flow to each reactor -->
+                    <aside class="online-mb-side" id="onlineMbSide" hidden aria-label="General_MB internal standard">
+                        <section class="online-mb-card">
+                            <div class="eyebrow">Feed gas composition · Internal Standard</div>
+                            <div class="online-mb-note">Bypass (reactor 0) GC lines, raw ESTD averages per Run Plan DOE condition</div>
+                            <div id="onlineFeedGasCards"></div>
+                        </section>
+                        <section class="online-mb-card">
+                            <div class="eyebrow" id="onlineIsFlowTitle">Average IS flow to reactor [g/h]</div>
+                            <div class="online-mb-note">Workbook R#_MB!F5 = Gas!G20, average of the calculated lines</div>
+                            <div id="onlineIsFlowCards"></div>
+                        </section>
+                    </aside>
                     </div>
                     <!-- Conversion basis: collapsed under the table -->
                     <details class="online-units-bar" id="onlineUnitsBar" hidden>

@@ -175,7 +175,8 @@ def online_units():
     try:
         return jsonify(convert_online_rows(
             body.get("rows") or [], body.get("unit"), feed_gas=body.get("feed_gas"),
-            feed_cut_in=body.get("feed_cut_in"), doe_rows=body.get("doe_rows")))
+            feed_cut_in=body.get("feed_cut_in"), doe_rows=body.get("doe_rows"),
+            internal_standard=body.get("internal_standard")))
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 

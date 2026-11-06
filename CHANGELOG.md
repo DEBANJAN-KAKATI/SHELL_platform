@@ -1,3 +1,22 @@
+## 6.9.0 (2026-11-06) — Process tabs Isomerization / Reforming / General_MB
+- **Process selection is back**, as three tabs next to the Run Number on the Run Plan page: **Isomerization**,
+  **Reforming** and **General_MB**. The other pages show the process as a badge. The tabs are locked until a Run Number
+  is entered. Switching clears the loaded Run Plan, and a Run Plan saved under another process is not restored.
+  The universal Run Plan template (Feed tables, Plan, DOE, Pre-run) is the same for all three.
+- **Reforming** is active again: its Offline Analysis tables, the Calculation table tabs (Reforming CARBON_TABULAR,
+  Component Summary, Export Complete), SharePoint/OneDrive sync and Data Integrity source were kept in the code since
+  v6.6 and now switch on with the Reforming tab.
+- **General_MB**: Isomerization pages plus the Internal Standard mass balance on Online Analysis (same as offline 6.5.0):
+  Internal Standard — / Argon / N2, measured in the bypass (reactor 0) GC lines per Run Plan DOE condition. The side
+  panel next to the table shows Feed gas composition · IS (IS mol%, IS wt%, mixed gas mol%, sum, mixed gas MW, RSD,
+  Run Plan Argon as a check) and the Average IS flow to reactor [g/h] (workbook R#_MB!F5 = Gas!G20). The Units g/h,
+  Nl/h and g C/h are calculated with that IS; bypass lines show "BYPASS – feed gas of …"; new column Condition; the
+  Conversion basis stays collapsed at the bottom; Historian / Save Run Details store both panel tables.
+- **Isomerization and Reforming**: the Online Analysis table shows Normalised mol% only (the unit conversion needs the
+  Internal Standard of General_MB).
+- Tests: General_MB worked examples (R3, R08 per block, workbook Gas!I37 / G20 from a bypass line, error cases);
+  fixture `RunPlan_MassBalance_SS_filled.xlsx` (gas feed composition = measured bypass gas of R08).
+
 ## 6.8.2 (2026-11-05) — Run Plans of the earlier template layout: gas feed composition
 - Run Plans made with the earlier template (Feed without Excel tables, e.g. `RunPlan_R6-C1-S1_MassBalance.xlsx`) keep the
   gas feed in a "Gas composition (mol%)" block under "Gas feed". It is now read as the Gas feed composition (it was read
