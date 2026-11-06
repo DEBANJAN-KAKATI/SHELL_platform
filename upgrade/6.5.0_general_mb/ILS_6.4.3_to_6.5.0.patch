@@ -1,0 +1,2125 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5398d34dd52125f1407ef6efd850ea5ddc010f2d..c0b4cf53d22569f78ea1d5c6f32fe8c8da0c9d85 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,3 +1,22 @@
++## 6.5.0 (2026-11-06) — Process General_MB: Internal Standard measured in the bypass lines
++- Third process **General_MB** on the Run Plan page (next to Isomerization and Reforming). It uses the Isomerization
++  pages; only the Online Analysis page changes.
++- **Isomerization / Reforming**: the Online Analysis table shows Normalised mol% only (no Units, no Internal Standard).
++- **General_MB → Online Analysis**: Internal Standard **— / Argon / N2** (default —: mol% only). With Argon or N2 the
++  Units g/h, Nl/h and g C/h become available and a **side panel** next to the table shows, per Run Plan DOE condition
++  (Block · Condition No.):
++  - **Feed gas composition · Internal Standard**, measured in the bypass (reactor 0) GC lines inside the condition window
++    (raw ESTD averages): IS mol%, IS wt%, mixed gas mol% (every other gas; N2 counts for Argon-IS, Argon for N2-IS), sum,
++    mixed gas MW, IS spread (RSD) and the Run Plan Argon for comparison;
++  - **Average IS flow to reactor [g/h]** (workbook R#_MB!F5 = Gas!G20) per active reactor.
++  Formulas: w_IS = y_IS·MW_IS / (y_IS·MW_IS + y_mix·MW_mix); F_IS,r = 01i14FI01 · FIC_r/ΣFIC · w_IS, else
++  FIC_r/1000 / 22.414 · y_IS,feed/100 · MW_IS; m_i = y_i·MW_i/(y_IS·MW_IS)·F_IS,r; V_out = FIC_r/1000 · y_IS,feed/y_IS.
++- Table: new column Condition; bypass lines get Status "BYPASS – feed gas of …" (grey) and stay the bypass when the
++  Reactor Map is ON. Explicit errors: no DOE condition, no bypass line in a condition, IS peak missing.
++- The Conversion basis block stays collapsed at the bottom. Historian / Save Run Details store the two panel tables.
++- Tests: R3 and R08 worked examples, the workbook Gas sheet (I37, G20) reproduced from a bypass line, error cases.
++  Fixture `tests/fixtures/run_plan/RunPlan_MassBalance_SS_filled.xlsx` (gas feed composition = measured bypass gas).
++
+ ## 6.4.3 (2026-11-05) — Online Analysis units: everything from the export and the Run Plan
+ - GC exports without gas flow columns (e.g. `R3-C2-S1_9-06-23.txt`) showed "ERROR: no gas feed to Rr (01i14FIC0r = empty)"
+   on every line. The gas feed of a line now comes from the export line, else from the **Run Plan DOE** (gas flow of the
+diff --git a/ILS.md b/ILS.md
+index 0a2890889556a0b946eefb559eadc520de52e9a0..b6a8fa6b6992f6fe0d25edd51bd4f5399f3004ae 100644
+--- a/ILS.md
++++ b/ILS.md
+@@ -1,10 +1,11 @@
+ # ILS — platform reference
+ 
+ "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
+-in `VERSION` (6.4.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
++in `VERSION` (6.5.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+ (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
+ timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
+-Two processes: **Isomerization** (original, reactors R1–R8) and **Reforming** (v6.4, Reactor 1 only).
++Three processes: **Isomerization** (original, reactors R1–R8), **Reforming** (v6.4, Reactor 1 only) and **General_MB**
++(v6.5.0: Isomerization pages + Internal Standard mass balance on Online Analysis).
+ 
+ ## Run / stack
+ - Python 3, Flask 3, pandas 2, olefile + xlrd (legacy `.XLS` read via the OLE `Workbook`/`Book` stream), openpyxl.
+@@ -124,6 +125,18 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
+   read-only and says what is missing in the Run Plan. TOS from the Run Plan Feed Cut-In. `ESTD_Etylene` = Ethylene.
+   Status OK / `ERROR: …` per line. Liquid feed analysis is not a Run Plan entry (comes later with the liquid product).
+ 
++## General_MB (v6.5.0) — Internal Standard from the bypass lines
++- `window.ILSProcess` values `isomerization`, `reforming`, `general_mb` (`isGeneralMB()`); General_MB uses the
++  Isomerization pipeline everywhere except Online Analysis. Isomerization / Reforming: Online shows mol% only.
++- Online (General_MB): Internal Standard — / Argon / N2 (`dhaOnlineState.internalStandard`, panels in `mbPanels`); units
++  other than mol% need an IS. `/api/online-units` takes `internal_standard`; returns `feed_gas_is[]` (per DOE condition
++  Block · Condition No.: bypass_lines, is_mol_pct, mixed_mol_pct, sum, mixed_mw, is_wt_pct, is_rsd_pct, error) and
++  `avg_is_flow[]` (condition × R1–R8: g/h or `ERROR …`). Condition window per reactor: Start → End, else Start + Duration,
++  else next condition of the reactor, else end of data; bypass lines = Reactor 0 with GC values inside the condition's
++  window (parallel blocks share them). Side panel next to the table; Conversion basis collapsed at the bottom.
++- R08 + `RunPlan_MassBalance_SS_filled.xlsx`, Argon: Block-1 C1 44 lines 5.1572 / 95.9625 mol%, 9.2933 wt%, R1 0.1267 g/h;
++  Block-2 C1 36 lines 5.0994 mol%, R5 0.2520, R6 0.2455 g/h.
++
+ ## Reforming (v6.4) — details in `REFORMING_PROGRESS.md`
+ - Process selector after Run Number on the shared Run Plan page; switching clears the loaded Run Plan and stays on
+   `run_plan.html`. The process is never inferred from the workbook.
+diff --git a/README.md b/README.md
+index 620a00da38a4e05d68c141efe326939312340b6d..2ba4d65ec4567efbf1b6e99c81427bf48d3d06c1 100644
+--- a/README.md
++++ b/README.md
+@@ -46,6 +46,9 @@ The first save creates a RunData snapshot. Saving the same Run Number again asks
+ ### Online Analysis units (v6.4.2)
+ On **Analysis → Online**, the **Units** selector shows the GC values as Normalised mol%, Mass flow rates (g/h), Volumetric flow rates (Nl/h) or TOS carbon of each molecule (g C/h), calculated like the MassBal workbook with argon as internal standard. The Ar content of the feed gas comes from the Run Plan gas table; when the export has no gas flow columns the gas feed comes from the Run Plan DOE (gas flow of the condition running at that time). Nothing is typed on the page: the read-only "Conversion basis" block under the table says what is missing in the Run Plan.
+ 
++### General_MB process (v6.5.0)
++Choose **General_MB** as Process on the Run Plan page. On **Analysis → Online**, choose the **Internal Standard** (Argon or N2): the bypass (reactor 0) GC lines of every Run Plan DOE condition give the feed gas composition (IS mol% and mixed gas mol%, raw averages) and the side panel next to the table shows it with the average IS flow to each reactor; the Units g/h, Nl/h and g C/h are then calculated with that IS. Without an Internal Standard, and in Isomerization / Reforming, the table shows mol% only. The Run Plan must contain the DOE conditions (Condition No., Block, Reactor ID, Start/End date) and, for exports without flow columns, the gas flow of each reactor.
++
+ ### Run v6.4 on Windows
+ Double-click `run_dashboard.bat` (or run `./run_dashboard.ps1` in PowerShell). The launcher uses, in order: a working `.venv` / `.venv-local`; an installed Python 3.9 or newer (Python launcher `py`, PATH, or the standard install folders, including the Python Install Manager's `%LOCALAPPDATA%\Python\pythoncore-*`) that already has the packages, which starts with no downloads; a new `.venv` created from an installed Python; and only when no Python is installed, a private Python 3.12 downloaded into `.python-runtime`. Packages in `requirements.txt` are installed only when missing or after `requirements.txt` changes (Python 3.15+ gets pandas 3, older Python pandas 2). If the company network blocks pypi.org ("403 Forbidden"), run `py -m pip download -r requirements.txt -d wheels` in this folder on a computer with internet and the same Python version, copy the `wheels` folder here and start again: the launcher then installs offline from it. It opens http://127.0.0.1:5001 (host/port in `config/settings.json`); when that port is busy or blocked it uses the next free port and prints the address, and when the dashboard is already running it just opens it. To start it directly from the v6.4 folder, use `.\.venv\Scripts\python.exe .\run_app.py` in PowerShell.
+ 
+diff --git a/VERSION b/VERSION
+index 133cad286fdf619d1cbbb26931c01f4e180b36a4..f22d756da39d4c5f688b56060df98ea326cc0376 100644
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-6.4.3
++6.5.0
+diff --git a/backend/routes/api.py b/backend/routes/api.py
+index 9aa603c4438259a98856007c91f7c0983c9267fa..3f1c889b71f4c9f2a9abec7a766e9807ccd53175 100644
+--- a/backend/routes/api.py
++++ b/backend/routes/api.py
+@@ -175,7 +175,8 @@ def online_units():
+     try:
+         return jsonify(convert_online_rows(
+             body.get("rows") or [], body.get("unit"), feed_gas=body.get("feed_gas"),
+-            feed_cut_in=body.get("feed_cut_in"), doe_rows=body.get("doe_rows")))
++            feed_cut_in=body.get("feed_cut_in"), doe_rows=body.get("doe_rows"),
++            internal_standard=body.get("internal_standard")))
+     except Exception as e:
+         return jsonify({"error": str(e)}), 400
+ 
+diff --git a/backend/services/online_units.py b/backend/services/online_units.py
+index a214b073c67f25f4629a91878bb40eeeca43e443..a6a9fa5337f780ae4cdf8579debfdca87719a0ea 100644
+--- a/backend/services/online_units.py
++++ b/backend/services/online_units.py
+@@ -17,7 +17,8 @@ the argon balance above (feed volume × Ar in / Ar out) is what that row intends
+ With flows on the export, every row uses the 01i14FI01 / 01i14FIC0r values of the same line (the workbook averages them
+ over the sampling window). Rows that cannot be calculated get an explicit "ERROR: ..." status, never zero.
+ """
+-from datetime import datetime
++from datetime import datetime, timedelta
++from statistics import pstdev
+ 
+ MW_AR = 39.948
+ MW_C = 12.011
+@@ -162,18 +163,142 @@ def _doe_flow(doe, reactor, when):
+     return hits[-1] if hits else None
+ 
+ 
+-def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=None, ar_mol_pct=None, ar_wt_pct=None):
++# Internal Standard of the General_MB process (6.5.0): measured in the bypass (reactor 0) GC lines.
++INTERNAL_STANDARDS = {"Argon": MW_AR, "N2": 28.0134}
++
++
++def internal_standard_name(value):
++    """'Argon' / 'N2' from argon, Ar, N2, nitrogen; None for '' / None / '—'."""
++    text = str(value or "").strip().lower()
++    if text in ("", "none", "—", "-"):
++        return None
++    if text in ("argon", "ar"):
++        return "Argon"
++    if text in ("n2", "nitrogen"):
++        return "N2"
++    raise ValueError(f"Unknown internal standard '{value}'. Use Argon or N2.")
++
++
++def _label_number(value):
++    number = _num(value)
++    if number is not None and number == int(number):
++        return str(int(number))
++    return str(value or "").strip()
++
++
++def doe_conditions(doe_rows, data_end=None):
++    """DOE conditions with their time windows.
++
++    Every DOE row is one reactor in one condition (Block, Condition No.). A reactor runs a condition from its Start Date
++    until its End Date, else Start + Duration (h), else the start of the reactor's next condition, else the end of the
++    data. The window of the condition (used for its bypass lines) spans all its reactors.
++    Returns (conditions in time order, per-reactor windows [(reactor, start, end, key)]).
++    """
++    entries = []
++    for row in doe_rows or []:
++        reactor = reactor_number(row.get("Reactor ID"))
++        start = _date(row.get("Start Date"))
++        cond = _label_number(row.get("Condition No."))
++        if not reactor or not start or not cond:
++            continue
++        end = _date(row.get("End Date"))
++        if end is None:
++            hours = next((_num(v) for k, v in row.items() if str(k).lower().startswith("duration") and _num(v)), None)
++            if hours:
++                end = start + timedelta(hours=hours)
++        block = str(row.get("Block") or "").strip()
++        entries.append([reactor, start, end, (block, cond)])
++    for entry in entries:                       # open end → next condition of the same reactor, else end of data
++        if entry[2] is None:
++            later = [e[1] for e in entries if e[0] == entry[0] and e[1] > entry[1]]
++            entry[2] = min(later) if later else data_end
++    blocks = {key[0] for *_, key in entries}
++    conditions = {}
++    for reactor, start, end, key in entries:
++        c = conditions.setdefault(key, {"key": key, "label": (f"{key[0]} · C{key[1]}" if len(blocks) > 1 and key[0]
++                                                              else f"C{key[1]}"),
++                                        "start": start, "end": end, "reactors": set()})
++        c["start"] = min(c["start"], start)
++        c["end"] = None if c["end"] is None or end is None else max(c["end"], end)
++        c["reactors"].add(reactor)
++    ordered = sorted(conditions.values(), key=lambda c: (c["start"], c["label"]))
++    return ordered, [tuple(e) for e in entries]
++
++
++def _in_window(when, start, end):
++    return when is not None and start <= when and (end is None or when < end)
++
++
++def bypass_feed_gas(rows, conditions, internal_standard, names, value_of, run_plan_argon=None):
++    """Feed Gas Composition IS per DOE condition from the bypass (reactor 0) GC lines (raw ESTD averages).
++
++    y_IS,feed = avg ESTD_IS;  y_mix,feed = avg Σ ESTD_j of every other gas (N2 counts for Argon-IS, Argon for N2-IS);
++    MW_mix = Σ avg_j·MW_j / Σ avg_j (gases with a MW);  w_IS = y_IS·MW_IS / (y_IS·MW_IS + y_mix·MW_mix).
++    """
++    mw_is = INTERNAL_STANDARDS[internal_standard]
++    out = []
++    for c in conditions:
++        lines = []
++        for row in rows or []:
++            if reactor_number(row.get("Reactor")) != 0 or not _in_window(_date(row.get("DateTime")), c["start"], c["end"]):
++                continue
++            values = {n: value_of(row, n) or 0.0 for n in names}
++            if any(values.values()):
++                lines.append(values)
++        entry = {"condition": c["label"], "start": c["start"].strftime("%Y-%m-%d %H:%M"),
++                 "end": c["end"].strftime("%Y-%m-%d %H:%M") if c["end"] else "",
++                 "reactors": [f"R{r}" for r in sorted(c["reactors"])], "bypass_lines": len(lines),
++                 "internal_standard": internal_standard, "is_mol_pct": None, "is_rsd_pct": None, "mixed_mol_pct": None,
++                 "sum_mol_pct": None, "mixed_mw": None, "is_wt_pct": None, "run_plan_argon_mol_pct": run_plan_argon,
++                 "no_mw": [], "composition": {}, "error": None}
++        if not lines:
++            entry["error"] = (f"no bypass (reactor 0) GC line in condition {c['label']} – feed gas "
++                              f"{internal_standard} not measured")
++            out.append(entry)
++            continue
++        avg = {n: sum(line[n] for line in lines) / len(lines) for n in names}
++        y_is = avg.get(internal_standard, 0.0)
++        others = {n: v for n, v in avg.items() if n != internal_standard and v}
++        y_mix = sum(others.values())
++        with_mw = {n: v for n, v in others.items() if n in COMPONENTS and n not in NO_MW}
++        mix_mass = sum(v * COMPONENTS[n][0] for n, v in with_mw.items())
++        mw_mix = mix_mass / sum(with_mw.values()) if with_mw else None
++        series = [line.get(internal_standard, 0.0) for line in lines]
++        entry.update({
++            "is_mol_pct": y_is, "mixed_mol_pct": y_mix, "sum_mol_pct": y_is + y_mix, "mixed_mw": mw_mix,
++            "is_rsd_pct": 100 * pstdev(series) / y_is if len(series) > 1 and y_is else None,
++            "is_wt_pct": (100 * y_is * mw_is / (y_is * mw_is + y_mix * mw_mix)) if y_is and mw_mix else
++                         (100.0 if y_is and not y_mix else None),
++            "no_mw": sorted(n for n in others if n not in with_mw),
++            "composition": {n: v for n, v in avg.items() if v},
++        })
++        if not y_is:
++            entry["error"] = (f"no {internal_standard} peak (ESTD_{internal_standard}) in the bypass lines of "
++                              f"condition {c['label']}")
++        out.append(entry)
++    return out
++
++
++def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=None, ar_mol_pct=None, ar_wt_pct=None,
++                        internal_standard=None):
+     """Rows of the Online Analysis table (DateTime, Reactor, ESTD_*, flows) in the chosen unit.
+ 
+-    Everything comes from the export and the Run Plan: Ar in the feed gas from `feed_gas` (Run Plan Feed → Gas feed
+-    composition), the gas feed of a line from the export line (01i14FIC0r, 01i14FI01), else from the Run Plan DOE
+-    condition running at that time (`doe_rows`). `ar_mol_pct` / `ar_wt_pct` override the feed gas for scripts and tests
+-    only (the page does not send them).
+-    Argon to the reactor: with 01i14FI01 and the Ar wt% as in the workbook (F_r · w_Ar); without 01i14FI01 from the
+-    volume: FIC_r/1000 / molar volume · y_Ar,feed/100 · 39.948 (the same quantity: n_Ar · MW_Ar).
++    Without `internal_standard` (6.4.3 behaviour): argon is the internal standard and Ar in the feed gas comes from
++    `feed_gas` (Run Plan Feed → Gas feed composition); `ar_mol_pct` / `ar_wt_pct` override it for scripts and tests.
++    With `internal_standard` = Argon or N2 (process General_MB, 6.5.0): the IS mol% and wt% of the feed gas are measured
++    in the bypass (reactor 0) GC lines of every Run Plan DOE condition (`feed_gas_is`), and each reactor line uses the
++    values of the condition it belongs to. The Run Plan Argon is only reported for comparison.
++    The gas feed of a line comes from the export line (01i14FIC0r, 01i14FI01), else from the Run Plan DOE condition
++    running at that time (`doe_rows`).
++    IS to the reactor: with 01i14FI01 and the IS wt% as in the workbook (F_r · w_IS); without 01i14FI01 from the volume:
++    FIC_r/1000 / molar volume · y_IS,feed/100 · MW_IS (the same quantity: n_IS · MW_IS).
+     """
+     if unit not in UNITS or unit == "mol":
+         raise ValueError(f"Unknown unit '{unit}'. Use one of: mass, volume, carbon.")
++    is_name = internal_standard_name(internal_standard)
++    general = is_name is not None
++    ist = is_name or "Argon"
++    mw_is = INTERNAL_STANDARDS[ist]
+     suffix = UNITS[unit]["suffix"]
+     feed = feed_argon(feed_gas)
+     ar_mol = _num(ar_mol_pct) if _num(ar_mol_pct) else feed["ar_mol_pct"]
+@@ -182,14 +307,17 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
+     doe = doe_gas_flows(doe_rows)
+     has_tags = any(_num(r.get(f"01i14FIC0{k}")) is not None or _num(r.get(f"02i2FIC0{k}")) is not None
+                    for r in rows or [] for k in range(1, 9))
+-    basis = {"unit": unit, "label": UNITS[unit]["label"], "ar_feed_mol_pct": ar_mol, "ar_feed_wt_pct": ar_wt,
+-             "ar_source": "override" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas",
+-             "excluded_feed_gas": feed["excluded"], "molar_volume": vm, "export_has_flows": has_tags,
++    basis = {"unit": unit, "label": UNITS[unit]["label"], "internal_standard": is_name,
++             "ar_feed_mol_pct": None if general else ar_mol, "ar_feed_wt_pct": None if general else ar_wt,
++             "run_plan_argon_mol_pct": feed["ar_mol_pct"],
++             "ar_source": ("bypass (reactor 0) GC lines per DOE condition" if general else
++                           "override" if (_num(ar_wt_pct) or _num(ar_mol_pct)) else "Run Plan feed gas"),
++             "excluded_feed_gas": [] if general else feed["excluded"], "molar_volume": vm, "export_has_flows": has_tags,
+              "doe_flows": len(doe)}
+     missing = None
+-    if unit == "volume" and not ar_mol:
++    if not general and unit == "volume" and not ar_mol:
+         missing = "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
+-    if unit in ("mass", "carbon") and not ar_mol and not ar_wt:
++    if not general and unit in ("mass", "carbon") and not ar_mol and not ar_wt:
+         missing = "ERROR: no Argon in the Run Plan feed gas (Run Plan → Feed → Gas feed composition)"
+ 
+     present = []
+@@ -200,50 +328,94 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
+                 if name not in present:
+                     present.append(name)
+     order = list(COMPONENTS) + sorted(NO_MW)
+-    names = [n for n in order if n in present] + [n for n in present if n not in COMPONENTS and n not in NO_MW]
+-    if unit == "carbon":           # only molecules that contain carbon
+-        names = [n for n in names if n in NO_MW or n not in COMPONENTS or COMPONENTS[n][1] > 0]
+-    spelled = {n: [k for k, v in ALIASES.items() if v == n] + [n] for n in names}
++    all_names = [n for n in order if n in present] + [n for n in present if n not in COMPONENTS and n not in NO_MW]
++    spelled = {n: [k for k, v in ALIASES.items() if v == n] + [n] for n in all_names}
+ 
+     def value_of(row, name):
+-        for key in spelled[name]:
++        for key in spelled.get(name, [name]):
+             v = _num(row.get(f"ESTD_{key}"))
+             if v is not None:
+                 return v
+         return None
+ 
+     # Components that have a value in at least one row
+-    names = [n for n in names if any(value_of(r, n) is not None for r in rows or [])]
++    all_names = [n for n in all_names if any(value_of(r, n) is not None for r in rows or [])]
++    names = list(all_names)
++    if unit == "carbon":           # only molecules that contain carbon
++        names = [n for n in names if n in NO_MW or n not in COMPONENTS or COMPONENTS[n][1] > 0]
+ 
+     times = [_date(r.get("DateTime")) for r in rows or []]
+     t0 = _date(feed_cut_in) or min((t for t in times if t), default=None)
+     basis["tos_zero"] = t0.strftime("%Y-%m-%d %H:%M:%S") if t0 else ""
+     basis["tos_zero_source"] = "Run Plan Feed Cut-In" if _date(feed_cut_in) else "first record"
+ 
+-    extra = {"mass": ["Gas feed to reactor [NmL/h]", "Ar to reactor [g/h]", "Total w/o Ar [g/h]"],
++    # General_MB: DOE conditions and the feed gas measured in their bypass lines
++    conditions, reactor_windows, feed_is = [], [], []
++    if general:
++        data_end = max((t for t in times if t), default=None)
++        conditions, reactor_windows = doe_conditions(doe_rows, data_end + timedelta(seconds=1) if data_end else None)
++        feed_is = bypass_feed_gas(rows, conditions, ist, all_names, value_of, feed["ar_mol_pct"])
++    feed_by_label = {f["condition"]: f for f in feed_is}
++
++    def condition_of(reactor, when):
++        hits = [(start, key) for r, start, end, key in reactor_windows if r == reactor and _in_window(when, start, end)]
++        if not hits:
++            return None
++        key = max(hits)[1]
++        return next(c["label"] for c in conditions if c["key"] == key)
++
++    def bypass_condition(when):
++        hits = [c["label"] for c in conditions if _in_window(when, c["start"], c["end"])]
++        return ", ".join(hits) if hits else None      # parallel blocks share the bypass line
++
++    is_col = f"{ist} to reactor [g/h]" if general else "Ar to reactor [g/h]"
++    extra = {"mass": ["Gas feed to reactor [NmL/h]", is_col, f"Total w/o {ist} [g/h]" if general else "Total w/o Ar [g/h]"],
+              "volume": ["Gas feed to reactor [Nl/h]", "Total out [Nl/h]"],
+              "carbon": ["Gas feed to reactor [NmL/h]", "Total C [g C/h]"]}[unit]
+-    columns = ["DateTime", "TOS (h)", "Reactor", "Status", "Flow source"] + [f"{n} [{suffix}]" for n in names] + extra
++    if general and unit != "mass":
++        extra.append(is_col)
++    lead = ["DateTime", "TOS (h)", "Reactor"] + (["Condition"] if general else []) + ["Status", "Flow source"]
++    columns = lead + [f"{n} [{suffix}]" for n in names] + extra
+     sources = {}
+     out_rows = []
++    is_flows = {}                  # (condition, reactor) → [F_IS of the calculated lines] / [errors]
+     for row, when in zip(rows or [], times):
+         out = {"DateTime": row.get("DateTime"), "TOS (h)": round((when - t0).total_seconds() / 3600, 4) if when and t0 else None,
+                "Reactor": row.get("Reactor")}
+-        for column in columns[4:]:
++        for column in columns[3:]:
+             out[column] = None
+         y = {n: value_of(row, n) for n in names}
+-        y_ar = _num(row.get("ESTD_Argon"))
++        y_is = value_of(row, ist)
+         reactor = reactor_number(row.get("Reactor"))
+-        status, flow = "OK", None
+-        if all(v is None or v == 0 for v in y.values()) and not y_ar:
++        status, flow, cond, line_mol, line_wt = "OK", None, None, ar_mol, ar_wt
++        has_gc = not (all(v is None or v == 0 for v in y.values()) and not y_is)
++        if general and reactor == 0:
++            cond = bypass_condition(when)
++            out["Condition"] = cond
++            out["Status"] = (f"BYPASS – feed gas of {cond}" if cond else
++                             "BYPASS – outside every Run Plan DOE condition") if has_gc else \
++                "BYPASS – no GC values in this line (not used)"
++            out_rows.append(out)
++            continue
++        if general and reactor:
++            cond = condition_of(reactor, when)
++            out["Condition"] = cond
++        if not has_gc:
+             status = "ERROR: no GC values in this line"
+         elif missing:
+             status = missing
+         elif reactor is None or reactor == 0:
+             status = "ERROR: no reactor (bypass or unknown) – no feed flow to scale with"
+-        elif not y_ar or y_ar <= 0:
+-            status = "ERROR: no argon peak (ESTD_Argon) – argon is the internal standard"
++        elif not y_is or y_is <= 0:
++            status = f"ERROR: no {ist} peak (ESTD_{ist}) – {ist} is the internal standard"
++        elif general and cond is None:
++            status = f"ERROR: no Run Plan DOE condition for R{reactor} at this time"
++        elif general and (feed_by_label[cond]["error"] or not feed_by_label[cond]["is_wt_pct"]):
++            status = "ERROR: " + (feed_by_label[cond]["error"] or f"{ist} wt% of the feed gas of condition {cond} "
++                                  f"cannot be calculated")
+         else:
++            if general:
++                line_mol, line_wt = feed_by_label[cond]["is_mol_pct"], feed_by_label[cond]["is_wt_pct"]
+             flow = _line_flows(row, reactor)
+             if flow is not None:
+                 fi01, v_r, v_sum = flow
+@@ -258,23 +430,28 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
+                           f"with a gas flow at this time")
+             elif v_r <= 0 or not v_sum:
+                 status = f"ERROR: no gas feed to R{reactor} ({source}: {v_r:g} NmL/h)"
+-            elif unit != "volume" and not (fi01 and fi01 > 0 and ar_wt) and not ar_mol:
++            elif unit != "volume" and not (fi01 and fi01 > 0 and line_wt) and not line_mol:
+                 status = "ERROR: no Argon mol% in the Run Plan feed gas (needed without 01i14FI01)"
+         if status != "OK":
+             out["Status"] = status
+             out_rows.append(out)
++            if general and cond and reactor:
++                is_flows.setdefault((cond, reactor), {"ok": [], "errors": []})["errors"].append(status)
+             continue
+ 
+         fi01, v_r, v_sum, source = flow
+-        if unit != "volume" and fi01 and fi01 > 0 and ar_wt:
+-            ar_r = fi01 * v_r / v_sum * ar_wt / 100            # workbook: Gas!G20 = 01i14FI01 · V_r/ΣV · w_Ar
++        use_fi01 = bool(fi01 and fi01 > 0 and line_wt) and (general or unit != "volume")
++        if use_fi01:
++            is_r = fi01 * v_r / v_sum * line_wt / 100            # workbook: Gas!G20 = 01i14FI01 · V_r/ΣV · w_IS
+             route = f"{source}, 01i14FI01"
+         else:
+-            ar_r = v_r / 1000 / vm * (ar_mol or 0) / 100 * MW_AR   # n_Ar · MW_Ar from the volumetric feed
+-            route = f"{source}, molar volume" if unit != "volume" else source
++            is_r = v_r / 1000 / vm * (line_mol or 0) / 100 * mw_is   # n_IS · MW_IS from the volumetric feed
++            route = f"{source}, molar volume" if unit != "volume" or general else source
++        if unit == "volume":
++            route = source
+         sources[route] = sources.get(route, 0) + 1
+         out["Flow source"] = route
+-        v_out = v_r / 1000 * ar_mol / y_ar if ar_mol else None
++        v_out = v_r / 1000 * line_mol / y_is if line_mol else None
+         problems, total = [], 0.0
+         for n in names:
+             value = y[n]
+@@ -291,19 +468,22 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
+             if unit == "volume":
+                 result = value / 100 * v_out
+             else:
+-                mass = value * mw / (y_ar * MW_AR) * ar_r
++                mass = value * mw / (y_is * mw_is) * is_r
+                 result = mass if unit == "mass" else MW_C * carbons / mw * mass
+-                if unit == "mass" and n == "Argon":
++                if unit == "mass" and n == ist:
+                     out[f"{n} [{suffix}]"] = result
+                     continue
+             out[f"{n} [{suffix}]"] = result
+             total += result
+         if unit == "mass":
+-            out.update({"Gas feed to reactor [NmL/h]": v_r, "Ar to reactor [g/h]": ar_r, "Total w/o Ar [g/h]": total})
++            out.update({"Gas feed to reactor [NmL/h]": v_r, is_col: is_r, extra[2]: total})
+         elif unit == "volume":
+             out.update({"Gas feed to reactor [Nl/h]": v_r / 1000, "Total out [Nl/h]": v_out})
+         else:
+             out.update({"Gas feed to reactor [NmL/h]": v_r, "Total C [g C/h]": total})
++        if general:
++            out[is_col] = is_r
++            is_flows.setdefault((cond, reactor), {"ok": [], "errors": []})["ok"].append(is_r)
+         out["Status"] = "OK" if not problems else f"ERROR: no MW for {', '.join(problems)} (total without them)"
+         out_rows.append(out)
+ 
+@@ -314,10 +494,32 @@ def convert_online_rows(rows, unit, feed_gas=None, feed_cut_in=None, doe_rows=No
+                              + (f"; export spelling {', '.join(k for k in spelled[n] if k != n)}" if len(spelled[n]) > 1 else "")}
+                   for n in names]
+     ok = sum(1 for r in out_rows if r["Status"] == "OK")
++    bypass = sum(1 for r in out_rows if str(r["Status"]).startswith("BYPASS"))
+     flows_missing = any(r["Status"].startswith("ERROR: no gas feed for R") for r in out_rows)
+     basis["flows_missing"] = flows_missing
+     # The export has no flows and the Run Plan DOE has no gas flows: the gas feed is missing
+     basis["flows_needed"] = not has_tags and not doe
+     basis["argon_missing"] = bool(missing)
+-    return {"unit": unit, "label": UNITS[unit]["label"], "columns": columns, "rows": out_rows, "basis": basis,
+-            "components": components, "ok_count": ok, "error_count": len(out_rows) - ok}
++    result = {"unit": unit, "label": UNITS[unit]["label"], "columns": columns, "rows": out_rows, "basis": basis,
++              "components": components, "ok_count": ok, "bypass_count": bypass,
++              "error_count": len(out_rows) - ok - bypass}
++    if general:
++        # Average IS Flow to Reactor (workbook R#_MB!F5 = Gas!G20) per condition and reactor
++        avg = []
++        for c in conditions:
++            cells = {}
++            for r in range(1, 9):
++                entry = is_flows.get((c["label"], r))
++                if entry and entry["ok"]:
++                    cells[f"R{r}"] = sum(entry["ok"]) / len(entry["ok"])
++                elif entry:
++                    cells[f"R{r}"] = entry["errors"][0]
++                else:
++                    cells[f"R{r}"] = None
++            avg.append({"condition": c["label"], "lines": {f"R{r}": len(is_flows.get((c["label"], r), {}).get("ok", []))
++                                                          for r in range(1, 9)}, **cells})
++        basis["no_conditions"] = not conditions
++        basis["no_bypass"] = [f["condition"] for f in feed_is if f["bypass_lines"] == 0]
++        result["feed_gas_is"] = feed_is
++        result["avg_is_flow"] = avg
++    return result
+diff --git a/frontend/calculation_table.html b/frontend/calculation_table.html
+index 199a1c49de61d816540f32fdb991ae6e8fd01a48..1228da384b98de61a2a02a91941d7e25b880d2c2 100644
+--- a/frontend/calculation_table.html
++++ b/frontend/calculation_table.html
+@@ -7,7 +7,7 @@
+     <title>Calculation Table | DHA Data Dashboard</title>
+     <link href="/frontend/css/dashboard.css?v=64" rel="stylesheet">
+     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
+     <script src="/frontend/js/calculation_table.js?v=10" defer></script>
+     <script src="/frontend/js/reforming_carbon_table.js?v=10" defer></script>
+ </head>
+diff --git a/frontend/css/online_units.css b/frontend/css/online_units.css
+index c86151d390ed185c89bc127fde8d8512792176a1..62b6e866d4b820a5bddbec452c0a84cf57d10564 100644
+--- a/frontend/css/online_units.css
++++ b/frontend/css/online_units.css
+@@ -20,3 +20,23 @@
+ .online-units-title{font-size:12px;font-weight:700;color:var(--burnt)}
+ .online-units-bar.needs-input{border-left-color:#991b1b}
+ .online-units-bar.needs-input summary .online-units-title{color:#991b1b}
++/* General_MB (6.5.0): Internal Standard side panel next to the table */
++.online-unit-wrap[hidden]{display:none}
++.online-mb-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
++.online-mb-layout.with-side{grid-template-columns:minmax(0,1fr) 330px;padding-right:16px}
++.online-mb-side{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;max-height:72vh;overflow:auto;padding:12px 0}
++.online-mb-side[hidden]{display:none}
++.online-mb-card{border:1px solid var(--border);border-left:3px solid var(--burnt);border-radius:8px;background:#fffaf0;padding:10px 12px;font-size:12px}
++.online-mb-note{color:var(--slate);font-size:11px;margin:2px 0 8px}
++.online-mb-cond{border-top:1px solid var(--border);padding-top:8px;margin-top:8px}
++.online-mb-cond:first-child{border-top:0;margin-top:0;padding-top:0}
++.online-mb-cond-head{font-weight:700;color:var(--ink)}
++.online-mb-cond-window{color:var(--slate);font-size:11px;margin-bottom:4px}
++.online-mb-kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;margin:0}
++.online-mb-kv dt{color:var(--slate)}
++.online-mb-kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
++.online-mb-kv dd b{color:var(--ink)}
++.online-mb-error{color:#991b1b;font-weight:600}
++.online-mb-warn{color:#92400e;font-size:11px;margin-top:4px}
++.online-table td.online-status-bypass{color:var(--slate);font-style:italic;white-space:normal;min-width:200px}
++@media (max-width:1280px){.online-mb-layout.with-side{grid-template-columns:1fr;padding-right:0}.online-mb-side{position:static;max-height:none;padding:0 16px}}
+diff --git a/frontend/custom_table.html b/frontend/custom_table.html
+index c12cb1463404bf7fc4696935e56270cf0604bdcc..f8e72e469edc995e4d81fe142d3f742d680dbf1e 100644
+--- a/frontend/custom_table.html
++++ b/frontend/custom_table.html
+@@ -7,7 +7,7 @@
+     <title>Custom Table Studio | DHA Data Dashboard</title>
+     <link href="/frontend/css/dashboard.css" rel="stylesheet">
+     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
+     <script src="/frontend/js/custom_table.js?v=2" defer></script>
+ </head>
+ 
+diff --git a/frontend/history.html b/frontend/history.html
+index f5b7a310c49583ffe26d652272a8153341d93f05..5327f2b54be44bf6ee9f35fc0bba5be0c408ff1b 100644
+--- a/frontend/history.html
++++ b/frontend/history.html
+@@ -8,7 +8,7 @@
+     <link href="/frontend/css/dashboard.css" rel="stylesheet">
+     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+     <link href="/frontend/css/historian.css" rel="stylesheet" id="historianCss">
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
+     <script src="/frontend/js/history.js" defer></script>
+ </head>
+ 
+diff --git a/frontend/index.html b/frontend/index.html
+index de1f7da62fe37b5384983da5858a527e6e51b89c..e08e8ac8ceda193a5e1083dce91a9532cf92b034 100644
+--- a/frontend/index.html
++++ b/frontend/index.html
+@@ -1,5 +1,5 @@
+ <!DOCTYPE html>
+-<script src="/frontend/js/navigation.js?v=3" defer></script>
++<script src="/frontend/js/navigation.js?v=4" defer></script>
+ <html>
+ 
+ <head>
+@@ -144,7 +144,7 @@
+         </main>
+     </div>
+     <script src="/frontend/js/lucide.min.js" defer></script>
+-    <script src="/frontend/js/reforming_offline.js" defer></script>
++    <script src="/frontend/js/reforming_offline.js?v=2" defer></script>
+     <script src="/frontend/js/dashboard.js?v=9" defer></script>
+     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
+ </body>
+diff --git a/frontend/js/historian_save.js b/frontend/js/historian_save.js
+index 1f88a7f0567dc6833ff0553c0f1670d4df93da13..80e6dd33133840977cb85a749a8ea0350caeb134 100644
+--- a/frontend/js/historian_save.js
++++ b/frontend/js/historian_save.js
+@@ -79,6 +79,21 @@
+         const onl = readJson('dhaOnlineState') || {};
+         addTable('online.analysis', 'Online Analysis', 'Online Analysis', onl.rows, onl.columns);
+         addKpi('online.record_count', 'Online Records', 'Online Analysis', Array.isArray(onl.rows) ? onl.rows.length : null);
++        // General_MB: feed gas measured in the bypass lines and the average IS flow to each reactor (side panel)
++        const mb = onl.mbPanels;
++        if (mb && onl.internalStandard) {
++            const isName = mb.internal_standard || onl.internalStandard;
++            addTable('online.feed_gas_is', `Online · Feed Gas Composition IS (${isName}, bypass)`, 'Online Analysis',
++                (mb.feed_gas_is || []).map(f => ({
++                    Condition: f.condition, Start: f.start, End: f.end, Reactors: (f.reactors || []).join(', '),
++                    'Bypass lines': f.bypass_lines, [`${isName} mol%`]: f.is_mol_pct, [`${isName} wt%`]: f.is_wt_pct,
++                    'Mixed gas mol%': f.mixed_mol_pct, 'Sum mol%': f.sum_mol_pct, 'Mixed gas MW': f.mixed_mw,
++                    [`${isName} RSD %`]: f.is_rsd_pct, 'Run Plan Argon mol%': f.run_plan_argon_mol_pct, Error: f.error || ''
++                })));
++            addTable('online.avg_is_flow', `Online · Average ${isName} Flow to Reactor [g/h]`, 'Online Analysis',
++                (mb.avg_is_flow || []).map(r => ({ Condition: r.condition,
++                    ...Object.fromEntries(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'].map(k => [k, r[k] ?? ''])) })));
++        }
+ 
+         const base = readJson('ils_base_table_state') || {};
+         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);
+diff --git a/frontend/js/navigation.js b/frontend/js/navigation.js
+index bee3c77e518de5e67d0cec8dc4315fd7a72e2cb3..89ea39b287810ed6f3b1c20b1172bce7350fb61a 100644
+--- a/frontend/js/navigation.js
++++ b/frontend/js/navigation.js
+@@ -17,18 +17,24 @@ function sortDateTimeRows(rows, column = 'DateTime') {
+     })).sort((left, right) => left.time === right.time ? 0 : left.time - right.time).map(entry => entry.row);
+ }
+ 
+-// Process of the current run (Isomerization or Reforming), chosen on the Run Plan page.
++// Process of the current run (Isomerization, Reforming or General_MB), chosen on the Run Plan page.
+ // Kept per browser tab like the Run Number; cleared by the reset button.
++// General_MB (6.5.0) uses the Isomerization pages and adds the Internal Standard mass balance on Online Analysis.
+ window.ILSProcess = {
+     KEY: 'ils_process',
+-    LABELS: { isomerization: 'Isomerization', reforming: 'Reforming' },
++    LABELS: { isomerization: 'Isomerization', reforming: 'Reforming', general_mb: 'General_MB' },
+     get() {
+-        try { return sessionStorage.getItem(this.KEY) === 'reforming' ? 'reforming' : 'isomerization'; } catch { return 'isomerization'; }
++        try {
++            const value = sessionStorage.getItem(this.KEY);
++            return Object.prototype.hasOwnProperty.call(this.LABELS, value) ? value : 'isomerization';
++        } catch { return 'isomerization'; }
+     },
+     set(value) {
+-        try { sessionStorage.setItem(this.KEY, value === 'reforming' ? 'reforming' : 'isomerization'); } catch {}
++        const process = Object.prototype.hasOwnProperty.call(this.LABELS, value) ? value : 'isomerization';
++        try { sessionStorage.setItem(this.KEY, process); } catch {}
+     },
+     isReforming() { return this.get() === 'reforming'; },
++    isGeneralMB() { return this.get() === 'general_mb'; },
+     label() { return this.LABELS[this.get()]; },
+     runPlanUrl() { return '/frontend/run_plan.html'; }
+ };
+@@ -129,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
+     // Manual Historian save button (logic lives in historian_save.js)
+     if (!isPlotDashboard) {
+         const historianScript = document.createElement('script');
+-        historianScript.src = '/frontend/js/historian_save.js';
++        historianScript.src = '/frontend/js/historian_save.js?v=2';
+         historianScript.onload = () => {
+             const runDataScript = document.createElement('script');
+             runDataScript.src = '/frontend/js/run_data.js';
+@@ -247,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
+                 '<div class="run-number-group process-group">' +
+                 '<label for="processSelect" class="run-number-label">Process</label>' +
+                 '<select class="input run-number-input process-select" id="processSelect" title="Process of this run">' +
+-                '<option value="isomerization">Isomerization</option><option value="reforming">Reforming</option>' +
++                '<option value="isomerization">Isomerization</option><option value="reforming">Reforming</option><option value="general_mb">General_MB</option>' +
+                 '</select></div>');
+             const processSelect = document.getElementById('processSelect');
+             const runField = document.getElementById('runNumberInput');
+diff --git a/frontend/js/online_analysis.js b/frontend/js/online_analysis.js
+index 4f5149cc84dacfd97cc4ad17ae3234714bb52823..d704c2a9cd8c4572d3671b49d2124c154ad092a5 100644
+--- a/frontend/js/online_analysis.js
++++ b/frontend/js/online_analysis.js
+@@ -9,8 +9,12 @@ const onlineState = {
+     // Units of the GC values: 'mol' (as imported) or a conversion from /api/online-units (mass, volume, carbon)
+     unit: 'mol',
+     converted: null,
+-    hiddenConverted: []
++    hiddenConverted: [],
++    // General_MB (6.5.0): internal standard measured in the bypass lines ('' = none → mol% only)
++    internalStandard: '',
++    mbPanels: null
+ };
++const isGeneralMB = () => Boolean(window.ILSProcess?.isGeneralMB?.());
+ const online$ = (selector) => document.querySelector(selector);
+ const formatOnlineValue = (value) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : (value ?? '');
+ 
+@@ -139,6 +143,8 @@ function applyReactorMapMapping(rows, reactorRows) {
+     if (!Array.isArray(reactorRows) || !reactorRows.length) return rows.map(r => ({ ...r }));
+     return rows.map(row => {
+         const rCopy = { ...row };
++        // General_MB: a bypass line (Sampled_reactor 0 in the export) stays the bypass with the Reactor Map ON
++        if (isGeneralMB() && String(row.Reactor ?? '').trim() !== '' && Number(row.Reactor) === 0) return rCopy;
+         const mapped = computeReactorForDateTime(row.DateTime, reactorRows);
+         if (mapped) {
+             rCopy.Reactor = mapped;
+@@ -148,6 +154,12 @@ function applyReactorMapMapping(rows, reactorRows) {
+ }
+ 
+ // ---------------------------------------------------------------- Units (mol% → g/h, Nl/h, g C/h)
++const ONLINE_UNIT_FORMULAS_IS = {
++    mass: 'm_i [g/h] = y_i·MW_i / (y_IS·MW_IS) · F_IS,r   with   F_IS,r = 01i14FI01 · FIC_r / ΣFIC · w_IS,   or without 01i14FI01: F_IS,r = FIC_r/1000 / 22.414 · y_IS,feed/100 · MW_IS   (y = ESTD mol%; y_IS,feed and w_IS from the bypass lines of the condition; FIC from the export or the Run Plan DOE)',
++    volume: 'V_i [Nl/h] = y_i/100 · V_out   with   V_out = FIC_r[NmL/h]/1000 · y_IS,feed / y_IS   (internal standard balance; y_IS,feed from the bypass lines)',
++    carbon: 'C_i [g C/h] = 12.011 · nC_i / MW_i · m_i   (carbon of each molecule over TOS; m_i as for the mass flow rates)',
++    feed: 'Feed gas (bypass, per condition): y_IS,feed = avg ESTD_IS; y_mix,feed = avg Σ ESTD of every other gas; MW_mix = Σ avg_j·MW_j / Σ avg_j; w_IS = y_IS·MW_IS / (y_IS·MW_IS + y_mix·MW_mix)',
++};
+ const ONLINE_UNIT_FORMULAS = {
+     mass: 'm_i [g/h] = y_i·MW_i / (y_Ar·39.948) · F_Ar,r   with   F_Ar,r = 01i14FI01 · FIC_r / ΣFIC · w_Ar,   or without 01i14FI01: F_Ar,r = FIC_r/1000 / 22.414 · y_Ar,feed/100 · 39.948   (y = ESTD mol%; FIC from the export or the Run Plan DOE; Ar from the Run Plan)',
+     volume: 'V_i [Nl/h] = y_i/100 · V_out   with   V_out = FIC_r[NmL/h]/1000 · y_Ar,feed / y_Ar   (argon balance)',
+@@ -173,7 +185,8 @@ function onlineRunPlanContext() {
+         const cutIn = info.find(i => String(i.parameter).trim().toLowerCase() === 'feed cut-in')?.value || '';
+         // DOE gas flow per reactor and condition (template "Total gas (Nl/h)", older files "Gas Flow (NmL/h)")
+         const doeRows = (rp.doeData?.rows || []).map(row => Object.fromEntries(Object.entries(row).filter(([key]) =>
+-            /^(Reactor ID|Start Date|End Date)$/.test(key) || /^total gas/i.test(key) || /^gas flow/i.test(key))));
++            /^(Reactor ID|Start Date|End Date|Condition No\.|Block)$/.test(key) || /^duration/i.test(key)
++            || /^total gas/i.test(key) || /^gas flow/i.test(key))));
+         return { feedGas: rp.feedTables?.gas?.rows || [], feedCutIn: cutIn, doeRows };
+     } catch (e) {
+         return { feedGas: [], feedCutIn: '', doeRows: [] };
+@@ -188,9 +201,13 @@ function compactUnitRows(rows) {
+ 
+ let unitRequest = 0;
+ async function refreshOnlineUnits() {
++    syncGeneralMBControls();
+     const unit = onlineState.unit;
++    const internalStandard = isGeneralMB() ? onlineState.internalStandard : '';
+     renderUnitsBar();
+-    if (unit === 'mol' || !onlineState.rows.length) {
++    if (!internalStandard) onlineState.mbPanels = null;
++    renderMbPanels();
++    if ((unit === 'mol' && !internalStandard) || !onlineState.rows.length) {
+         onlineState.converted = null;
+         renderOnlineTable();
+         return;
+@@ -202,26 +219,107 @@ async function refreshOnlineUnits() {
+         const response = await fetch('/api/online-units', {
+             method: 'POST', headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+-                unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas, feed_cut_in: ctx.feedCutIn,
+-                doe_rows: ctx.doeRows,
++                // mol% with an Internal Standard: the side panel needs the bypass values (table stays in mol%)
++                unit: unit === 'mol' ? 'mass' : unit, rows: compactUnitRows(onlineState.rows), feed_gas: ctx.feedGas,
++                feed_cut_in: ctx.feedCutIn, doe_rows: ctx.doeRows, internal_standard: internalStandard || null,
+             }),
+         });
+         const data = await onlineJson(response);
+         if (!response.ok) throw Error(data.error);
+         if (ticket !== unitRequest) return;
+-        onlineState.converted = data;
++        onlineState.converted = unit === 'mol' ? null : data;
++        onlineState.mbPanels = internalStandard ? {
++            internal_standard: internalStandard, feed_gas_is: data.feed_gas_is || [], avg_is_flow: data.avg_is_flow || [],
++            basis: data.basis || {},
++        } : null;
+         onlineError();
++        saveOnlineState();
+     } catch (error) {
+         if (ticket !== unitRequest) return;
+         onlineState.converted = null;
++        onlineState.mbPanels = null;
+         onlineError(`Unit conversion failed: ${error.message}`);
+     } finally {
+         if (ticket === unitRequest) online$('#onlineStatus').textContent = 'Ready';
+     }
+     renderUnitsBar();
++    renderMbPanels();
+     renderOnlineTable();
+ }
+ 
++// ---------------------------------------------------------------- General_MB controls and side panel
++function syncGeneralMBControls() {
++    const general = isGeneralMB();
++    const isSelect = online$('#onlineInternalStandard');
++    const unitSelect = online$('#onlineUnit');
++    if (online$('#onlineIsWrap')) online$('#onlineIsWrap').hidden = !general;
++    if (online$('#onlineUnitWrap')) online$('#onlineUnitWrap').hidden = !general;
++    // Isomerization / Reforming: mol% only. General_MB without an Internal Standard: mol% only.
++    if (!general || !onlineState.internalStandard) onlineState.unit = 'mol';
++    if (isSelect) isSelect.value = general ? onlineState.internalStandard : '';
++    if (unitSelect) {
++        [...unitSelect.options].forEach(option => {
++            option.disabled = option.value !== 'mol' && !onlineState.internalStandard;
++            option.title = option.disabled ? 'Choose an Internal Standard (Argon or N2) first' : '';
++        });
++        unitSelect.value = onlineState.unit;
++        unitSelect.title = onlineState.internalStandard ? '' : 'Choose an Internal Standard (Argon or N2) to convert to g/h, Nl/h or g C/h';
++    }
++}
++
++const fmtMb = (value, digits = 4) => (typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '–');
++
++function renderMbPanels() {
++    const side = online$('#onlineMbSide');
++    const layout = online$('#onlineMbLayout');
++    if (!side) return;
++    const panels = isGeneralMB() && onlineState.internalStandard ? onlineState.mbPanels : null;
++    const show = isGeneralMB() && Boolean(onlineState.internalStandard) && onlineState.rows.length > 0;
++    side.hidden = !show;
++    layout?.classList.toggle('with-side', show);
++    if (!show) return;
++    const is = onlineState.internalStandard;
++    const other = is === 'Argon' ? 'N2 included' : 'Argon included';
++    const feed = panels?.feed_gas_is || [];
++    const basis = panels?.basis || {};
++    let feedHtml;
++    if (!panels) feedHtml = '<div class="online-mb-note">Calculating…</div>';
++    else if (basis.no_conditions) feedHtml = '<div class="online-mb-error">ERROR: no Run Plan DOE conditions (Condition No., Reactor ID, Start Date). Load the Run Plan of this run on the Run Plan page.</div>';
++    else feedHtml = feed.map(f => {
++        const window = `${escOnline(f.start)} → ${escOnline(f.end || 'end of data')} · ${escOnline((f.reactors || []).join(', '))}`;
++        if (!f.bypass_lines) return `<div class="online-mb-cond"><div class="online-mb-cond-head">${escOnline(f.condition)}</div>`
++            + `<div class="online-mb-cond-window">${window}</div><div class="online-mb-error">ERROR: ${escOnline(f.error)}</div></div>`;
++        const rp = typeof f.run_plan_argon_mol_pct === 'number' && is === 'Argon'
++            ? `<dt>Run Plan Argon (check)</dt><dd>${fmtMb(f.run_plan_argon_mol_pct, 2)} mol%`
++              + (f.is_mol_pct ? ` <small>(${(100 * (f.run_plan_argon_mol_pct - f.is_mol_pct) / f.is_mol_pct).toFixed(1)} %)</small>` : '') + '</dd>'
++            : '';
++        return `<div class="online-mb-cond"><div class="online-mb-cond-head">${escOnline(f.condition)} · ${f.bypass_lines} bypass line${f.bypass_lines === 1 ? '' : 's'}</div>`
++            + `<div class="online-mb-cond-window">${window}</div>`
++            + `<dl class="online-mb-kv">`
++            + `<dt>${escOnline(is)} (IS)</dt><dd><b>${fmtMb(f.is_mol_pct)}</b> mol%</dd>`
++            + `<dt>${escOnline(is)} (IS) mass fraction</dt><dd><b>${fmtMb(f.is_wt_pct)}</b> wt%</dd>`
++            + `<dt>Mixed gas (${other})</dt><dd><b>${fmtMb(f.mixed_mol_pct)}</b> mol%</dd>`
++            + `<dt>Sum</dt><dd>${fmtMb(f.sum_mol_pct)} mol%</dd>`
++            + `<dt>Mixed gas MW</dt><dd>${fmtMb(f.mixed_mw, 3)} g/mol</dd>`
++            + (f.is_rsd_pct != null ? `<dt>${escOnline(is)} spread (RSD)</dt><dd>${fmtMb(f.is_rsd_pct, 2)} %</dd>` : '')
++            + rp + `</dl>`
++            + (f.error ? `<div class="online-mb-error">ERROR: ${escOnline(f.error)}</div>` : '')
++            + ((f.no_mw || []).length ? `<div class="online-mb-warn">No MW, left out of the mixed gas MW: ${escOnline(f.no_mw.join(', '))}</div>` : '')
++            + `</div>`;
++    }).join('') || '<div class="online-mb-note">No conditions.</div>';
++    online$('#onlineFeedGasCards').innerHTML = feedHtml;
++    online$('#onlineIsFlowTitle').textContent = `Average ${is} flow to reactor [g/h]`;
++    const flows = panels?.avg_is_flow || [];
++    online$('#onlineIsFlowCards').innerHTML = !panels ? '<div class="online-mb-note">Calculating…</div>' : (flows.map(row => {
++        const cells = ['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'].filter(r => row[r] !== null && row[r] !== undefined);
++        const items = cells.map(r => typeof row[r] === 'number'
++            ? `<dt>${r} <small>(${row.lines?.[r] ?? 0} lines)</small></dt><dd><b>${fmtMb(row[r])}</b></dd>`
++            : `<dt>${r}</dt><dd class="online-mb-error" title="${escOnline(row[r])}">${escOnline(String(row[r]).replace(/^ERROR: /, 'ERROR: '))}</dd>`).join('');
++        return `<div class="online-mb-cond"><div class="online-mb-cond-head">${escOnline(row.condition)}</div>`
++            + (items ? `<dl class="online-mb-kv">${items}</dl>` : '<div class="online-mb-note">No reactor lines in this condition.</div>') + '</div>';
++    }).join('') || '<div class="online-mb-note">No conditions.</div>');
++}
++
+ function renderUnitsBar() {
+     const bar = online$('#onlineUnitsBar');
+     if (!bar) return;
+@@ -235,8 +333,14 @@ function renderUnitsBar() {
+     if (data) {
+         parts.push(`<b>${escOnline(data.label)}</b> · ${data.ok_count} line${data.ok_count === 1 ? '' : 's'} calculated`
+             + (data.error_count ? `, <span class="online-cell-error">${data.error_count} with ERROR</span> (see Status)` : ''));
+-        parts.push(`Ar in feed gas: ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
+-            + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} (${escOnline(basis.ar_source || '')})`);
++        if (basis.internal_standard) {
++            parts.push(`Internal Standard: ${escOnline(basis.internal_standard)} – ${escOnline(basis.ar_source || '')} (side panel)`
++                + (data.bypass_count ? ` · ${data.bypass_count} bypass lines` : ''));
++            if (basis.run_plan_argon_mol_pct != null) parts.push(`Run Plan Argon (comparison only): ${formatBasisValue(basis.run_plan_argon_mol_pct)} mol%`);
++        } else {
++            parts.push(`Ar in feed gas: ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
++                + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} (${escOnline(basis.ar_source || '')})`);
++        }
+         if ((basis.excluded_feed_gas || []).length) parts.push(`no MW, left out of the feed gas mass: ${escOnline(basis.excluded_feed_gas.join(', '))}`);
+         if (basis.tos_zero) parts.push(`TOS from ${escOnline(basis.tos_zero)} (${escOnline(basis.tos_zero_source)})`);
+     } else {
+@@ -251,18 +355,26 @@ function renderUnitsBar() {
+     if (sources) flowNote.push(`Flow source of the calculated lines – ${sources}`);
+     if (basis.flows_missing || basis.flows_needed) flowNote.push('<span class="online-cell-error">Gas feed missing: load the Run Plan with the DOE gas flow of every condition (start date, duration, Total gas Nl/h).</span>');
+     if (basis.argon_missing) flowNote.push('<span class="online-cell-error">Ar missing: load the Run Plan with Argon in Feed → Gas feed composition.</span>');
++    if (basis.no_conditions) flowNote.push('<span class="online-cell-error">No Run Plan DOE conditions: the bypass lines cannot be grouped per condition.</span>');
++    if ((basis.no_bypass || []).length) flowNote.push(`<span class="online-cell-error">No bypass (reactor 0) line in: ${escOnline(basis.no_bypass.join(', '))}</span>`);
+     online$('#onlineFlowNote').innerHTML = flowNote.join(' · ');
+-    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'DOE gas flows' : ''].filter(Boolean);
++    const missingInputs = [basis.argon_missing ? 'Ar in feed gas' : '', (basis.flows_missing || basis.flows_needed) ? 'DOE gas flows' : '',
++        basis.no_conditions ? 'DOE conditions' : ''].filter(Boolean);
+     bar.classList.toggle('needs-input', missingInputs.length > 0);
+     if (missingInputs.length && !bar.dataset.autoOpened) { bar.open = true; bar.dataset.autoOpened = '1'; }
+     // One line on the closed block: Ar basis and how many lines could be calculated
++    const isPart = basis.internal_standard
++        ? `· IS ${escOnline(basis.internal_standard)} from the bypass lines`
++        : `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
++          + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'}`;
+     online$('#onlineUnitsSummary').innerHTML = data
+         ? (missingInputs.length ? `· <span class="online-cell-error">${missingInputs.join(' and ')} missing in the Run Plan</span> ` : '')
+-          + `· Ar ${basis.ar_feed_mol_pct != null ? formatBasisValue(basis.ar_feed_mol_pct) + ' mol%' : '–'} / `
+-          + `${basis.ar_feed_wt_pct != null ? formatBasisValue(basis.ar_feed_wt_pct) + ' wt%' : '–'} · ${data.ok_count} calculated`
++          + `${isPart} · ${data.ok_count} calculated`
++          + (data.bypass_count ? `, ${data.bypass_count} bypass` : '')
+           + (data.error_count ? `, <span class="online-cell-error">${data.error_count} ERROR</span>` : '')
+         : '';
+-    online$('#onlineUnitsFormula').textContent = ONLINE_UNIT_FORMULAS[unit] || '';
++    online$('#onlineUnitsFormula').textContent = basis.internal_standard
++        ? `${ONLINE_UNIT_FORMULAS_IS[unit] || ''}   ·   ${ONLINE_UNIT_FORMULAS_IS.feed}` : (ONLINE_UNIT_FORMULAS[unit] || '');
+     online$('#onlineMwBody').innerHTML = (data?.components || []).map(c => `<tr><td>${escOnline(c.component)}</td>`
+         + `<td>${c.mw ?? '–'}</td><td>${c.carbon_atoms ?? '–'}</td><td>${escOnline(c.source)}</td></tr>`).join('');
+ }
+@@ -281,8 +393,8 @@ function onlineCellHtml(column, row, converted) {
+     if (column === 'Reactor') return `<td>${escOnline(String(value ?? ''))}</td>`;
+     if (!converted) return `<td>${formatOnlineValue(value)}</td>`;
+     if (column === 'Status') {
+-        const ok = value === 'OK';
+-        return `<td class="${ok ? 'online-status-ok' : 'online-status-error'}">${escOnline(value)}</td>`;
++        const cls = value === 'OK' ? 'online-status-ok' : String(value ?? '').startsWith('BYPASS') ? 'online-status-bypass' : 'online-status-error';
++        return `<td class="${cls}">${escOnline(value)}</td>`;
+     }
+     if (typeof value === 'string' && value.startsWith('ERROR')) return `<td><span class="online-cell-error">${escOnline(value)}</span></td>`;
+     if (column === 'TOS (h)' && typeof value === 'number') return `<td>${value.toFixed(2)}</td>`;
+@@ -314,6 +426,8 @@ function saveOnlineState() {
+             reactorMapActive: onlineState.reactorMapActive,
+             unit: onlineState.unit,
+             hiddenConverted: onlineState.hiddenConverted,
++            internalStandard: onlineState.internalStandard,
++            mbPanels: onlineState.mbPanels,
+             path: online$('#onlineFile').value,
+             summary: online$('#onlineSummary').textContent,
+             from: from,
+@@ -338,6 +452,8 @@ function restoreOnlineState() {
+             onlineState.reactorMapActive = Boolean(saved.reactorMapActive);
+             if (['mol', 'mass', 'volume', 'carbon'].includes(saved.unit)) onlineState.unit = saved.unit;
+             if (Array.isArray(saved.hiddenConverted)) onlineState.hiddenConverted = saved.hiddenConverted;
++            if (['Argon', 'N2'].includes(saved.internalStandard)) onlineState.internalStandard = saved.internalStandard;
++            if (saved.mbPanels && typeof saved.mbPanels === 'object') onlineState.mbPanels = saved.mbPanels;
+             if (Array.isArray(saved.rows)) onlineState.rows = saved.rows;
+             if (Array.isArray(saved.columns)) onlineState.columns = saved.columns;
+             onlineState.allColumns = Array.isArray(saved.allColumns) ? saved.allColumns : [...onlineState.columns];
+@@ -509,7 +625,7 @@ online$('#onlineProcess').onclick = async () => {
+         saveOnlineState();
+         renderOnlineTable();
+         online$('#onlineStatus').textContent = 'Ready';
+-        if (onlineState.unit !== 'mol') await refreshOnlineUnits();
++        if (onlineState.unit !== 'mol' || (isGeneralMB() && onlineState.internalStandard)) await refreshOnlineUnits();
+     } catch (error) {
+         onlineError(error.message);
+         online$('#onlineStatus').textContent = 'Failed';
+@@ -544,12 +660,22 @@ online$('#onlineReactorMapToggle').onclick = async () => {
+     renderReactorFilter();
+     renderOnlineTable();
+     saveOnlineState();
+-    if (onlineState.unit !== 'mol') refreshOnlineUnits();
++    if (onlineState.unit !== 'mol' || (isGeneralMB() && onlineState.internalStandard)) refreshOnlineUnits();
+ };
+ 
+ online$('#onlineSearch').oninput = renderOnlineTable;
++if (online$('#onlineInternalStandard')) online$('#onlineInternalStandard').onchange = () => {
++    onlineState.internalStandard = online$('#onlineInternalStandard').value;
++    onlineState.converted = null;
++    onlineState.mbPanels = null;
++    onlineState.hiddenConverted = [];
++    syncGeneralMBControls();
++    saveOnlineState();
++    refreshOnlineUnits();
++};
+ if (online$('#onlineUnit')) online$('#onlineUnit').onchange = () => {
+     onlineState.unit = online$('#onlineUnit').value;
++    syncGeneralMBControls();
+     onlineState.converted = null;
+     saveOnlineState();
+     refreshOnlineUnits();
+@@ -580,8 +706,10 @@ if (onlineState.reactorMapActive && onlineState.rawRows.length) {
+ updateToggleButtonVisuals();
+ renderReactorFilter();
+ renderOnlineTable();
++syncGeneralMBControls();
+ renderUnitsBar();
+-if (onlineState.unit !== 'mol' && onlineState.rows.length) refreshOnlineUnits();
++renderMbPanels();
++if ((onlineState.unit !== 'mol' || (isGeneralMB() && onlineState.internalStandard)) && onlineState.rows.length) refreshOnlineUnits();
+ if (shouldRefreshOnlineSchema) {
+     online$('#onlineProcess').click();
+ }
+\ No newline at end of file
+diff --git a/frontend/js/reforming_offline.js b/frontend/js/reforming_offline.js
+index 5356ee06d6cf1a4bb10e20a382d38841939c1feb..ae1a38b4a252f960be98e87b2314099d84ccd67e 100644
+--- a/frontend/js/reforming_offline.js
++++ b/frontend/js/reforming_offline.js
+@@ -38,11 +38,12 @@ window.ILSReformingOffline = (() => {
+         try {
+             const saved = JSON.parse(sessionStorage.getItem('dhaDashboardState') || localStorage.getItem('dhaDashboardState') || 'null');
+             if (!saved || !Array.isArray(saved.r1) || !saved.r1.length) return;
++            // General_MB processes the offline DHA files as Isomerization: only Reforming differs.
+             const savedProcess = saved.process === 'reforming' ? 'reforming' : 'isomerization';
+-            const current = window.ILSProcess?.get() || 'isomerization';
++            const current = window.ILSProcess?.isReforming() ? 'reforming' : 'isomerization';
+             if (savedProcess !== current) {
+                 const error = document.getElementById('error');
+-                const label = { isomerization: 'Isomerization', reforming: 'Reforming' };
++                const label = { isomerization: 'Isomerization / General_MB', reforming: 'Reforming' };
+                 if (error) {
+                     error.textContent = `The tables below were processed as ${label[savedProcess]} but the Run Plan process is ${label[current]}. Click Process again to reload them.`;
+                     error.classList.add('show');
+diff --git a/frontend/online_analysis.html b/frontend/online_analysis.html
+index 04e66b837216e225e2bfd151abe5d31c46a8b43c..59f5655a692a37f816bfc8003ee1163cf51c32e8 100644
+--- a/frontend/online_analysis.html
++++ b/frontend/online_analysis.html
+@@ -7,9 +7,9 @@
+     <title>ILS GC and System Data | DHA Data Dashboard</title>
+     <link href="/frontend/css/dashboard.css" rel="stylesheet">
+     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
+-    <link href="/frontend/css/online_units.css?v=2" rel="stylesheet">
+-    <script src="/frontend/js/online_analysis.js?v=5" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
++    <link href="/frontend/css/online_units.css?v=3" rel="stylesheet">
++    <script src="/frontend/js/online_analysis.js?v=6" defer></script>
+     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
+ </head>
+ 
+@@ -60,7 +60,15 @@
+                             <h3>Reactor conditions</h3>
+                         </div>
+                         <div class="table-actions online-table-actions">
+-                            <label class="online-unit-wrap" title="Show the GC values as normalised mol% or converted with argon as internal standard (MassBal workbook)">
++                            <label class="online-unit-wrap" id="onlineIsWrap" hidden title="General_MB: internal standard measured in the bypass (reactor 0) GC lines">
++                                <span>Internal Standard</span>
++                                <select class="input online-filter" id="onlineInternalStandard" aria-label="Internal Standard">
++                                    <option value="">—</option>
++                                    <option value="Argon">Argon</option>
++                                    <option value="N2">N2</option>
++                                </select>
++                            </label>
++                            <label class="online-unit-wrap" id="onlineUnitWrap" hidden title="General_MB: GC values as normalised mol% or converted with the Internal Standard (MassBal workbook)">
+                                 <span>Units</span>
+                                 <select class="input online-filter" id="onlineUnit" aria-label="Units of the GC values">
+                                     <option value="mol">Normalised mol%</option>
+@@ -87,6 +95,7 @@
+                         <button type="button" class="btn secondary online-clear-dates-btn" id="onlineClearDates" title="Clear date range">Clear dates</button>
+                         <div class="online-filter-badge" id="onlineDateBadge"></div>
+                     </div>
++                    <div class="online-mb-layout" id="onlineMbLayout">
+                     <div class="table-wrap online-table-wrap">
+                         <table class="online-table" id="onlineTable">
+                             <thead>
+@@ -96,6 +105,20 @@
+                         </table>
+                         <div class="empty" id="onlineEmpty">Import a SystemTxt file to load Online Analysis data.</div>
+                     </div>
++                    <!-- General_MB: feed gas measured in the bypass lines and the IS flow to each reactor -->
++                    <aside class="online-mb-side" id="onlineMbSide" hidden aria-label="General_MB internal standard">
++                        <section class="online-mb-card">
++                            <div class="eyebrow">Feed gas composition · Internal Standard</div>
++                            <div class="online-mb-note">Bypass (reactor 0) GC lines, raw ESTD averages per Run Plan DOE condition</div>
++                            <div id="onlineFeedGasCards"></div>
++                        </section>
++                        <section class="online-mb-card">
++                            <div class="eyebrow" id="onlineIsFlowTitle">Average IS flow to reactor [g/h]</div>
++                            <div class="online-mb-note">Workbook R#_MB!F5 = Gas!G20, average of the calculated lines</div>
++                            <div id="onlineIsFlowCards"></div>
++                        </section>
++                    </aside>
++                    </div>
+                     <!-- Conversion basis: collapsed under the table -->
+                     <details class="online-units-bar" id="onlineUnitsBar" hidden>
+                         <summary><span class="online-units-title">Conversion basis</span> <span id="onlineUnitsSummary"></span></summary>
+diff --git a/frontend/plot_dashboard.html b/frontend/plot_dashboard.html
+index 8e28c2e4b2ce7c99285dfb0542a2d9e80f6e32ba..0372400d2bc798a0b222056202a7b6472728b77c 100644
+--- a/frontend/plot_dashboard.html
++++ b/frontend/plot_dashboard.html
+@@ -9,7 +9,7 @@
+     <link href="/frontend/css/plot_dashboard.css?v=3" rel="stylesheet">
+     <script src="/frontend/js/lucide.min.js" defer></script>
+     <script src="/frontend/js/plot_dashboard_store.js" defer></script>
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
+     <script src="/frontend/js/plot_dashboard.js" defer></script>
+ </head>
+ <body class="dashboard-page">
+diff --git a/frontend/plots.html b/frontend/plots.html
+index 730128f330b968ef04ab33df70a3859cf31f48df..df2e8758b9c251b864fc95153c5520ead4d247a6 100644
+--- a/frontend/plots.html
++++ b/frontend/plots.html
+@@ -11,7 +11,7 @@
+     <script src="/frontend/js/lucide.min.js" defer></script>
+     <script src="/frontend/js/plot_dashboard_store.js" defer></script>
+     <script src="/frontend/js/plot_dashboard.js" defer></script>
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
+     <script src="/frontend/js/chart.umd.min.js" defer></script>
+     <script src="/frontend/js/plots.js?v=7" defer></script>
+     <style>
+diff --git a/frontend/run_plan.html b/frontend/run_plan.html
+index d48cec478cdc23f01878086e57ea0fa9a5ecd2b5..cf17ff47537e0b763c588e182c58b577ecb0a19e 100644
+--- a/frontend/run_plan.html
++++ b/frontend/run_plan.html
+@@ -7,7 +7,7 @@
+     <title>Run Plan | DHA Data Dashboard</title>
+     <link href="/frontend/css/dashboard.css" rel="stylesheet">
+     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
+-    <script src="/frontend/js/navigation.js?v=3" defer></script>
++    <script src="/frontend/js/navigation.js?v=4" defer></script>
+     <link href="/frontend/css/run_plan.css?v=3" rel="stylesheet">
+     <script src="/frontend/js/chart.umd.min.js" defer></script>
+     <script src="/frontend/js/run_plan.js?v=8" defer></script>
+diff --git a/tests/fixtures/run_plan/RunPlan_MassBalance_SS_filled.xlsx b/tests/fixtures/run_plan/RunPlan_MassBalance_SS_filled.xlsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..a931a660827c0619749df933735a137d6f24aeaa
+GIT binary patch
+literal 53085
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/tests/test_online_units.py b/tests/test_online_units.py
+index 8473777ab092aec1f0860f3261d91056081e60c2..e5e5f9492579e0d00e539dac2090de5863e4667b 100644
+--- a/tests/test_online_units.py
++++ b/tests/test_online_units.py
+@@ -189,3 +189,125 @@ def test_run_plan_r6_earlier_layout_gives_feed_gas_and_doe_flows(workbook_case):
+     verified = convert_online_rows(export, "mass", ar_mol_pct=4.3, **kw)["rows"][0]
+     assert verified["Acetylene [g/h]"] == pytest.approx(ws["D78"].value, rel=0.005)
+     assert verified["N2 [g/h]"] == pytest.approx(ws["D80"].value, rel=0.005)
++
++
++# ---------------------------------------------------------------- General_MB (6.5.0): Internal Standard from the bypass
++from backend.services.online_units import internal_standard_name  # noqa: E402
++
++R3_EXPORT = FIXTURES / "online" / "R3-C2-S1_9-06-23.txt"
++MB_RUN_PLAN_FILLED = FIXTURES / "run_plan" / "RunPlan_MassBalance_SS_filled.xlsx"
++GC_NAME = {"Hydrogen": "H2", "Nitrogen": "N2"}
++
++
++def _doe_all(flow_nl_h=3, start="2023-01-01 00:00:00", end=""):
++    return [{"Condition No.": 1, "Block": "", "Reactor ID": f"R{k}", "Start Date": start, "End Date": end,
++             "Total gas (Nl/h)": flow_nl_h} for k in range(1, 9)]
++
++
++def test_internal_standard_names():
++    assert internal_standard_name("argon") == "Argon" and internal_standard_name("Ar") == "Argon"
++    assert internal_standard_name("N2") == "N2" and internal_standard_name("nitrogen") == "N2"
++    assert internal_standard_name("") is None and internal_standard_name(None) is None
++    with pytest.raises(ValueError):
++        internal_standard_name("helium")
++
++
++def test_bypass_feed_gas_reproduces_the_workbook_gas_sheet(workbook_case):
++    """A bypass line with the workbook feed gas (Gas!I35 Ar, mixed gas Run_Plan) gives Gas!I37 and Gas!G20 (R6)."""
++    ws, gas, names, feed, rows = workbook_case
++    bypass = {"DateTime": "2024-05-14 07:00:00", "Reactor": 0}
++    bypass.update({f"ESTD_{GC_NAME.get(f['component'], f['component'])}": f["value"] for f in feed if f["value"]})
++    doe = _doe_all(start="2024-05-14 06:00:00")
++    out = convert_online_rows([bypass] + rows, "mass", doe_rows=doe, internal_standard="Argon")
++    f = out["feed_gas_is"][0]
++    assert f["bypass_lines"] == 1 and f["is_mol_pct"] == pytest.approx(gas["I35"].value)
++    assert f["is_wt_pct"] == pytest.approx(gas["I37"].value, rel=1e-4)         # MWs: R#_MB vs Run_Plan row 37
++    line = next(r for r in out["rows"] if r["Reactor"] == 6)
++    assert line["Status"] == "OK" and line["Argon to reactor [g/h]"] == pytest.approx(ws["F5"].value, rel=2e-3)
++    assert out["avg_is_flow"][0]["R6"] == pytest.approx(ws["F5"].value, rel=2e-3)
++
++
++@pytest.mark.parametrize("ist, y_is, y_mix, mw_mix, w_is, f_is", [
++    ("Argon", 5.1077, 96.0090, 27.911, 7.0757, 0.273103),
++    ("N2", 88.5583, 12.5584, 32.082, 86.0285, 3.320451),
++])
++def test_r3_bypass_feed_gas_and_is_flow(ist, y_is, y_mix, mw_mix, w_is, f_is):
++    rows = process_online_file(R3_EXPORT)["rows"]
++    out = convert_online_rows(rows, "mass", doe_rows=_doe_all(3), internal_standard=ist)
++    f = out["feed_gas_is"][0]
++    assert f["bypass_lines"] == 1
++    assert (f["is_mol_pct"], f["mixed_mol_pct"]) == (pytest.approx(y_is, abs=1e-4), pytest.approx(y_mix, abs=1e-4))
++    assert f["sum_mol_pct"] == pytest.approx(101.1167, abs=1e-4)
++    assert f["mixed_mw"] == pytest.approx(mw_mix, abs=1e-3) and f["is_wt_pct"] == pytest.approx(w_is, abs=1e-4)
++    assert all(out["avg_is_flow"][0][f"R{k}"] == pytest.approx(f_is, abs=1e-6) for k in range(1, 9))
++    assert out["bypass_count"] == 1 and out["ok_count"] == 44
++    assert f"{ist} to reactor [g/h]" in out["columns"] and "Condition" in out["columns"]
++
++
++@pytest.fixture(scope="module")
++def r08_general_mb():
++    rows = process_online_file(EXPORT)["rows"]
++    plan = process_run_plan_file(str(MB_RUN_PLAN_FILLED))
++    return rows, plan["feed"]["tables"]["gas"]["rows"], plan["doe"]["rows"]
++
++
++def test_r08_feed_gas_per_block_condition(r08_general_mb):
++    rows, gas, doe = r08_general_mb
++    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, internal_standard="Argon")
++    b1, b2 = out["feed_gas_is"]
++    assert (b1["condition"], b1["bypass_lines"], b2["condition"], b2["bypass_lines"]) == ("Block-1 · C1", 44, "Block-2 · C1", 36)
++    assert b1["is_mol_pct"] == pytest.approx(5.1572, abs=1e-4) and b1["mixed_mol_pct"] == pytest.approx(95.9625, abs=1e-4)
++    assert b1["is_wt_pct"] == pytest.approx(9.2933, abs=1e-4) and b2["is_mol_pct"] == pytest.approx(5.0994, abs=1e-4)
++    assert b1["run_plan_argon_mol_pct"] == pytest.approx(5.1001)                         # filled Run Plan: measured
++    avg = {r["condition"]: r for r in out["avg_is_flow"]}
++    assert avg["Block-1 · C1"]["R1"] == pytest.approx(0.1267, abs=1e-4)
++    assert avg["Block-2 · C1"]["R5"] == pytest.approx(0.2520, abs=1e-4)
++    assert avg["Block-2 · C1"]["R6"] == pytest.approx(0.2455, abs=1e-4)
++    assert avg["Block-1 · C1"]["R2"] is None                                            # not used
++    assert (out["ok_count"], out["bypass_count"]) == (107, 45)
++    statuses = Counter(r["Status"] for r in out["rows"])
++    assert statuses["BYPASS – feed gas of Block-1 · C1, Block-2 · C1"] == 36            # parallel blocks share it
++
++
++@pytest.mark.parametrize("unit, column, value", [
++    ("mass", "Methane [g/h]", 0.02323), ("volume", "Methane [Nl/h]", 0.03703), ("carbon", "Methane [g C/h]", 0.01739),
++])
++def test_r08_reactor_line_in_every_unit(r08_general_mb, unit, column, value):
++    rows, gas, doe = r08_general_mb
++    out = convert_online_rows(rows, unit, feed_gas=gas, doe_rows=doe, internal_standard="Argon")
++    line = next(r for r in out["rows"] if r["DateTime"] == "2024-10-24 15:09:23")
++    assert line["Status"] == "OK" and line["Condition"] == "Block-1 · C1"
++    assert line[column] == pytest.approx(value, abs=1e-5)
++    assert out["avg_is_flow"][0]["R1"] == pytest.approx(0.1267, abs=1e-4)              # same in every unit
++
++
++def test_r08_with_n2_as_internal_standard(r08_general_mb):
++    rows, gas, doe = r08_general_mb
++    out = convert_online_rows(rows, "mass", feed_gas=gas, doe_rows=doe, internal_standard="N2")
++    b1 = out["feed_gas_is"][0]
++    assert b1["is_mol_pct"] == pytest.approx(58.3231, abs=1e-4) and b1["mixed_mol_pct"] == pytest.approx(42.7966, abs=1e-4)
++    assert b1["is_wt_pct"] == pytest.approx(73.6999, abs=1e-4)
++    assert "N2 to reactor [g/h]" in out["columns"] and "Total w/o N2 [g/h]" in out["columns"]
++
++
++def test_general_mb_errors_are_explicit():
++    base = {"DateTime": "2024-01-01 10:00:00", "Reactor": 1, "01i14FIC01": 3000, "ESTD_Argon": 5.0, "ESTD_Methane": 1.0}
++    # no DOE conditions at all
++    out = convert_online_rows([base], "mass", internal_standard="Argon")
++    assert out["basis"]["no_conditions"] and out["rows"][0]["Status"] == "ERROR: no Run Plan DOE condition for R1 at this time"
++    # a condition without a bypass line
++    out = convert_online_rows([base], "mass", doe_rows=_doe_all(start="2024-01-01 09:00:00"), internal_standard="Argon")
++    assert out["feed_gas_is"][0]["bypass_lines"] == 0
++    assert out["rows"][0]["Status"].startswith("ERROR: no bypass (reactor 0) GC line in condition C1")
++    assert out["avg_is_flow"][0]["R1"].startswith("ERROR: no bypass")
++    # IS peak missing in the reactor line, empty cells and bypass lines without values never crash
++    bypass = {"DateTime": "2024-01-01 09:30:00", "Reactor": 0.0, "ESTD_Argon": 5.0, "ESTD_N2": 95.0}
++    empty_bypass = {"DateTime": "2024-01-01 09:40:00", "Reactor": "0", "ESTD_Argon": None, "ESTD_N2": ""}
++    no_is = dict(base, ESTD_Argon=None, ESTD_Ethane="")
++    for unit in ("mass", "volume", "carbon"):
++        out = convert_online_rows([bypass, empty_bypass, base, no_is], unit,
++                                  doe_rows=_doe_all(start="2024-01-01 09:00:00"), internal_standard="Argon")
++        status = [r["Status"] for r in out["rows"]]
++        assert status[0] == "BYPASS – feed gas of C1" and status[1] == "BYPASS – no GC values in this line (not used)"
++        assert status[2] == "OK"
++        assert status[3] == "ERROR: no Argon peak (ESTD_Argon) – Argon is the internal standard"
