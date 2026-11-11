@@ -1,3 +1,13 @@
+## 6.9.3 (2026-11-11) — ZMB: liquid pump check
+- ZMB page: new card **Liquid collected per reactor** (workbook ZMB rows 4–13). One tab per repeat (Rep 1, Rep 2, …,
+  "+ Add rep", "Remove this rep"; each tab shows how many reactors have a flow) keeps several repeats uncluttered.
+  Per reactor: sample collection started / finished (typed, or "Apply to all reactors" for the rep), duration (min),
+  TOS (h) = finished − started, TL collected mass (g, typed) and Liq. flow rate (g/h) = mass / TOS. Reactors not used in
+  the Run Plan are greyed. Errors shown in the row (finished not after started, mass without times, not a number).
+- **Verified liquid flow (g/h)** per reactor = average of the reps with a flow rate, with the number of reps.
+- Kept in the tab (`ils_zmb_pump`) and saved with the run (tables "ZMB · Liquid pump check (reps)" and "ZMB · Verified
+  liquid flow (g/h)"). Not yet used in the mass balance.
+
 ## 6.9.2 (2026-11-11) — General_MB: ZMB import
 - **Analysis → ZMB** (only with the General_MB process tab): browse and import the GC export of the blank (ZMB) run,
   the same tab-delimited file as Online Analysis. The lines are shown as imported (normalised mol%) with reactor filter

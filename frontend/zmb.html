@@ -7,9 +7,10 @@
     <title>ILS ZMB | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=9" defer></script>
+    <script src="/frontend/js/navigation.js?v=10" defer></script>
     <link href="/frontend/css/online_units.css?v=6" rel="stylesheet">
-    <script src="/frontend/js/zmb.js?v=1" defer></script>
+    <link href="/frontend/css/zmb.css?v=1" rel="stylesheet">
+    <script src="/frontend/js/zmb.js?v=2" defer></script>
 </head>
 
 <body>
@@ -51,6 +52,39 @@
                     <button class="btn primary" id="zmbProcess" type="button">Import file</button>
                 </div>
                 <div class="online-summary" id="zmbSummary">Select the ZMB GC export to load it.</div>
+                <!-- Liquid pump check: one tab per repeat (Rep 1, Rep 2, ...), reactors as rows -->
+                <div class="card zmb-pump-card">
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">ZMB · LIQUID PUMP CHECK</div>
+                            <h3>Liquid collected per reactor</h3>
+                        </div>
+                        <div class="zmb-rep-tabs" id="zmbRepTabs" role="tablist" aria-label="ZMB repeats"></div>
+                    </div>
+                    <div class="zmb-pump-layout">
+                        <div class="zmb-pump-main">
+                            <div class="zmb-apply-row">
+                                <span>Same times for all reactors of this rep:</span>
+                                <label>Start<input class="input" id="zmbApplyStart" type="datetime-local" step="60"></label>
+                                <label>End<input class="input" id="zmbApplyEnd" type="datetime-local" step="60"></label>
+                                <button type="button" class="btn secondary" id="zmbApplyTimes">Apply to all reactors</button>
+                                <button type="button" class="btn secondary zmb-remove-rep" id="zmbRemoveRep">Remove this rep</button>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="online-table zmb-pump-table">
+                                    <thead><tr><th>Reactor</th><th>Sample collection started</th><th>Sample collection finished</th><th class="num">Duration (min)</th><th class="num">TOS (h)</th><th class="num">TL collected mass (g)</th><th class="num">Liq. flow rate (g/h)</th></tr></thead>
+                                    <tbody id="zmbPumpBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="zmb-pump-note">TOS = collection time in hours (finished − started); Liq. flow rate = TL collected mass / TOS.</div>
+                        </div>
+                        <aside class="zmb-verified">
+                            <div class="eyebrow">Verified liquid flow (g/h)</div>
+                            <div class="zmb-pump-note">Average over the reps with a flow rate (workbook ZMB row 13)</div>
+                            <table class="online-mw-table"><thead><tr><th>Reactor</th><th>g/h</th><th>Reps</th></tr></thead><tbody id="zmbVerifiedBody"></tbody></table>
+                        </aside>
+                    </div>
+                </div>
                 <div class="card online-table-card">
                     <div class="card-head">
                         <div>

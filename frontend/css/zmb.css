@@ -1,0 +1,23 @@
+/* ZMB page: liquid pump check (6.9.3) */
+.zmb-pump-card{margin-bottom:18px}
+.zmb-rep-tabs{display:flex;flex-wrap:wrap;gap:6px}
+.zmb-rep-tab{padding:7px 14px;border:1px solid var(--border);background:var(--paper);border-radius:7px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}
+.zmb-rep-tab.active{background:var(--ink);color:var(--paper)}
+.zmb-rep-tab small{font-weight:600;opacity:.75;margin-left:4px}
+.zmb-rep-tab.add{border-style:dashed;color:var(--burnt)}
+.zmb-pump-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;padding:0 16px 16px;align-items:start}
+.zmb-apply-row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;padding:12px 0;font-size:12px;color:var(--slate)}
+.zmb-apply-row > span{align-self:center;font-weight:700}
+.zmb-apply-row label{display:grid;gap:3px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.zmb-apply-row input{padding:6px 8px}
+.zmb-remove-rep{margin-left:auto}
+.zmb-pump-table td,.zmb-pump-table th{white-space:nowrap}
+.zmb-pump-table th.num,.zmb-pump-table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.zmb-pump-table input{padding:5px 7px;font:inherit;font-size:12px}
+.zmb-pump-table input[type=number]{width:110px;text-align:right}
+.zmb-pump-table tr.unused td{opacity:.55}
+.zmb-pump-table .zmb-err{color:#991b1b;font-weight:600;white-space:normal}
+.zmb-pump-note{font-size:11px;color:var(--slate);margin:6px 0}
+.zmb-verified{border:1px solid var(--border);border-radius:8px;background:#fffaf0;padding:10px 12px;margin-top:12px}
+.zmb-verified td:nth-child(2),.zmb-verified td:nth-child(3){text-align:right;font-variant-numeric:tabular-nums}
+@media(max-width:1100px){.zmb-pump-layout{grid-template-columns:1fr}}
