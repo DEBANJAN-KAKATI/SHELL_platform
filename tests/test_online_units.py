@@ -375,3 +375,24 @@ def test_add_molecular_weights_script_is_idempotent(tmp_path):
     shutil.copy(MB_RUN_PLAN_FILLED, done)
     out = subprocess.run([sys.executable, str(script), str(done)], capture_output=True, text=True)
     assert "already present" in out.stdout
+
+
+# ---------------------------------------------------------------- Conditions of R08 (6.9.4)
+def test_r08_run_plan_conditions_follow_the_export():
+    """RunPlan_MassBalance_R08_filled.xlsx: Block-1 C1 200 °C → C2 250 °C at 25.10 11:00; Block-2 C1 until 27.10 01:45."""
+    from backend.services.online_units import doe_conditions
+    plan = process_run_plan_file(str(FIXTURES / "run_plan" / "RunPlan_MassBalance_R08_filled.xlsx"))
+    conditions, windows = doe_conditions(plan["doe"]["rows"])
+    got = [(c["label"], c["start"].strftime("%d.%m %H:%M"), c["end"].strftime("%d.%m %H:%M")) for c in conditions]
+    assert got == [("Block-1 · C1", "24.10 14:00", "25.10 11:00"), ("Block-2 · C1", "24.10 14:00", "27.10 01:45"),
+                   ("Block-1 · C2", "25.10 11:00", "27.10 17:45")]
+    temps = {(r["Block"], r["Condition No."]): r["Temperature (°C)"] for r in plan["doe"]["rows"] if r["Reactor ID"] in ("R1", "R5")}
+    assert temps == {("Block-1", 1): 200, ("Block-1", 2): 250, ("Block-2", 1): 250}
+    rows = process_online_file(EXPORT)["rows"]
+    out = convert_online_rows(rows, "mass", feed_gas=plan["feed"]["tables"]["gas"]["rows"], doe_rows=plan["doe"]["rows"],
+                              molecular_weights=molecular_weights_from_feed(plan["feed"]["tables"]), internal_standard="Argon")
+    by_time = {r["DateTime"]: r for r in out["rows"]}
+    assert by_time["2024-10-24 15:09:23"]["Condition"] == "Block-1 · C1"
+    assert by_time["2024-10-25 11:14:06"]["Condition"] == "Block-1 · C2"          # R1 after the switch to 250 °C
+    assert by_time["2024-10-27 01:58:53"]["Status"].startswith("ERROR: no Run Plan DOE condition for R5")
+    assert [f["bypass_lines"] for f in out["feed_gas_is"]] == [11, 32, 32]
