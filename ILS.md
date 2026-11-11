@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -84,7 +84,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
+`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
 new version. History stores runs in `Historian/Run_<n>.sqlite` and compares tables between runs.
@@ -178,7 +178,9 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   for Argon-IS, Argon for N2-IS); MW_mix = Σ avg_j·MW_j / Σ avg_j; w_IS = y_IS·MW_IS/(y_IS·MW_IS + y_mix·MW_mix);
   F_IS,r = 01i14FI01·FIC_r/ΣFIC·w_IS, else FIC_r/1000/22.414·y_IS,feed/100·MW_IS; the unit formulas below with IS for Ar.
 - ZMB (v6.9.2): Analysis → ZMB imports the blank-run GC export (`process_online_file`) and shows it in mol%; not used in
-  calculations yet (planned: liquid pump check, feed gas reference; see `documentation/MassBal_Workbook_Reference.md` §3).
+  calculations yet (planned: feed gas reference; see `documentation/MassBal_Workbook_Reference.md` §3). Liquid pump check
+  (v6.9.3, zmb.js): one tab per rep, per reactor start/end → duration, TOS (h), typed TL mass → flow = mass/TOS; verified
+  liquid flow = average of the reps' flows (workbook ZMB!B13:I13 → Liq row 13); not yet used in the mass balance.
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;
   bypass lines = Reactor 0 with GC values inside the condition's window (parallel blocks share them); bypass lines stay
   the bypass with the Reactor Map ON. Side panel next to the table; Conversion basis collapsed at the bottom.

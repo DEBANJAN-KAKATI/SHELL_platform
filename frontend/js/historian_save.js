@@ -6,7 +6,7 @@
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
         'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state',
-        'ils_zmb_state'
+        'ils_zmb_state', 'ils_zmb_pump'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.
     const LOCAL_FALLBACK_KEYS = ['dhaDashboardState', 'dhaOnlineState'];
@@ -99,6 +99,18 @@
         // General_MB: ZMB (blank run) GC lines
         const zmbSaved = readJson('ils_zmb_state') || {};
         addTable('zmb.analysis', 'ZMB (blank run)', 'Analysis', zmbSaved.rows, zmbSaved.columns);
+        const zmbPump = readJson('ils_zmb_pump') || {};
+        const pumpRows = [];
+        (zmbPump.reps || []).forEach((rep, i) => Object.entries(rep.rows || {}).forEach(([reactor, row]) => {
+            if (row && (row.start || row.end || row.mass !== undefined && row.mass !== '')) {
+                pumpRows.push({ Rep: i + 1, Reactor: reactor, 'Sample collection started': row.start || '',
+                    'Sample collection finished': row.end || '', 'TL collected mass (g)': row.mass ?? '' });
+            }
+        }));
+        addTable('zmb.pump_reps', 'ZMB · Liquid pump check (reps)', 'Analysis', pumpRows);
+        addTable('zmb.pump_verified', 'ZMB · Verified liquid flow (g/h)', 'Analysis',
+            (zmbPump.results || []).filter(r => r.verified_flow_g_h !== null)
+                .map(r => ({ Reactor: r.reactor, 'Verified liquid flow (g/h)': r.verified_flow_g_h, Reps: r.reps })));
 
         const base = readJson('ils_base_table_state') || {};
         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);
