@@ -102,6 +102,10 @@ def create_app(test_config=None):
         return send_from_directory(BASE / "frontend", "index.html")
 
     @app.get("/online-analysis")
+    @app.get("/zmb")
+    def zmb_view():
+        return send_from_directory(BASE / "frontend", "zmb.html")
+
     @app.get("/online_analysis")
     def online_analysis():
         return send_from_directory(BASE / "frontend", "online_analysis.html")
