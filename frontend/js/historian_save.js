@@ -78,7 +78,10 @@
         });
 
         const onl = readJson('dhaOnlineState') || {};
-        addTable('online.analysis', 'Online Analysis', 'Online Analysis', onl.rows, onl.columns);
+        // Condition (Run Plan DOE) is derived when shown; fill it in when saving from the Online page
+        const onlineRows = Array.isArray(onl.rows) && typeof onlineConditionOf === 'function' && (onl.columns || []).includes('Condition')
+            ? onl.rows.map(row => ({ ...row, Condition: onlineConditionOf(row) })) : onl.rows;
+        addTable('online.analysis', 'Online Analysis', 'Online Analysis', onlineRows, onl.columns);
         addKpi('online.record_count', 'Online Records', 'Online Analysis', Array.isArray(onl.rows) ? onl.rows.length : null);
         // General_MB: feed gas measured in the bypass lines and the average IS flow to each reactor (side panel)
         const mb = onl.mbPanels;

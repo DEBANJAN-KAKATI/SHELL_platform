@@ -1,3 +1,13 @@
+## 6.9.4 (2026-11-11) — Online Analysis: Condition column
+- Online Analysis table: new column **Condition** after Reactor, for every process. The Condition No. comes from the
+  Run Plan DOE only when the line's DateTime falls inside a DOE condition window of its reactor (Start Date → End Date,
+  else Start + Duration, else the next condition of that reactor). Lines outside every window stay blank (e.g. after a
+  block was stopped). Bypass / unknown-reactor lines take the condition running in each block; when blocks differ it
+  reads e.g. "Block-1: 2, Block-2: 1". Shown in the mol% view and in the converted units views; saved with the run.
+- New filled Run Plan `tests/fixtures/run_plan/RunPlan_MassBalance_R08_filled.xlsx` matching the R08 export
+  (Block-1 R1: C1 200 °C 24.10 14:00–25.10 11:00, C2 250 °C to 27.10 17:45; Block-2 R5/R6: C1 250 °C to 27.10 01:45),
+  and a test that checks the conditions against the export.
+
 ## 6.9.3 (2026-11-11) — ZMB: liquid pump check
 - ZMB page: new card **Liquid collected per reactor** (workbook ZMB rows 4–13). One tab per repeat (Rep 1, Rep 2, …,
   "+ Add rep", "Remove this rep"; each tab shows how many reactors have a flow) keeps several repeats uncluttered.

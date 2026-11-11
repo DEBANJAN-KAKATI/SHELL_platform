@@ -52,6 +52,8 @@ Load the universal Run Plan template (Plan, DOE, Feed) on the **Run Plan** page.
 ### ZMB import (v6.9.2)
 With the **General_MB** process, **Analysis → ZMB** imports the GC export of the blank (ZMB) run that precedes the experiment and shows its lines in normalised mol%, like Online Analysis (filter reactor 0 for the bypass lines). It is saved with the run; its use in the mass balance calculations comes later. The **Liquid collected per reactor** card (v6.9.3) holds the liquid pump check: one tab per repeat, collection start and end per reactor (or "Apply to all reactors"), the TL collected mass in g; it shows the duration, TOS (h), the liquid flow rate (g/h) and the verified liquid flow averaged over the repeats.
 
+Online Analysis shows a **Condition** column (v6.9.4): the Run Plan DOE Condition No. whose Start/End window of that reactor contains the line's date and time; blank when no condition matches. Bypass lines list the condition of each block when they differ ("Block-1: 2, Block-2: 1").
+
 ### Molecular weights in the Run Plan (v6.9.1)
 Every molar mass and carbon number comes from the Run Plan's Feed sheet: the gas feed table has **MW (g/mol)** and **Carbon #** columns, and the **Molecular weights** table lists every analysed component as it is named in the GC export (ESTD_<name>), with spare rows. For a new molecule, add a row with its name, MW and carbon number; the Online Analysis then converts it. Add the columns and table to an older Run Plan with `python scripts/run_plan_examples/add_molecular_weights.py RunPlan.xlsx`.
 

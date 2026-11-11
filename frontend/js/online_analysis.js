@@ -391,18 +391,87 @@ function renderUnitsBar() {
         + `<td>${c.mw ?? '–'}</td><td>${c.carbon_atoms ?? '–'}</td><td>${escOnline(c.source)}</td></tr>`).join('');
 }
 
+// ---------------------------------------------------------------- Condition from the Run Plan DOE
+// A line belongs to the DOE condition whose window contains its DateTime: Start Date ≤ t < End Date (else Start +
+// Duration, else the start of that reactor's next condition, else open). Reactor lines use their reactor's DOE rows;
+// bypass / unknown-reactor lines take every condition running at that time (several blocks: "Block-1: 2, Block-2: 1").
+let onlineDoeCache = { key: null, windows: [] };
+function onlineDoeWindows() {
+    let raw = null;
+    try { raw = sessionStorage.getItem('runPlanDashboardState'); } catch (e) {}
+    if (raw === onlineDoeCache.key) return onlineDoeCache.windows;
+    let windows = [];
+    try {
+        const rows = JSON.parse(raw || 'null')?.doeData?.rows || [];
+        windows = rows.map(row => {
+            const reactor = String(row['Reactor ID'] ?? '').trim().toUpperCase().replace(/^R/, '');
+            const start = parseOnlineDateTime(row['Start Date']);
+            const condition = String(row['Condition No.'] ?? '').trim();
+            let end = parseOnlineDateTime(row['End Date']);
+            if (!end && start) {
+                const durationKey = Object.keys(row).find(k => /^duration/i.test(k));
+                const hours = Number(row[durationKey]);
+                if (durationKey && Number.isFinite(hours) && hours > 0) end = new Date(start.getTime() + hours * 3600000);
+            }
+            return { reactor: Number(reactor), block: String(row.Block ?? '').trim(), condition, start, end };
+        }).filter(w => w.start && w.condition && Number.isFinite(w.reactor) && w.reactor > 0);
+        windows.forEach(w => {        // open end → next condition of the same reactor
+            if (!w.end) {
+                const later = windows.filter(o => o.reactor === w.reactor && o.start > w.start).map(o => o.start.getTime());
+                w.end = later.length ? new Date(Math.min(...later)) : null;
+            }
+        });
+    } catch (e) { windows = []; }
+    onlineDoeCache = { key: raw, windows };
+    return windows;
+}
+
+function onlineConditionOf(row) {
+    const windows = onlineDoeWindows();
+    if (!windows.length) return '';
+    const when = parseOnlineDateTime(row.DateTime);
+    if (!when) return '';
+    const t = when.getTime();
+    const inside = w => w.start.getTime() <= t && (!w.end || t < w.end.getTime());
+    const reactorText = String(row.Reactor ?? '').trim().toUpperCase().replace(/^R/, '');
+    const reactor = reactorText === '' ? NaN : Number(reactorText);
+    if (Number.isFinite(reactor) && reactor > 0) {
+        const hits = windows.filter(w => w.reactor === reactor && inside(w)).sort((a, b) => b.start - a.start);
+        return hits.length ? hits[0].condition : '';
+    }
+    // bypass (0) or unknown reactor: every condition running at that time
+    const byBlock = new Map();
+    windows.filter(inside).forEach(w => byBlock.set(w.block || '', w.condition));
+    const values = [...new Set(byBlock.values())];
+    if (values.length <= 1) return values[0] || '';
+    return [...byBlock.entries()].map(([block, condition]) => `${block || '—'}: ${condition}`).join(', ');
+}
+
+function withConditionColumn(columns) {
+    if (!Array.isArray(columns) || !columns.length || columns.includes('Condition')) return columns;
+    const at = columns.indexOf('Reactor');
+    const out = [...columns];
+    out.splice(at >= 0 ? at + 1 : 1, 0, 'Condition');
+    return out;
+}
+
 function currentOnlineView() {
     if (onlineState.unit !== 'mol' && onlineState.converted) {
         const hidden = new Set(onlineState.hiddenConverted);
         const all = onlineState.converted.columns;
-        return { rows: onlineState.converted.rows, columns: all.filter(c => !hidden.has(c)), all, converted: true };
+        // Same condition number as the mol% view (the server's "Block · C<n>" labels stay in the side panel)
+        const rows = all.includes('Condition')
+            ? onlineState.converted.rows.map(row => ({ ...row, Condition: onlineConditionOf(row) })) : onlineState.converted.rows;
+        return { rows, columns: all.filter(c => !hidden.has(c)), all, converted: true };
     }
-    return { rows: onlineState.rows, columns: onlineState.columns, all: onlineState.allColumns, converted: false };
+    const rows = onlineState.columns.includes('Condition')
+        ? onlineState.rows.map(row => ({ ...row, Condition: onlineConditionOf(row) })) : onlineState.rows;
+    return { rows, columns: onlineState.columns, all: onlineState.allColumns, converted: false };
 }
 
 function onlineCellHtml(column, row, converted) {
     const value = row[column];
-    if (column === 'Reactor') return `<td>${escOnline(String(value ?? ''))}</td>`;
+    if (column === 'Reactor' || column === 'Condition') return `<td>${escOnline(String(value ?? ''))}</td>`;
     if (!converted) return `<td>${formatOnlineValue(value)}</td>`;
     if (column === 'Status') {
         const cls = value === 'OK' ? 'online-status-ok' : String(value ?? '').startsWith('BYPASS') ? 'online-status-bypass' : 'online-status-error';
@@ -469,6 +538,10 @@ function restoreOnlineState() {
             if (Array.isArray(saved.rows)) onlineState.rows = saved.rows;
             if (Array.isArray(saved.columns)) onlineState.columns = saved.columns;
             onlineState.allColumns = Array.isArray(saved.allColumns) ? saved.allColumns : [...onlineState.columns];
+            if (!onlineState.allColumns.includes('Condition')) {        // tables saved before 6.9.4
+                onlineState.allColumns = withConditionColumn(onlineState.allColumns);
+                onlineState.columns = withConditionColumn(onlineState.columns);
+            }
             if (saved.path) online$('#onlineFile').value = saved.path;
             if (saved.summary) online$('#onlineSummary').textContent = saved.summary;
             if (saved.from && online$('#onlineFrom')) online$('#onlineFrom').value = saved.from;
@@ -612,8 +685,8 @@ online$('#onlineProcess').onclick = async () => {
         if (!response.ok) throw Error(data.error);
 
         onlineState.rawRows = data.rows;
-        onlineState.allColumns = [...data.columns];
-        onlineState.columns = [...data.columns];
+        onlineState.allColumns = withConditionColumn([...data.columns]);
+        onlineState.columns = [...onlineState.allColumns];
 
         if (onlineState.reactorMapActive) {
             let reactorRows = onlineState.reactorRows.length ? onlineState.reactorRows : getStoredReactorRows();

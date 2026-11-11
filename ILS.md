@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.4). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -181,6 +181,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   calculations yet (planned: feed gas reference; see `documentation/MassBal_Workbook_Reference.md` §3). Liquid pump check
   (v6.9.3, zmb.js): one tab per rep, per reactor start/end → duration, TOS (h), typed TL mass → flow = mass/TOS; verified
   liquid flow = average of the reps' flows (workbook ZMB!B13:I13 → Liq row 13); not yet used in the mass balance.
+- Online table column **Condition** (v6.9.4, all processes, `onlineConditionOf` in online_analysis.js): DOE Condition No. of
+  the reactor's window containing the line time (latest start wins), blank outside; bypass lines "Block-1: 2, Block-2: 1".
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;
   bypass lines = Reactor 0 with GC values inside the condition's window (parallel blocks share them); bypass lines stay
   the bypass with the Reactor Map ON. Side panel next to the table; Conversion basis collapsed at the bottom.
