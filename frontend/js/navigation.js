@@ -49,8 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const isRunPlan = path.endsWith('/run_plan.html') || path.endsWith('/run-plan') || path.endsWith('/run_plan') || path.includes('/frontend/run_plan.html');
     const isOnline = path.endsWith('/online_analysis.html') || path.endsWith('/online-analysis') || path.endsWith('/online_analysis');
     const isHistory = path.endsWith('/history.html') || path.endsWith('/history');
-    const isOffline = !isRunPlan && !isOnline && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
-    const analysisActive = isOffline || isOnline;
+    const isZmb = path.endsWith('/zmb.html') || path.endsWith('/zmb');
+    const isOffline = !isRunPlan && !isOnline && !isZmb && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
+    const analysisActive = isOffline || isOnline || isZmb;
     const calculationActive = isCalculation || isCustom;
     const firstAnalysis = `<a aria-current="${isOffline ? 'page' : 'false'}" href="/frontend/index.html">Offline Analysis</a>`;
     const calculationHref = '/frontend/calculation_table.html';
@@ -64,6 +65,8 @@ document.addEventListener('DOMContentLoaded', () => {
         `<button type="button" class="analysis-tab${analysisActive ? ' active' : ''}" aria-label="Analysis pages" aria-expanded="false" aria-haspopup="true">Analysis <span aria-hidden="true">▾</span></button>` +
         `<div class="analysis-menu-items">` + firstAnalysis +
         `<a aria-current="${isOnline ? 'page' : 'false'}" href="/frontend/online_analysis.html">Online Analysis</a>` +
+        // General_MB: ZMB (blank run) import
+        (window.ILSProcess.isGeneralMB() || isZmb ? `<a aria-current="${isZmb ? 'page' : 'false'}" href="/frontend/zmb.html">ZMB</a>` : '') +
         `</div></div>` +
         `<div class="analysis-menu${calculationActive ? ' active' : ''}">` +
         `<button type="button" class="analysis-tab${calculationActive ? ' active' : ''}" aria-label="Calculation pages" aria-expanded="false" aria-haspopup="true">Calculation <span aria-hidden="true">▾</span></button>` +
@@ -135,10 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=5';
+        historianScript.src = '/frontend/js/historian_save.js?v=6';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
-            runDataScript.src = '/frontend/js/run_data.js?v=4';
+            runDataScript.src = '/frontend/js/run_data.js?v=5';
             document.head.appendChild(runDataScript);
         };
         document.head.appendChild(historianScript);

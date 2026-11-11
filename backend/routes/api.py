@@ -167,6 +167,32 @@ def process_online():
         return jsonify({"error": str(e)}), 400
 
 
+# ZMB (zero mass balance / blank run) of a General_MB run: same tab-delimited GC export as Online Analysis.
+@api.post("/browse-zmb-file")
+def browse_zmb_file():
+    initial = (request.get_json(silent=True) or {}).get("initial_file") or ""
+    try:
+        selected, cancelled = browse_file_dialog(
+            initial_file=initial,
+            title="Select the ZMB (blank run) GC export",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        return jsonify({"path": selected, "cancelled": cancelled})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api.post("/process-zmb")
+def process_zmb():
+    file_path = (request.get_json(silent=True) or {}).get("path")
+    if not file_path:
+        return jsonify({"error": "ZMB file path is required."}), 400
+    try:
+        return jsonify(process_online_file(file_path))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @api.post("/online-units")
 def online_units():
     """Online Analysis rows in mass flow (g/h), volumetric flow (Nl/h) or carbon flow (g C/h) per molecule."""

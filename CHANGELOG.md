@@ -1,3 +1,11 @@
+## 6.9.2 (2026-11-11) — General_MB: ZMB import
+- **Analysis → ZMB** (only with the General_MB process tab): browse and import the GC export of the blank (ZMB) run,
+  the same tab-delimited file as Online Analysis. The lines are shown as imported (normalised mol%) with reactor filter
+  (0 = bypass), search, date range and removable columns; the summary counts the bypass lines. Kept in the browser tab
+  (`ils_zmb_state`) and saved with Save Run Details / Save to Historian ("ZMB (blank run)"). Other processes see the
+  page read-only with a hint. How ZMB values enter the calculations (liquid pump check, feed gas reference) comes later.
+- New `frontend/zmb.html`, `frontend/js/zmb.js`, `/zmb`, `POST /api/browse-zmb-file`, `POST /api/process-zmb`.
+
 ## 6.9.1 (2026-11-06) — Molecular weights from the Run Plan
 - **The Run Plan now holds every molar mass and carbon number** used by the dashboard, so a new molecule only needs a
   row in the Run Plan. On the Feed sheet:

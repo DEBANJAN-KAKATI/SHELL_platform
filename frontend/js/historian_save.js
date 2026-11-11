@@ -5,7 +5,8 @@
         'runPlanDashboardState', 'ils_feed_properties', 'dhaDashboardState', 'dhaOnlineState',
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
-        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state'
+        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state',
+        'ils_zmb_state'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.
     const LOCAL_FALLBACK_KEYS = ['dhaDashboardState', 'dhaOnlineState'];
@@ -94,6 +95,10 @@
                 (mb.avg_is_flow || []).map(r => ({ Condition: r.condition,
                     ...Object.fromEntries(['R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'R8'].map(k => [k, r[k] ?? ''])) })));
         }
+
+        // General_MB: ZMB (blank run) GC lines
+        const zmbSaved = readJson('ils_zmb_state') || {};
+        addTable('zmb.analysis', 'ZMB (blank run)', 'Analysis', zmbSaved.rows, zmbSaved.columns);
 
         const base = readJson('ils_base_table_state') || {};
         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);
