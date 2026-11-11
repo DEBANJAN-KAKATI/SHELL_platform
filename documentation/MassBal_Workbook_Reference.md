@@ -105,6 +105,24 @@ C2H6, N2, CO2, CO, C2H2, C3H6, C3H8 per injection in D–AB. `B` = `AVERAGE(D:AB
 the other positions agree within about 3 % (e.g. C2H2 7.82–8.06 mol%) and the Bypass block is empty.
 Checks (conditional formatting): injection time outside the window turns red; durations below 48 min highlighted.
 
+**Source of the ZMB GC data.** The ZMB export (`Run6_ZMB_g_07_May_24_1.txt`, 39 lines, 06.05.2024 14:53 → 07.05.2024
+10:15, cycling Sampled_reactor 0,1,…,8) is the feed gas analysed through every reactor position before catalyst
+contact. Its **ESTD** values (not Conc) are pasted per Sampled_reactor into the blocks: Reactor-1 D22:H31 = the five
+lines with Sampled_reactor 1 (H2 19.764, 21.199, 21.145, 21.116, 21.298 …), Reactor-2 = lines with 2, … Reactor-8 = lines
+with 8. The five bypass lines (Sampled_reactor 0) are **not** entered (the Bypass block is empty), and the ZMB sheet has
+**no Argon row**: the export's argon (average of all 39 lines 4.30 mol%) is the "verified" Ar typed in Gas!I35 (4.3).
+The averages include the first injection (H2 19.76 / bypass 18.17, still settling).
+
+**Where ZMB is used.**
+| ZMB cells | → | Used in | Effect |
+|---|---|---|---|
+| B13:I13 verified liquid flow | Liq!B13:I13 | R#_MB!C8 (liquid feed in the mass balance), C-Balance row 3 (C in liquid feed), row 11 (C4+ in liquid feed) | denominator of mass balance closure and C4+ yield |
+| B22:B31 Reactor-1 average composition | Run_Plan!B35:K35 → B36 (mass %), B38 (g per 100 mol) | Gas!J36 (mixed-gas MW) → Gas!I37 (Ar wt%) → Gas!B20:I20 (Ar flow) → R#_MB!F5 | every g/h, Nl/h and g C/h, mass balance closure |
+| (same, via Run_Plan!C36, D36, E36, I36) | | C-Balance helper N3–N32 → rows 4 (C in gas feed), 17 (acetylene in), 20 (ethylene/ethane) | carbon balance, acetylene conversion, selectivity |
+| (same, via Run_Plan!B35:L35) | | C-Balance X3:AG5 gas-mix density | unused |
+| Reactor-2…8 blocks, Rep-2/Rep-3 times, durations | | nothing (display and checks only) | |
+
+
 ---
 
 ## 4. Liq — sample window, liquid feed and liquid product
