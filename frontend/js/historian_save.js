@@ -6,7 +6,7 @@
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
         'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state',
-        'ils_zmb_state', 'ils_zmb_pump'
+        'ils_zmb_state', 'ils_zmb_pump', 'ils_liquid_state'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.
     const LOCAL_FALLBACK_KEYS = ['dhaDashboardState', 'dhaOnlineState'];
@@ -114,6 +114,20 @@
         addTable('zmb.pump_verified', 'ZMB · Verified liquid flow (g/h)', 'Analysis',
             (zmbPump.results || []).filter(r => r.verified_flow_g_h !== null)
                 .map(r => ({ Reactor: r.reactor, 'Verified liquid flow (g/h)': r.verified_flow_g_h, Reps: r.reps })));
+
+        // General_MB: liquid product per sample (Online Analysis → Liquid)
+        const liquid = readJson('ils_liquid_state') || {};
+        addTable('online.liquid_samples', 'Online · Liquid product per sample', 'Online Analysis',
+            (liquid.results || []).map(r => ({ Sample: r.sample, Reactor: r.reactor, Condition: r.condition,
+                'Sample collection started': r.start, 'Sample collection finished': r.end, 'Duration (min)': r.duration_min,
+                'TOS (h)': r.tos_h, 'TLP mass (g)': r.tlp_g, 'HC phase mass (g)': r.hc_g, 'Aqueous phase mass (g)': r.aq_g,
+                'Decantation loss (%)': r.decant_loss_pct, 'Carbon (wt%)': r.c_wt_pct, 'HC product (g/h)': r.hc_flow_g_h,
+                'Aqueous product (g/h)': r.aq_flow_g_h, 'C in liquid product (g C/h)': r.c_out_g_h,
+                'Liquid feed (g/h)': r.feed_flow_g_h, 'Liquid feed source': r.feed_flow_source,
+                'Liquid feed carbon (wt%)': r.feed_c_wt_pct, 'C in liquid feed (g C/h)': r.c_in_g_h,
+                'Hydrogen (wt%)': r.h, 'Oxygen (wt%)': r.o, 'Nitrogen (ppmw)': r.n, 'Sulfur (ppmw)': r.s,
+                'Density (g/mL)': r.density, 'Monoaromatics (wt%)': r.mono, 'Diaromatics (wt%)': r.di,
+                'Tri+ aromatics (wt%)': r.tri, Error: r.error })));
 
         const base = readJson('ils_base_table_state') || {};
         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);

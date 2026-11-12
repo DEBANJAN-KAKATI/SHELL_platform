@@ -2,7 +2,7 @@
     if (window.ILSRunData) return;
 
     const historian = window.ILSHistorian;
-    const sourceKeys = ['runPlanDashboardState', 'dhaDashboardState', 'dhaOnlineState', 'ils_zmb_state', 'ils_zmb_pump',
+    const sourceKeys = ['runPlanDashboardState', 'dhaDashboardState', 'dhaOnlineState', 'ils_zmb_state', 'ils_zmb_pump', 'ils_liquid_state',
         'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns', 'ils_custom_table_state',
         'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state'];
 

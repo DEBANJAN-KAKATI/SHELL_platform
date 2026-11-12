@@ -54,6 +54,8 @@ With the **General_MB** process, **Analysis → ZMB** imports the GC export of t
 
 Online Analysis shows a **Condition** column (v6.9.4): the Run Plan DOE Condition No. whose Start/End window of that reactor contains the line's date and time; blank when no condition matches. Bypass lines list the condition of each block when they differ ("Block-1: 2, Block-2: 1").
 
+With **General_MB**, Online Analysis has two tabs (v6.9.5): **Gas** (the imported export) and **Liquid**, where the liquid product of each sample is typed: one tab per sample, one row per reactor with sample collection start/finish, TLP mass (or HC and aqueous phases), and Carbon wt%; plus the Carbon wt% of the liquid feed once. The liquid feed flow comes from the ZMB pump check or the Run Plan DOE. The page calculates duration, TOS, product flows and carbon flows, and shows per reactor whether the mass and carbon balance can be calculated. Paste from Excel and Enter-to-next-row make entry quick.
+
 ### Molecular weights in the Run Plan (v6.9.1)
 Every molar mass and carbon number comes from the Run Plan's Feed sheet: the gas feed table has **MW (g/mol)** and **Carbon #** columns, and the **Molecular weights** table lists every analysed component as it is named in the GC export (ESTD_<name>), with spare rows. For a new molecule, add a row with its name, MW and carbon number; the Online Analysis then converts it. Add the columns and table to an older Run Plan with `python scripts/run_plan_examples/add_molecular_weights.py RunPlan.xlsx`.
 
