@@ -71,7 +71,7 @@
 .mb-seg button{padding:7px 14px;border:0;background:#fffaf0;font:inherit;font-size:12px;font-weight:700;color:var(--slate);cursor:pointer}
 .mb-seg button.active{background:var(--ink);color:var(--paper)}
 .mb-small-select{width:auto;padding:6px 10px;font:inherit;font-size:12px}
-.mb-table{width:auto;min-width:520px;border-collapse:separate;border-spacing:0;font-size:12px}
+.mb-table{width:100%;min-width:720px;border-collapse:separate;border-spacing:0;font-size:12px}
 .mb-table th{position:sticky;top:0;background:var(--ink);color:var(--paper);padding:9px 12px;text-align:right;white-space:nowrap}
 .mb-table th:first-child,.mb-table td:first-child,.mb-table td.txt{text-align:left}
 .mb-table td{padding:7px 12px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -97,3 +97,35 @@
 .mb-pane .table-wrap{max-height:none}
 .mb-pane .table-wrap.mb-scroll{max-height:60vh}
 .mb-table td.txt{text-align:left}
+
+/* 6.9.8: C-Balance as section cards filling the width; full-width tables */
+.mb-sections{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px;align-items:stretch}
+.mb-sec{border:1px solid var(--border);border-radius:10px;background:#fffdf8;padding:14px 16px 10px;display:flex;flex-direction:column}
+.mb-sec h4{margin:0;font:700 17px Georgia,serif;color:var(--ink)}
+.mb-sec p{margin:2px 0 10px;font-size:11px;color:var(--slate)}
+.mb-sec-table{width:100%;min-width:0;border-collapse:collapse;font-size:12.5px}
+.mb-sec-table th{position:static;background:transparent;color:var(--slate);font-size:11px;font-weight:800;padding:4px 8px 6px;border-bottom:2px solid var(--ink);text-align:right;z-index:auto}
+.mb-sec-table th:first-child{text-align:left}
+.mb-sec-table td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mb-sec-table tr:last-child td{border-bottom:0}
+.mb-sec-table td.lbl{text-align:left;color:var(--ink);white-space:normal}
+.mb-sec-table td.lbl small{color:var(--slate);font-size:10.5px;margin-left:3px}
+.mb-sec-table td.txt{text-align:right;font-size:11.5px;color:var(--slate)}
+.mb-sec-table tr.mb-key td{font-weight:800;font-size:14px;background:rgba(216,201,179,.16)}
+.mb-sec-table tr.mb-key td.lbl{font-size:12.5px}
+.mb-sec-table td.click{cursor:pointer}
+.mb-sec-table td.click:hover{background:#fff0df}
+.mb-sec-table td.err{color:#92400e;font-weight:600;font-size:10.5px;white-space:normal;text-align:right;max-width:200px}
+.mb-pill{display:inline-block;min-width:54px;padding:2px 9px;border-radius:999px;text-align:right}
+.mb-pill.good{background:#e3f0e8;color:#2f6b52}
+.mb-pill.warning{background:#f6ead7;color:#92400e}
+.mb-pill.serious{background:#f8e4df;color:#8b2d22}
+.mb-table .mb-group-row th{background:#1d3147;font-size:10px;letter-spacing:.08em;text-transform:uppercase;text-align:center;border-left:2px solid #071a2d;padding:7px 10px}
+.mb-table .mb-group-row th small{text-transform:none;letter-spacing:0;opacity:.75}
+.mb-table thead tr:nth-child(2) th{top:31px}
+.mb-table th.txt{text-align:left}
+.mb-table td .mb-pill{font-weight:700}
+#mbSummaryTable{min-width:0;table-layout:auto}
+#mbSummaryTable thead tr:nth-child(2) th{white-space:normal;vertical-align:bottom;line-height:1.25;padding:8px 8px;font-size:11.5px}
+#mbSummaryTable td{padding:8px 8px}
+#mbSummaryTable td.err{font-size:11px;color:#92400e;text-align:right}

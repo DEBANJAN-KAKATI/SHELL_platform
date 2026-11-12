@@ -1,3 +1,14 @@
+## 6.9.8 (2026-11-12) — Mass Balance: tables use the full width
+- C-Balance tab: the long single table is now nine cards side by side (three per row on a wide screen): Carbon balance,
+  Mass balance, Conversion · target product, Carbon selectivity by product, Carbon yield by product, Reactant and product
+  flows, C4+ (now also "C4+ in liquid feed" and "C4+ in liquid product" as the workbook counts them), Carbon recovered,
+  Basis (condition, TOS, GC lines, first / last line). Result rows are shaded, balances shown as green / amber / red pills;
+  click a result to see its formula.
+- Summary (all samples): grouped header (Sample · Balances · Conversion, selectivity, yield · Carbon flows · Carbon
+  recovered), wrapped column titles so all columns fit the width, balances as pills, "needs liquid" instead of ERROR
+  (full message on hover).
+- Tables on the page are full width.
+
 ## 6.9.7 (2026-11-12) — Mass Balance: tables only
 - Calculation → Mass Balance keeps the reactor cards and shows the calculated values as tables; the charts were removed
   (plots belong on the Plots page). Tabs:

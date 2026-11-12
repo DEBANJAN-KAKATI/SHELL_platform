@@ -261,42 +261,69 @@
     }
     let lastCTable = { rows: [], spec: [] };
 
+    // C-Balance as section cards that fill the width (3 per row on a wide screen); key results larger, balances coloured
+    function cSections(rows, d) {
+        const R = d.reactant || 'Reactant', P = d.product || 'Product';
+        const groups = (d.groups || []).filter(g => rows.some(r => isNum(r.selectivity?.[g])));
+        return [
+            { title: 'Carbon balance', note: '(C gas out + C liquid out) / (C gas in + C liquid in)', rows: [
+                ['C in gas feed', 'c_gas_in_g_h', 'g', 'g C/h'], ['C in liquid feed', 'c_liq_in_g_h', 'g', 'g C/h'],
+                ['C in gas product', 'c_gas_out_g_h', 'g', 'g C/h'], ['C in liquid product', 'c_liq_out_g_h', 'g', 'g C/h'],
+                ['Carbon balance', 'c_balance_pct', 1, '%', 'balance'], ['Gas-phase carbon balance', 'gas_c_balance_pct', 1, '%', 'balance']] },
+            { title: 'Mass balance', note: '(gas out + HC + aqueous) / (gas in + liquid feed), without the internal standard', rows: [
+                ['Gas feed', 'gas_in_g_h', 'g', 'g/h'], ['Liquid feed', 'liq_in_g_h', 'g', 'g/h'],
+                ['Gas product', 'gas_out_g_h', 'g', 'g/h'], ['HC product', 'hc_out_g_h', 'g', 'g/h'], ['Aqueous product', 'aq_out_g_h', 'g', 'g/h'],
+                ['Mass balance closure', 'mass_balance_pct', 1, '%', 'balance']] },
+            { title: `${R} conversion · ${P}`, note: 'carbon basis, net of the feed', rows: [
+                [`${R} conversion`, 'conversion_pct', 1, '%', 'key'], [`${P} selectivity`, 'selectivity_pct', 1, '%', 'key'],
+                [`${P} yield`, 'product_yield_pct', 1, '%', 'key'], [`${P} selectivity (workbook, Nl/h)`, 'selectivity_workbook_pct', 1, '%'],
+                [`C of ${R} converted`, 'converted_c_g_h', 'g', 'g C/h']] },
+            { title: 'Carbon selectivity by product', note: `where the converted ${R} carbon went`, rows: [
+                ...groups.map(g => [g, r => r.selectivity?.[g], 1, '%']), [NOT_GAS, r => notInGas(r, 'selectivity'), 1, '%']] },
+            { title: 'Carbon yield by product', note: `share of the fed ${R} carbon`, rows: [
+                ...groups.map(g => [g, r => r.yield?.[g], 1, '%']), [NOT_GAS, r => notInGas(r, 'yield'), 1, '%']] },
+            { title: `${R} and ${P} flows`, note: 'gas in (bypass, scaled with the internal standard) and out', rows: [
+                [`${R} in`, r => comp(r, d.reactant, 'in_g_h'), 'g', 'g/h'], [`${R} out`, r => comp(r, d.reactant, 'out_g_h'), 'g', 'g/h'],
+                [`${P} in`, r => comp(r, d.product, 'in_g_h'), 'g', 'g/h'], [`${P} out`, r => comp(r, d.product, 'out_g_h'), 'g', 'g/h']] },
+            { title: 'C4+', note: 'workbook definition: the liquid feed and HC product count as C4+', rows: [
+                ['C4+ in gas feed', 'c4_gas_in_g_h', 'g', 'g/h'], ['C4+ in liquid feed', 'liq_in_g_h', 'g', 'g/h'],
+                ['C4+ in gas product', 'c4_gas_out_g_h', 'g', 'g/h'], ['C4+ in liquid product', 'hc_out_g_h', 'g', 'g/h'],
+                ['C4+ yield', 'c4_yield_pct', 1, '%', 'key']] },
+            { title: 'Carbon recovered', note: 'share of the carbon out', rows: [
+                ['in the gas product', 'c_out_gas_share_pct', 1, '%'], ['in the liquid product', 'c_out_liquid_share_pct', 1, '%']] },
+            { title: 'Basis', note: 'GC lines averaged for this sample', rows: [
+                ['Condition', 'condition', 'txt', ''], ['TOS', 'tos_h', 1, 'h'], ['GC lines', 'lines', 0, ''],
+                ['First line', 'first_line', 'txt', ''], ['Last line', 'last_line', 'txt', '']] },
+        ];
+    }
+
+    const EXPLAINABLE = new Set(['c_balance_pct', 'gas_c_balance_pct', 'mass_balance_pct', 'conversion_pct', 'selectivity_pct', 'product_yield_pct', 'c4_yield_pct']);
+    function sectionCell(r, key, digits, kind) {
+        const v = valueOf(r, key);
+        if (digits === 'txt') {
+            const m = String(v ?? '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/);   // 2024-10-24 16:58:07 → 24.10 16:58
+            return `<td class="txt" title="${esc(v ?? '')}">${esc(m ? `${m[3]}.${m[2]} ${m[4]}` : (v || '–'))}</td>`;
+        }
+        if (typeof v === 'string' && v.startsWith('ERROR')) {
+            return `<td class="err" title="${esc(v)}">${esc(v.replace(/^ERROR:\s*/, '').replace(/ \(Online Analysis → Liquid\)/, ''))}</td>`;
+        }
+        const text = isNum(v) ? (digits === 'g' ? fmtG(v) : v.toFixed(digits)) : '–';
+        const st = kind === 'balance' && isNum(v) ? balanceStatus(v) : '';
+        const click = typeof key === 'string' && EXPLAINABLE.has(key) ? ` data-explain="${r.reactor}|${key}"` : '';
+        return `<td class="${click ? 'click ' : ''}${st ? `st-${st}` : ''}"${click}>${st ? `<span class="mb-pill ${st}">${text}</span>` : text}</td>`;
+    }
+
     function renderCTable(view) {
         const rows = shownRows(view);
         const d = state.data || {};
-        const groups = (d.groups || []).filter(g => rows.some(r => isNum(r.selectivity?.[g])));
-        const spec = [
-            ['Sample', null], ['Condition', 'condition', 'txt'], ['TOS [h]', 'tos_h', 1], ['GC lines averaged', 'lines', 0],
-            ['Carbon in', null], ['C in liquid feed [g C/h]', 'c_liq_in_g_h', 'g'], ['C in gas feed [g C/h]', 'c_gas_in_g_h', 'g'],
-            ['Carbon out', null], ['C in liquid product [g C/h]', 'c_liq_out_g_h', 'g'], ['C in gas product [g C/h]', 'c_gas_out_g_h', 'g'],
-            ['Carbon balance [%]', 'c_balance_pct', 2, true], ['Gas-phase carbon balance [%]', 'gas_c_balance_pct', 2, true],
-            ['Mass', null], ['Liquid feed [g/h]', 'liq_in_g_h', 'g'], ['Gas feed w/o IS [g/h]', 'gas_in_g_h', 'g'],
-            ['HC product [g/h]', 'hc_out_g_h', 'g'], ['Aqueous product [g/h]', 'aq_out_g_h', 'g'], ['Gas product w/o IS [g/h]', 'gas_out_g_h', 'g'],
-            ['Mass balance closure [%]', 'mass_balance_pct', 2, true],
-            ['C4+', null], ['C4+ in gas feed [g/h]', 'c4_gas_in_g_h', 'g'], ['C4+ in gas product [g/h]', 'c4_gas_out_g_h', 'g'], ['C4+ yield [%]', 'c4_yield_pct', 2, true],
-            [`${d.reactant || 'Reactant'} and ${d.product || 'product'}`, null], [`${d.reactant || 'Reactant'} conversion [%]`, 'conversion_pct', 2, true],
-            [`${d.product || 'Product'} selectivity, carbon [%]`, 'selectivity_pct', 2, true], [`${d.product || 'Product'} yield, carbon [%]`, 'product_yield_pct', 2, true],
-            [`${d.product || 'Product'} selectivity, workbook (Nl/h) [%]`, 'selectivity_workbook_pct', 2],
-            [`${d.reactant || 'Reactant'} in / out`, null],
-            [`${d.reactant || 'Reactant'} in [g/h]`, r => comp(r, d.reactant, 'in_g_h'), 'g'], [`${d.reactant || 'Reactant'} out [g/h]`, r => comp(r, d.reactant, 'out_g_h'), 'g'],
-            [`${d.product || 'Product'} in [g/h]`, r => comp(r, d.product, 'in_g_h'), 'g'], [`${d.product || 'Product'} out [g/h]`, r => comp(r, d.product, 'out_g_h'), 'g'],
-            [`C of ${d.reactant || 'reactant'} converted [g C/h]`, 'converted_c_g_h', 'g'],
-            [`Carbon selectivity by product (where the converted ${d.reactant || 'reactant'} carbon went) [%]`, null],
-            ...groups.map(g => [g, r => r.selectivity?.[g], 2]),
-            [NOT_GAS, r => notInGas(r, 'selectivity'), 2],
-            [`Carbon yield by product (share of the fed ${d.reactant || 'reactant'} carbon) [%]`, null],
-            ...groups.map(g => [g, r => r.yield?.[g], 2]),
-            [NOT_GAS, r => notInGas(r, 'yield'), 2],
-            ['Carbon recovered', null],
-            ['in the gas product [%]', 'c_out_gas_share_pct', 1], ['in the liquid product [%]', 'c_out_liquid_share_pct', 1],
-        ];
-        lastCTable = { rows, spec };
-        $('#mbCTable').innerHTML = `<thead><tr><th>Quantity</th>${rows.map(r => `<th><i class="mb-dot" style="background:${REACTOR_COLORS[r.reactor]}"></i>${r.reactor}</th>`).join('')}</tr></thead><tbody>`
-            + spec.map(([label, key, digits, explainable]) => key === null
-                ? `<tr class="mb-section"><td colspan="${rows.length + 1}">${esc(label)}</td></tr>`
-                : `<tr${explainable ? ' class="mb-key"' : ''}><td>${esc(label)}</td>${rows.map(r => digits === 'txt' ? `<td class="txt">${esc(r[key])}</td>`
-                    : cell(valueOf(r, key), digits, explainable ? key : '', r.reactor)).join('')}</tr>`).join('')
-            + '</tbody>';
+        const sections = cSections(rows, d);
+        lastCTable = { rows, spec: sections.flatMap(sec => [[sec.title, null], ...sec.rows.map(([label, key, , unit]) => [unit ? `${label} [${unit}]` : label, key])]) };
+        if (!rows.length) { $('#mbCTable').innerHTML = '<div class="mb-empty">No results for this sample.</div>'; return; }
+        const head = `<thead><tr><th></th>${rows.map(r => `<th><i class="mb-dot" style="background:${REACTOR_COLORS[r.reactor]}"></i>${r.reactor}</th>`).join('')}</tr></thead>`;
+        $('#mbCTable').innerHTML = sections.map(sec => `<section class="mb-sec"><h4>${esc(sec.title)}</h4><p>${esc(sec.note)}</p>`
+            + `<table class="mb-sec-table">${head}<tbody>${sec.rows.map(([label, key, digits, unit, kind]) =>
+                `<tr class="${kind ? 'mb-key' : ''}"><td class="lbl">${esc(label)}${unit ? ` <small>${esc(unit)}</small>` : ''}</td>`
+                + rows.map(r => sectionCell(r, key, digits, kind)).join('') + '</tr>').join('')}</tbody></table></section>`).join('');
     }
 
     function summaryRows() {
@@ -316,13 +343,21 @@
         const rows = summaryRows();
         if (!rows.length) { $('#mbSummaryTable').innerHTML = '<tbody><tr><td>No results.</td></tr></tbody>'; return; }
         const cols = Object.keys(rows[0]);
-        $('#mbSummaryTable').innerHTML = `<thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`
+        // Group header: which block of the workbook Summary a column belongs to
+        const groupOf = (c) => /^(Sample|Condition|Reactor|Role|TOS|GC lines)/.test(c) ? 'Sample' : /balance/i.test(c) ? 'Balances'
+            : /recovered/.test(c) ? 'Carbon recovered' : /g C\/h/.test(c) ? 'Carbon flows' : 'Conversion · selectivity · yield';
+        const spans = [];
+        cols.forEach(c => { const g = groupOf(c); if (spans.length && spans[spans.length - 1][0] === g) spans[spans.length - 1][1] += 1; else spans.push([g, 1]); });
+        const short = (c) => c.replace(' (%)', '').replace(' (g C/h)', '').replace(' (h)', ' [h]');
+        $('#mbSummaryTable').innerHTML = `<thead><tr class="mb-group-row">${spans.map(([g, n]) => `<th colspan="${n}" class="grp">${esc(g)}${g === 'Carbon flows' ? ' <small>g C/h</small>' : g === 'Sample' ? '' : ' <small>%</small>'}</th>`).join('')}</tr>`
+            + `<tr>${cols.map(c => `<th class="${/^(Sample|Condition|Reactor|Role)$/.test(c) ? 'txt' : ''}">${esc(short(c))}</th>`).join('')}</tr></thead><tbody>`
             + rows.map((r, i) => `<tr class="${viewKey(state.data.results[i]) === state.selected ? 'sel' : ''}" data-key="${esc(viewKey(state.data.results[i]))}">${cols.map(c => {
                 const v = r[c];
                 if (c === 'Reactor') return `<td class="txt"><i class="mb-dot" style="background:${REACTOR_COLORS[v]}"></i>${esc(v)}</td>`;
-                if (typeof v === 'string') return v.startsWith('ERROR') ? `<td class="err" title="${esc(v)}">ERROR</td>` : `<td class="txt">${esc(v)}</td>`;
+                if (typeof v === 'string') return v.startsWith('ERROR') ? `<td class="err" title="${esc(v)}">${/liquid/i.test(v) ? 'needs liquid' : 'error'}</td>` : `<td class="txt">${esc(v)}</td>`;
                 const st = /balance/.test(c) && isNum(v) ? balanceStatus(v) : '';
-                return `<td class="${st ? `st-${st}` : ''}">${isNum(v) ? (/g C\/h/.test(c) ? fmtG(v) : v.toFixed(c === 'GC lines' ? 0 : c === 'TOS (h)' ? 1 : 2)) : '–'}</td>`;
+                const text = isNum(v) ? (/g C\/h/.test(c) ? fmtG(v) : v.toFixed(c === 'GC lines' ? 0 : 1)) : '–';
+                return `<td>${st ? `<span class="mb-pill ${st}">${text}</span>` : text}</td>`;
             }).join('')}</tr>`).join('') + '</tbody>';
         $('#mbSummaryTable').querySelectorAll('tr[data-key]').forEach(tr => tr.onclick = () => {
             state.selected = tr.dataset.key; state.reactors = null; save(); render();
