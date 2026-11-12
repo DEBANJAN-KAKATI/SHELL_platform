@@ -7,9 +7,11 @@
     <title>ILS GC and System Data | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=11" defer></script>
+    <script src="/frontend/js/navigation.js?v=12" defer></script>
     <link href="/frontend/css/online_units.css?v=6" rel="stylesheet">
+    <link href="/frontend/css/online_liquid.css?v=1" rel="stylesheet">
     <script src="/frontend/js/online_analysis.js?v=13" defer></script>
+    <script src="/frontend/js/online_liquid.js?v=1" defer></script>
     <script src="/frontend/js/reforming_sync.js?v=1" defer></script>
 </head>
 
@@ -46,6 +48,12 @@
                     <p>Load a tab-delimited SystemTxt export to review reactor conditions and calculated gas values.</p>
                 </div>
                 <div class="error" id="onlineError"></div>
+                <!-- General_MB (6.9.5): Gas = the GC export, Liquid = the liquid product typed by the user -->
+                <nav class="online-phase-tabs" id="onlinePhaseTabs" role="tablist" aria-label="Gas or liquid" hidden>
+                    <button type="button" role="tab" class="online-phase-tab active" id="onlineTabGas" aria-selected="true">Gas <small id="onlineTabGasBadge"></small></button>
+                    <button type="button" role="tab" class="online-phase-tab" id="onlineTabLiquid" aria-selected="false">Liquid <small id="onlineTabLiquidBadge"></small></button>
+                </nav>
+                <div id="onlineGasPanel">
                 <div class="card online-source-row">
                     <input class="input" id="onlineFile" placeholder="Enter path to SystemTxt .txt file" type="text">
                     <button class="btn secondary" id="onlineBrowse" type="button">Browse</button>
@@ -130,6 +138,70 @@
                             <table class="online-mw-table"><thead><tr><th>Component</th><th>MW (g/mol)</th><th>C atoms</th><th>Source</th></tr></thead><tbody id="onlineMwBody"></tbody></table>
                         </div>
                     </details>
+                </div>
+                </div>
+                <div id="onlineLiquidPanel" hidden>
+                    <div class="card liq-feed-card">
+                        <div class="liq-feed-item">
+                            <div class="eyebrow">LIQUID FEED</div>
+                            <label class="liq-feed-carbon">Carbon in the liquid feed
+                                <span><input class="input" id="liqFeedCarbon" type="text" inputmode="decimal" placeholder="e.g. 85.6"> wt%</span>
+                            </label>
+                        </div>
+                        <div class="liq-feed-item liq-feed-flows-wrap">
+                            <div class="eyebrow">LIQUID FEED FLOW PER REACTOR</div>
+                            <div class="liq-feed-flows" id="liqFeedFlows"></div>
+                            <div class="liq-note">From the ZMB pump check (Analysis → ZMB), else the Run Plan DOE liquid flow. Nothing to type here.</div>
+                        </div>
+                    </div>
+                    <div class="card liq-card">
+                        <div class="card-head">
+                            <div>
+                                <div class="eyebrow">LIQUID PRODUCT · ONE TAB PER SAMPLE</div>
+                                <h3>Liquid collected per reactor</h3>
+                            </div>
+                            <div class="liq-sample-tabs" id="liqSampleTabs" role="tablist" aria-label="Liquid samples"></div>
+                        </div>
+                        <div class="liq-toolbar">
+                            <label>Sample<input class="input" id="liqSampleName" type="text" placeholder="C1-S1"></label>
+                            <span class="liq-sep"></span>
+                            <label>Started (all)<input class="input" id="liqAllStart" type="datetime-local" step="60"></label>
+                            <label>Finished (all)<input class="input" id="liqAllEnd" type="datetime-local" step="60"></label>
+                            <button type="button" class="btn secondary" id="liqApplyTimes">Apply times</button>
+                            <span class="liq-sep"></span>
+                            <label>Carbon wt% (all)<input class="input liq-short" id="liqAllCarbon" type="text" inputmode="decimal"></label>
+                            <button type="button" class="btn secondary" id="liqApplyCarbon">Apply</button>
+                            <span class="liq-sep"></span>
+                            <label class="liq-switch"><input type="checkbox" id="liqTwoPhase"> Two phases seen</label>
+                            <label class="liq-switch"><input type="checkbox" id="liqShowAll"> Show unused reactors</label>
+                            <button type="button" class="btn secondary liq-remove" id="liqRemoveSample">Remove sample</button>
+                        </div>
+                        <div class="liq-checklist" id="liqChecklist"></div>
+                        <div class="table-wrap liq-table-wrap">
+                            <table class="online-table liq-table">
+                                <thead id="liqMainHead"></thead>
+                                <tbody id="liqMainBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="liq-note liq-howto">
+                            <b>Quick entry:</b> Enter moves down to the next reactor · paste a block copied from Excel into any cell
+                            (rows = reactors, columns = fields) · dates as 5/14/2024 7:52 AM, 14.05.2024 07:52 or 2024-05-14 07:52.
+                            Only TLP mass is needed for one phase; tick <i>Two phases seen</i> to split it into HC and aqueous phase.
+                            <span id="liqCutInNote"></span>
+                            Flows over the sampling duration: HC product = (TLP − aqueous) / duration, aqueous = aqueous / duration,
+                            C in liquid product = HC product × Carbon wt%.
+                        </div>
+                        <details class="liq-extra">
+                            <summary>More analyses of the HC product (optional: H, O, N, S, density, aromatics)</summary>
+                            <div class="table-wrap">
+                                <table class="online-table liq-table">
+                                    <thead id="liqExtraHead"></thead>
+                                    <tbody id="liqExtraBody"></tbody>
+                                </table>
+                            </div>
+                        </details>
+                        <div class="liq-flash" id="liqFlash" role="status"></div>
+                    </div>
                 </div>
             </section>
         </main>

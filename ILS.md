@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.4). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.5). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -84,7 +84,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
+`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
 new version. History stores runs in `Historian/Run_<n>.sqlite` and compares tables between runs.
@@ -181,6 +181,15 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   calculations yet (planned: feed gas reference; see `documentation/MassBal_Workbook_Reference.md` §3). Liquid pump check
   (v6.9.3, zmb.js): one tab per rep, per reactor start/end → duration, TOS (h), typed TL mass → flow = mass/TOS; verified
   liquid flow = average of the reps' flows (workbook ZMB!B13:I13 → Liq row 13); not yet used in the mass balance.
+- Online Analysis **Gas | Liquid** tabs (v6.9.5, General_MB only; `online_liquid.js`, `online_liquid.css`): Gas = the export
+  table; Liquid = typed liquid product (workbook Liq sheet). Liquid feed carbon wt% once; liquid feed flow per reactor from
+  the ZMB verified flow, else the Run Plan DOE "Liquid flow if fed" of the sample's condition (read-only pills). One tab per
+  sample (C1-S1, "+ New sample" names the next), one row per active reactor: started/finished (apply to all), TLP mass,
+  optional HC/aqueous phases ("Two phases seen"; one phase → HC = TLP, aqueous 0), Carbon wt%; calculated condition,
+  duration, TOS (mid-window − Feed Cut-In), decantation loss, HC = (TLP − aq)/duration, aq/duration (the workbook's row 40
+  divides by the average TOS — fixed), C out = HC × C wt%, C in = feed × feed C wt%. Ready chips Mass / Carbon + checklist
+  of what is missing; Enter moves down, Excel block paste (rows = reactors), US/dotted/ISO dates, decimal comma.
+  Optional H, O, N, S, density, aromatics in a collapsed table. Saved as table "Online · Liquid product per sample".
 - Online table column **Condition** (v6.9.4, all processes, `onlineConditionOf` in online_analysis.js): DOE Condition No. of
   the reactor's window containing the line time (latest start wins), blank outside; bypass lines "Block-1: 2, Block-2: 1".
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;

@@ -1,3 +1,24 @@
+## 6.9.5 (2026-11-12) — Online Analysis: Gas and Liquid tabs
+- General_MB: Online Analysis has two tabs. **Gas** is the imported export (unchanged). **Liquid** holds the liquid side
+  of the mass balance, typed by the user (workbook Liq sheet):
+  - **Liquid feed:** Carbon wt% of the liquid feed (typed once) and the liquid feed flow per reactor, taken from the ZMB
+    pump check (verified) or else the Run Plan DOE liquid flow of the sample's condition (shown, nothing to type).
+  - **Liquid product, one tab per sample** (C1-S1, C1-S2 …; "+ New sample" proposes the next name). One row per Run Plan
+    reactor (unused reactors hidden, "Show unused reactors"). Typed: sample collection started / finished ("Apply times" to
+    every reactor), TLP mass, Carbon wt% ("Apply" to every reactor). Tick **Two phases seen** to type the HC (top) and
+    aqueous (bottom) phase masses. Calculated: Condition (Run Plan DOE), duration, TOS from the Feed Cut-In, decantation
+    loss, HC and aqueous product flows over the sampling duration, carbon in the liquid product and in the liquid feed.
+  - Each row shows whether it is ready for the **mass balance** and the **carbon balance**; a checklist above the table
+    says what is still needed and for which reactors. Errors are shown in the row (not a number, negative, finished
+    before started, phases heavier than the TLP).
+  - Quick entry: Enter moves to the next reactor; a block copied from Excel can be pasted into any cell (rows =
+    reactors, columns = fields); dates as 5/14/2024 7:52 AM, 14.05.2024 07:52 or ISO; decimal comma accepted.
+  - Optional analyses (H, O wt%, N, S ppmw, density, mono/di/tri+ aromatics) in a collapsed table.
+- Workbook fix: the hydrocarbon product flow is divided by the sampling duration (the workbook's Liq row 40 divides by the
+  average TOS).
+- Kept in the browser tab (`ils_liquid_state`) and saved with Save Run Details / Save to Historian ("Online · Liquid
+  product per sample"). Next: C-Balance and Summary tables from the Gas and Liquid tabs.
+
 ## 6.9.4 (2026-11-11) — Online Analysis: Condition column
 - Online Analysis table: new column **Condition** after Reactor, for every process. The Condition No. comes from the
   Run Plan DOE only when the line's DateTime falls inside a DOE condition window of its reactor (Start Date → End Date,

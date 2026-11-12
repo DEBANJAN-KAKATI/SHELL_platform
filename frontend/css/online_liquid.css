@@ -1,0 +1,70 @@
+/* Online Analysis · Gas / Liquid tabs and the liquid product entry (General_MB, 6.9.5) */
+.online-phase-tabs{display:flex;gap:4px;margin:18px 0 0;border-bottom:2px solid var(--ink)}
+.online-phase-tabs[hidden]{display:none}
+.online-phase-tab{padding:10px 26px;border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;background:rgba(216,201,179,.35);font:inherit;font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--slate);cursor:pointer}
+.online-phase-tab.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.online-phase-tab small{font-weight:600;opacity:.75;margin-left:6px;font-size:11px}
+#onlineGasPanel[hidden],#onlineLiquidPanel[hidden]{display:none}
+#onlineLiquidPanel{margin-top:18px;display:grid;gap:16px}
+.liq-feed-card{display:flex;flex-wrap:wrap;gap:28px;padding:14px 18px;align-items:flex-start;border-left:4px solid var(--burnt)}
+.liq-feed-item{display:grid;gap:6px}
+.liq-feed-flows-wrap{flex:1 1 380px}
+.liq-feed-carbon{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--ink)}
+.liq-feed-carbon span{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--slate)}
+.liq-feed-carbon input{width:120px;padding:7px 9px;text-align:right}
+.liq-feed-flows{display:flex;flex-wrap:wrap;gap:8px}
+.liq-feed-pill{display:inline-flex;align-items:baseline;gap:6px;padding:6px 11px;border:1px solid var(--border);border-radius:999px;background:#fffaf0;font-size:12px;font-variant-numeric:tabular-nums}
+.liq-feed-pill small{color:var(--slate);font-size:10px}
+.liq-feed-pill.missing{border-color:#e0b4ab;background:#fbeeea;color:#8b2d22}
+.liq-note{font-size:11px;color:var(--slate);line-height:1.5}
+.liq-card{overflow:hidden;position:relative}
+.liq-sample-tabs{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.liq-sample-tab{padding:7px 14px;border:1px solid var(--border);background:var(--paper);border-radius:7px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink);position:relative}
+.liq-sample-tab small{font-weight:600;opacity:.7;margin-left:6px}
+.liq-sample-tab.part{box-shadow:inset 3px 0 0 #b97712}
+.liq-sample-tab.done{box-shadow:inset 3px 0 0 #2f6b52}
+.liq-sample-tab.active{background:var(--ink);color:var(--paper)}
+.liq-sample-tab.add{border-style:dashed;color:var(--burnt)}
+.liq-toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px;padding:12px 17px;border-bottom:1px solid var(--border);background:rgba(216,201,179,.1)}
+.liq-toolbar label{display:grid;gap:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--slate)}
+.liq-toolbar input.input{padding:6px 8px;font:inherit;font-size:12px}
+.liq-toolbar #liqSampleName{width:110px;font-weight:700}
+.liq-toolbar .liq-short{width:80px;text-align:right}
+.liq-toolbar .btn{padding:7px 12px;font-size:12px}
+.liq-sep{width:1px;align-self:stretch;background:var(--border);margin:0 4px}
+.liq-toolbar label.liq-switch{display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:12px;font-weight:700;color:var(--ink);align-self:center;cursor:pointer}
+.liq-switch input{accent-color:var(--burnt);width:15px;height:15px}
+.liq-remove{margin-left:auto}
+.liq-checklist{display:flex;flex-wrap:wrap;gap:8px 28px;padding:10px 17px;font-size:12px;border-bottom:1px solid var(--border)}
+.liq-check{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.liq-meter{display:inline-block;width:90px;height:7px;border-radius:9px;background:rgba(7,26,45,.1);overflow:hidden}
+.liq-meter i{display:block;height:100%;background:#b97712}
+.liq-check.ok .liq-meter i{background:#2f6b52}
+.liq-check.ok b{color:#2f6b52}
+.liq-check-miss{color:#8b2d22;font-size:11px}
+.liq-table-wrap{max-height:none}
+.liq-table th{text-align:left;vertical-align:bottom;line-height:1.25}
+.liq-table th small{font-weight:500;opacity:.75;text-transform:none}
+.liq-table th.num,.liq-table td.num{text-align:right}
+.liq-table th.liq-key{box-shadow:inset 0 -3px 0 var(--burnt)}
+.liq-table td{vertical-align:middle;padding:6px 8px}
+.liq-table input.liq-in{padding:6px 8px;font:inherit;font-size:12px;border-color:rgba(201,85,18,.35);background:#fff}
+.liq-table input.liq-in:not(.liq-date){width:92px;text-align:right}
+.liq-table input.liq-in:placeholder-shown{background:#fff7ec}
+.liq-table input.liq-in:focus{outline:none;border-color:var(--burnt);box-shadow:0 0 0 3px rgba(201,85,18,.18)}
+.liq-table tr.unused td{opacity:.5}
+.liq-table td[data-out]{color:var(--ink);font-weight:600}
+.liq-chip{display:inline-block;padding:2px 8px;margin-right:4px;border-radius:999px;font-size:11px;font-weight:700}
+.liq-chip.ok{background:#e3f0e8;color:#2f6b52}
+.liq-chip.todo{background:#f6ead7;color:#92400e;cursor:help}
+.liq-err{color:#991b1b;font-weight:600;white-space:normal}
+.liq-missing{color:#8b2d22}
+.liq-howto{padding:10px 17px;border-top:1px solid var(--border)}
+.liq-extra{border-top:1px solid var(--border)}
+.liq-extra summary{padding:11px 17px;cursor:pointer;font-size:12px;font-weight:700;color:var(--burnt)}
+.liq-flash{position:absolute;right:18px;bottom:14px;padding:8px 14px;border-radius:7px;background:var(--ink);color:var(--paper);font-size:12px;opacity:0;transition:opacity .2s;pointer-events:none}
+.liq-flash.show{opacity:1}
+.liq-table th:first-child,.liq-table td:first-child{min-width:60px}
+.liq-table th:nth-child(2),.liq-table td:nth-child(2){min-width:0}
+.liq-table input.liq-date{width:200px}
+.liq-table td[data-out="status"]{white-space:nowrap}
