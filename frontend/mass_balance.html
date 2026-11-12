@@ -5,11 +5,12 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>ILS Mass Balance | DHA Data Dashboard</title>
-    <link href="/frontend/css/dashboard.css" rel="stylesheet">
+    <link href="/frontend/css/dashboard.css?v=64" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
     <script src="/frontend/js/navigation.js?v=14" defer></script>
-    <link href="/frontend/css/mass_balance.css?v=4" rel="stylesheet">
-    <script src="/frontend/js/mass_balance.js?v=4" defer></script>
+    <link href="/frontend/css/mass_balance.css?v=5" rel="stylesheet">
+    <script src="/frontend/js/mb_core.js?v=1" defer></script>
+    <script src="/frontend/js/mass_balance.js?v=5" defer></script>
 </head>
 
 <body>
@@ -38,74 +39,73 @@
                     <button aria-label="Reset dashboard and Run Number" class="page-refresh" id="pageRefresh" title="Reset dashboard and Run Number" type="button">↻</button>
                 </div>
             </header>
-            <section class="content mb-content">
-                <div class="hero mb-hero">
-                    <div>
-                        <div class="eyebrow">MASS BALANCE · ANY CHEMISTRY</div>
-                        <h1>How each reactor performed.</h1>
-                        <p>Gas from Online Analysis, liquid from its Liquid tab, flows and molecules from the Run Plan. Pick the components, the reference reactant and the metrics you need, as in the Isomerization tables; click any % to see how it was calculated.</p>
-                    </div>
+            <section class="content">
+                <div class="hero">
+                    <div class="eyebrow">CALCULATION WORKSPACE · GENERAL_MB</div>
+                    <h1>Mass balance tables.</h1>
+                    <p>Gas from Online Analysis, liquid from its Liquid tab, flows and molecular weights from the Run Plan. Plots of these values are on the Plots page.</p>
                 </div>
                 <div class="error" id="mbError"></div>
-                <div class="mb-ready" id="mbReady"></div>
 
-                <div class="card mb-controls">
-                    <label class="mb-field mb-sample">Sample
-                        <select class="input" id="mbSample" aria-label="Liquid sample or condition"></select>
-                    </label>
-                    <div class="mb-field">Reactors
-                        <div class="mb-reactor-chips" id="mbReactorChips" role="group" aria-label="Reactors shown"></div>
-                    </div>
-                    <details class="mb-settings" id="mbSettings">
-                        <summary>Calculation settings</summary>
-                        <div class="mb-settings-grid">
-                            <label>Internal standard
-                                <select class="input" id="mbIs"><option>Argon</option><option>N2</option></select></label>
-                            <label>GC lines averaged
-                                <select class="input" id="mbBasis">
+                <div class="kpis">
+                    <div class="kpi"><span>Samples × reactors</span><b id="kpiMbRows">0</b></div>
+                    <div class="kpi"><span>Components</span><b id="kpiMbComps">0</b></div>
+                    <div class="kpi"><span>Reference reactant</span><b id="kpiMbRef">—</b></div>
+                    <div class="kpi"><span>Internal standard</span><b id="kpiMbIs">—</b></div>
+                </div>
+
+                <div class="card run-plan-panel">
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">MASS BALANCE · PER SAMPLE AND REACTOR</div>
+                            <h3>Reactor table</h3>
+                        </div>
+                        <div class="table-actions online-table-actions">
+                            <label class="mb-inline">Internal standard
+                                <select class="input online-filter" id="mbIs"><option>Argon</option><option>N2</option></select></label>
+                            <label class="mb-inline">GC lines averaged
+                                <select class="input online-filter" id="mbBasis">
                                     <option value="condition-skip">Whole condition, without the first line</option>
                                     <option value="condition-all">Whole condition, all lines</option>
-                                    <option value="window">Around the liquid sample (± hours)</option>
+                                    <option value="window">Around the liquid sample (± h)</option>
                                 </select></label>
-                            <label id="mbWindowWrap">± hours
-                                <input class="input" id="mbWindow" type="number" min="0.25" step="0.25" value="2"></label>
+                            <label class="mb-inline" id="mbWindowWrap">± h
+                                <input class="input mb-num" id="mbWindow" type="number" min="0.25" step="0.25" value="2"></label>
+                            <select class="input online-filter" id="mbReactorFilter" aria-label="Filter by reactor"><option value="">All reactors</option></select>
+                            <button type="button" class="btn secondary" data-export="reactors">Export CSV</button>
                         </div>
-                    </details>
+                    </div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table mb-table" id="mbReactorTable"></table>
+                        <div class="empty" id="mbReactorEmpty">No mass balance yet.</div>
+                    </div>
+                    <div class="filter-summary" id="mbReactorSummary"></div>
                 </div>
 
-                <div class="mb-cards" id="mbCards"></div>
-                <p class="mb-card-note" id="mbCardNote"></p>
-
-                <div class="card mb-detail">
-                    <nav class="mb-tabs" role="tablist" aria-label="Tables">
-                        <button type="button" role="tab" data-tab="components" class="active">Components</button>
-                        <button type="button" role="tab" data-tab="balances">Balances</button>
-                        <button type="button" role="tab" data-tab="summary">Summary (all samples)</button>
-                        <button type="button" role="tab" data-tab="injections">Per GC injection</button>
-                    </nav>
-                    <section class="mb-pane" data-pane="components">
-                        <div class="mb-comp-controls" id="mbCompControls"></div>
-                        <div class="mb-pane-head"><p class="mb-pane-note" id="mbCompNote"></p>
-                            <button type="button" class="btn secondary" data-export="components">Export CSV</button></div>
-                        <div class="table-wrap mb-scroll"><table class="mb-table mb-comp-table" id="mbCompTable"></table></div>
-                    </section>
-                    <section class="mb-pane" data-pane="balances" hidden>
-                        <div class="mb-pane-head"><p class="mb-pane-note">Carbon and mass balance of the selected sample, the same for every chemistry. Click a shaded balance to see its formula with the numbers.</p>
-                            <button type="button" class="btn secondary" data-export="balances">Export CSV</button></div>
-                        <div class="mb-sections" id="mbBalances"></div>
-                    </section>
-                    <section class="mb-pane" data-pane="summary" hidden>
-                        <div class="mb-pane-head"><p class="mb-pane-note">One row per sample and reactor. Conversion of the reference reactant and selectivity / yield of the first selected product (Components tab). Click a row to open that sample above.</p>
-                            <button type="button" class="btn secondary" data-export="summary">Export CSV</button></div>
-                        <div class="table-wrap"><table class="mb-table" id="mbSummaryTable"></table></div>
-                    </section>
-                    <section class="mb-pane" data-pane="injections" hidden>
-                        <div class="mb-pane-head"><p class="mb-pane-note" id="mbInjNote"></p>
-                            <button type="button" class="btn secondary" data-export="injections">Export CSV</button></div>
-                        <div class="table-wrap mb-scroll"><table class="mb-table" id="mbInjTable"></table></div>
-                    </section>
+                <div class="card run-plan-panel">
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">MASS BALANCE · ANY COMPONENT</div>
+                            <h3>Component table</h3>
+                        </div>
+                        <div class="table-actions online-table-actions">
+                            <div class="component-filter mb-filter" id="mbCompFilter"></div>
+                            <div class="component-filter mb-filter" id="mbRefFilter"></div>
+                            <div class="component-filter mb-filter" id="mbMetricFilter"></div>
+                            <select class="input online-filter" id="mbCompBasis" aria-label="Basis">
+                                <option value="carbon">Basis: Carbon (g C/h)</option>
+                                <option value="mass">Basis: Mass (g/h)</option>
+                                <option value="mole">Basis: Mole (mmol/h)</option>
+                            </select>
+                            <button type="button" class="btn secondary" data-export="components">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table mb-table" id="mbCompTable"></table>
+                        <div class="empty" id="mbCompEmpty">No mass balance yet.</div>
+                    </div>
+                    <div class="filter-summary" id="mbCompSummary"></div>
                 </div>
-                <div class="mb-explain" id="mbExplain" role="status" hidden></div>
             </section>
         </main>
     </div>

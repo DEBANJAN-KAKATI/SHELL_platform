@@ -1,3 +1,18 @@
+## 6.9.10 (2026-11-12) — Mass Balance tables as simple as Isomerization; mass balance plots
+- Calculation → Mass Balance is now one plain page like the Isomerization calculation table (no cards, tabs or charts):
+  - **Reactor table**: one row per sample and reactor with TOS, GC lines, carbon in / out (gas, liquid), carbon balance,
+    gas-phase carbon balance, gas / liquid feed, gas / HC / aqueous product, mass balance, carbon in the liquid and the
+    conversion of the reference reactant. Internal standard, GC lines averaged and reactor filter in the header; Export CSV.
+  - **Component table**: Components, Reference and Values filter menus (as the Offline Analysis component filter) and a
+    basis select (carbon / mass / mole); columns grouped per component; Export CSV. Missing inputs show as ERROR text,
+    formulas with the numbers on hover.
+- Plots (General_MB): new row **Data** (mass balance per GC injection, per sample, or the calculation tables), **Chart**
+  (X–Y, Carbon in → out, Selectivity / yield by component), **Component**, **Value** (conversion, selectivity, yield,
+  yield wof%, in, out, net), **Basis** and **Reference reactant**. The X–Y chart is the normal scatter (reactor colours,
+  condition shapes, moving average, axis limits, Export PNG, Add to Dashboard); X can be TOS or any other value
+  (e.g. selectivity vs conversion). Bar charts use the components chosen on the Mass Balance page.
+- New `frontend/js/mb_core.js`: the chemistry-independent engine shared by both pages.
+
 ## 6.9.9 (2026-11-12) — Mass Balance for any chemistry (Isomerization-style component table)
 - Nothing on the Mass Balance page assumes acetylene → ethylene any more. Like the Isomerization tables, it lists every
   component and you choose what to look at:

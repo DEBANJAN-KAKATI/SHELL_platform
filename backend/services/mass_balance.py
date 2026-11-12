@@ -192,7 +192,10 @@ def calculate_mass_balance(rows, feed_gas=None, feed_cut_in=None, doe_rows=None,
         chosen, how = pick_lines(reactor, cond, u["mid"])
         res.update({"lines": len(chosen), "line_basis": how,
                     "first_line": chosen[0]["datetime"] if chosen else "", "last_line": chosen[-1]["datetime"] if chosen else "",
-                    "tos_h": liq.get("tos_h") if liq else _avg([ln["tos"] for ln in chosen])})
+                    "tos_h": liq.get("tos_h") if liq else _avg([ln["tos"] for ln in chosen]),
+                    # date-time of the result (middle of the liquid sample, else of the GC lines averaged) for plots
+                    "datetime": (u["mid"].strftime("%Y-%m-%d %H:%M:%S") if u["mid"] else
+                                 chosen[len(chosen) // 2]["datetime"] if chosen else "")})
         if not chosen:
             res["errors"].append(f"ERROR: no calculated GC line of R{reactor} in {cond}"
                                  + (f" within ±{window_h:g} h of the sample" if how == "window" else ""))

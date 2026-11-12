@@ -182,6 +182,8 @@
 
     // Internal state - strictly single Y axis
     const plotState = {
+        // General_MB (6.9.10): mass balance source / chart / component / value / basis / reference
+        mb: { source: 'mb_injection', chart: 'xy', comp: '', metric: 'sel', basis: 'carbon', ref: '', data: null },
         rows: [],
         columns: [],
         baseRows: [],
@@ -773,6 +775,8 @@
         setStatus('Loading...', false);
         showError('');
         loadConditionRanges();
+        syncMbControls();
+        if (mbActive()) { await loadMbData(); return; }
 
         // Get Base Table rows
         const baseRows = getBaseTableRows();
@@ -925,6 +929,178 @@
         setStatus('No Data', true);
     }
 
+
+    // ------------------------------------------------------------ General_MB mass balance plots (6.9.10)
+    const MB_SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+    const isGeneralMB = () => Boolean(window.ILSProcess?.isGeneralMB?.()) && Boolean(window.ILSMB);
+    const mbActive = () => isGeneralMB() && plotState.mb.source !== 'yield';
+    const mbColumn = (comp, metric) => `${comp} · ${window.ILSMB.METRICS[metric]} (${window.ILSMB.unitOf(metric, plotState.mb.basis)})`;
+    const mbRefs = () => plotState.mb.ref ? [plotState.mb.ref] : window.ILSMB.refsOf(plotState.mb.data, window.ILSMB.settings().comp);
+
+    function saveMbPrefs() {
+        try { sessionStorage.setItem('ils_plot_mb', JSON.stringify({ ...plotState.mb, data: undefined })); } catch (e) { }
+    }
+    function syncMbControls() {
+        const box = $('#plotMbControls');
+        if (!box) return;
+        box.hidden = !isGeneralMB();
+        if (!isGeneralMB()) return;
+        const mb = plotState.mb;
+        $('#plotMbSource').value = mb.source;
+        $('#plotMbChart').value = mb.chart;
+        $('#plotMbBasis').value = mb.basis;
+        const bars = mb.source !== 'yield' && mb.chart !== 'xy';
+        $('#plotMbChart').disabled = mb.source === 'yield';
+        $('#plotMbCompGroup').hidden = mb.source === 'yield' || mb.chart !== 'xy';
+        $('#plotMbMetricGroup').hidden = mb.source === 'yield' || mb.chart === 'carbon';
+        const metrics = mb.chart === 'distribution' ? ['sel', 'yld'] : Object.keys(window.ILSMB.METRICS);
+        if (!metrics.includes(mb.metric)) mb.metric = metrics[0];
+        $('#plotMbMetric').innerHTML = metrics.map(k => `<option value="${k}"${k === mb.metric ? ' selected' : ''}>${window.ILSMB.METRICS[k]}</option>`).join('');
+        ['plotXSelect', 'plotYSelect', 'plotSwapAxes'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = bars; });
+    }
+    function fillMbComponentLists() {
+        const MB = window.ILSMB, data = plotState.mb.data;
+        const u = MB.universe(data);
+        const names = u.map(c => c.name);
+        const refs = mbRefs();
+        if (!plotState.mb.comp || !names.includes(plotState.mb.comp)) {
+            plotState.mb.comp = MB.selectedOf(data, MB.settings().comp).find(n => !refs.includes(n)) || names[0] || '';
+        }
+        const group = c => c.kind === 'liquid' ? 'Liquid' : c.kind === 'lump' ? 'Gas by carbon number' : c.fed && !c.formed ? 'In the feed' : c.formed ? 'Formed' : 'Other';
+        const groups = {};
+        u.forEach(c => { (groups[group(c)] = groups[group(c)] || []).push(c.name); });
+        $('#plotMbComp').innerHTML = ['In the feed', 'Formed', 'Other', 'Liquid', 'Gas by carbon number'].filter(g => groups[g])
+            .map(g => `<optgroup label="${g}">${groups[g].map(n => `<option${n === plotState.mb.comp ? ' selected' : ''}>${n}</option>`).join('')}</optgroup>`).join('');
+        const fed = u.filter(c => c.fed && c.kind !== 'lump').map(c => c.name);
+        $('#plotMbRef').innerHTML = fed.map(n => `<option${n === refs[0] ? ' selected' : ''}>${n}</option>`).join('');
+    }
+
+    // Rows for the X–Y plot: one per GC injection or per sample, with the chosen component's values as columns
+    function buildMbRows() {
+        const MB = window.ILSMB, data = plotState.mb.data, mb = plotState.mb;
+        const refs = mbRefs(), opts = { basis: mb.basis, refs };
+        const refCol = `${refs.join(' + ') || 'Reference'} conversion (%)`;
+        // A reference reactant has no selectivity / yield: show its conversion instead
+        if (refs.includes(mb.comp) && (mb.metric === 'sel' || mb.metric === 'yld')) { mb.metric = 'conv'; $('#plotMbMetric').value = 'conv'; }
+        const metricCols = (ents, feed) => {
+            const m = MB.metrics(ents, mb.comp, { ...opts, feed });
+            return Object.fromEntries(Object.keys(MB.METRICS).map(k => [mbColumn(mb.comp, k), m.isRef && (k === 'sel' || k === 'yld') ? null : m[k]]));
+        };
+        let rows;
+        if (mb.source === 'mb_injection') {
+            rows = (data?.trends || []).map(t => {
+                const ents = MB.lineEntries(t, data.components);
+                return { DateTime: t.datetime, 'TOS(h)': t.tos_h, Reactor: t.reactor, Condition: t.condition,
+                         'Gas-phase C balance (%)': t.gas_c_balance, [refCol]: MB.refConversion(ents, opts), ...metricCols(ents, null) };
+            });
+        } else {
+            rows = (data?.results || []).filter(r => r.components).map(r => {
+                const ents = MB.entries(r);
+                const num = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+                return { DateTime: r.datetime, 'TOS(h)': r.tos_h, Reactor: r.reactor, Condition: r.condition, Sample: r.sample,
+                         'Carbon balance (%)': num(r.c_balance_pct), 'Gas-phase C balance (%)': num(r.gas_c_balance_pct),
+                         'Mass balance (%)': num(r.mass_balance_pct), 'C recovered in liquid (%)': num(r.c_out_liquid_share_pct),
+                         [refCol]: MB.refConversion(ents, opts), ...metricCols(ents, MB.feedOf(r)) };
+            });
+        }
+        plotState.rows = rows;
+        plotState.columns = rows.length ? Object.keys(rows[0]).filter(c => !['DateTime', 'Reactor', 'Condition', 'Sample'].includes(c)) : [];
+        plotState.customColumns = [];
+        plotState.selectedY = mbColumn(mb.comp, mb.metric);
+        if (!plotState.columns.includes(plotState.selectedX) || plotState.selectedX === plotState.selectedY) plotState.selectedX = 'TOS(h)';
+    }
+
+    async function loadMbData() {
+        try {
+            const { data, ready } = await window.ILSMB.request(window.ILSMB.settings().options);
+            plotState.mb.data = data;
+            if (!data) {
+                showError(`Mass balance needs ${[!ready.runPlan && 'the Run Plan', !ready.gas && 'the GC export (Online Analysis)'].filter(Boolean).join(' and ')}.`);
+                showEmptyNotice(true); setStatus('No Data', true); return;
+            }
+            fillMbComponentLists();
+            buildMbRows();
+            if (!plotState.rows.length) { showEmptyNotice(true); setStatus('No Data', true); return; }
+            onDataLoaded();
+        } catch (e) {
+            showError(`Mass balance failed: ${e.message}`);
+            setStatus('Error', true);
+        }
+    }
+
+    // Bar charts per sample and reactor: carbon in → out, or selectivity / yield by component
+    function renderMbBars() {
+        const MB = window.ILSMB, mb = plotState.mb, data = mb.data;
+        if (!data) return;
+        const refs = mbRefs();
+        const results = (data.results || []).filter(r => r.components && plotState.selectedReactors.has(r.reactor)
+            && (![...plotState.conditionRanges.values()].some(v => v.length) || matchingConditions(r.datetime).length));
+        const labels = results.map(r => `${r.sample} · ${r.reactor}`);
+        let datasets, yTitle, xTitle, title, horizontal = false, max;
+        if (mb.chart === 'carbon') {
+            const ds = (label, key, color, stack) => ({ label, stack, data: results.map(r => (typeof r[key] === 'number' ? r[key] : 0)), backgroundColor: color,
+                borderColor: '#fbf5e9', borderWidth: 2, borderRadius: 4, maxBarThickness: 46 });
+            datasets = [ds('Gas feed (in)', 'c_gas_in_g_h', '#9bbfe9', 'in'), ds('Liquid feed (in)', 'c_liq_in_g_h', '#2a78d6', 'in'),
+                        ds('Gas product (out)', 'c_gas_out_g_h', '#f2b49a', 'out'), ds('Liquid product (out)', 'c_liq_out_g_h', '#eb6834', 'out')];
+            yTitle = 'Carbon (g C/h)'; xTitle = 'Sample · reactor (left bar in, right bar out)'; title = 'Carbon in → out';
+        } else {
+            const metric = mb.metric === 'yld' ? 'yld' : 'sel';
+            const comps = MB.selectedOf(data, MB.settings().comp).filter(n => !refs.includes(n) && n !== MB.LIQUID && !/^Gas C\d/.test(n));
+            const values = results.map(r => { const ents = MB.entries(r); return comps.map(n => MB.metrics(ents, n, { basis: mb.basis, refs })[metric]); });
+            datasets = comps.map((n, i) => ({ label: n, data: values.map(v => v[i] ?? 0), backgroundColor: MB_SERIES[i % MB_SERIES.length],
+                borderColor: '#fbf5e9', borderWidth: 2, maxBarThickness: 40 }));
+            const rest = values.map((v, j) => {
+                const total = v.reduce((a, x) => a + (typeof x === 'number' ? x : 0), 0);
+                const top = metric === 'sel' ? 100 : MB.refConversion(MB.entries(results[j]), { basis: mb.basis, refs }) || 0;
+                return Math.max(0, top - total);
+            });
+            datasets.push({ label: metric === 'sel' ? 'Rest of the converted reactant' : 'Rest (converted, not in the chosen components)',
+                            data: rest, backgroundColor: '#c9c3b8', borderColor: '#fbf5e9', borderWidth: 2, maxBarThickness: 40 });
+            horizontal = true; max = metric === 'sel' ? 100 : undefined;
+            xTitle = `${metric === 'sel' ? 'Selectivity' : 'Yield'} (%, ${MB.BASIS[mb.basis].label.toLowerCase()} basis, reference ${refs.join(' + ')})`;
+            yTitle = ''; title = `${metric === 'sel' ? 'Selectivity' : 'Yield'} by component`;
+        }
+        if (plotState.chart) { plotState.chart.destroy(); plotState.chart = null; }
+        const ctx = $('#scatterCanvas').getContext('2d');
+        const axisTitle = (text) => ({ display: Boolean(text), text, color: '#071a2d', font: { size: 13, weight: '700' } });
+        plotState.chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false, animation: false, indexAxis: horizontal ? 'y' : 'x',
+                plugins: { legend: { display: true, position: 'bottom' },
+                           tooltip: { callbacks: { label: (it) => `${it.dataset.label}: ${Number(it.raw).toPrecision(4)}${mb.chart === 'carbon' ? ' g C/h' : ' %'}` } } },
+                scales: {
+                    x: { stacked: true, max: horizontal ? max : undefined, title: axisTitle(horizontal ? xTitle : xTitle), grid: { color: 'rgba(7, 26, 45, 0.06)' } },
+                    y: { stacked: true, title: axisTitle(horizontal ? '' : yTitle), grid: { color: 'rgba(7, 26, 45, 0.06)' } },
+                },
+            },
+        });
+        $('#plotChartTitle').textContent = title;
+        $('#plotEyebrow').textContent = `MASS BALANCE · ${title.toUpperCase()}`;
+        if ($('#plotLegend')) $('#plotLegend').innerHTML = '';
+        if ($('#conditionLegend')) $('#conditionLegend').hidden = true;
+        if ($('#kpiPlotPoints')) $('#kpiPlotPoints').textContent = results.length;
+        if ($('#kpiPlotReactors')) $('#kpiPlotReactors').textContent = new Set(results.map(r => r.reactor)).size;
+        if ($('#kpiPlotX')) $('#kpiPlotX').textContent = 'Sample · reactor';
+        if ($('#kpiPlotY')) $('#kpiPlotY').textContent = title;
+    }
+
+    function setupMbEvents() {
+        const mb = plotState.mb;
+        try { Object.assign(mb, JSON.parse(sessionStorage.getItem('ils_plot_mb') || '{}'), { data: null }); } catch (e) { }
+        const on = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('change', fn); };
+        on('plotMbSource', () => { mb.source = $('#plotMbSource').value; if (mb.source === 'mb_sample' || mb.source === 'mb_injection') { /* keep chart */ } else mb.chart = 'xy';
+            saveMbPrefs(); loadYieldData(); });
+        on('plotMbChart', () => { mb.chart = $('#plotMbChart').value; if (mb.chart !== 'xy' && mb.source === 'mb_injection') mb.source = 'mb_sample';
+            saveMbPrefs(); syncMbControls(); if (mb.data) { buildMbRows(); onDataLoaded(); } else loadYieldData(); });
+        const rebuild = () => { saveMbPrefs(); syncMbControls(); if (!mb.data) return; buildMbRows(); onDataLoaded(); };
+        on('plotMbComp', () => { mb.comp = $('#plotMbComp').value; rebuild(); });
+        on('plotMbMetric', () => { mb.metric = $('#plotMbMetric').value; rebuild(); });
+        on('plotMbBasis', () => { mb.basis = $('#plotMbBasis').value; rebuild(); });
+        on('plotMbRef', () => { mb.ref = $('#plotMbRef').value; rebuild(); });
+    }
+
     function showEmptyNotice(show) {
         const emptyEl = $('#plotEmpty');
         const canvasEl = $('#scatterCanvas');
@@ -945,7 +1121,7 @@
         setStatus('Ready', true);
 
         // Identify available numeric/time columns for plotting
-        const nonPlottable = new Set(['File Name', 'UID', '_row_error', 'Reactor', 'Active Reactor', 'Sampled_reactor', 'Component', 'DateTime', 'Date/Time']);
+        const nonPlottable = new Set(['File Name', 'UID', '_row_error', 'Reactor', 'Active Reactor', 'Sampled_reactor', 'Component', 'DateTime', 'Date/Time', 'Condition', 'Sample']);
         const rowKeys = plotState.rows.length ? Object.keys(plotState.rows[0]) : [];
         const rawCols = (plotState.columns && plotState.columns.length > 0)
             ? [...new Set([...plotState.columns, ...rowKeys])]
@@ -1289,6 +1465,7 @@
      * Render the Scatter Plot using Chart.js with single Y axis
      */
     function renderPlot() {
+        if (mbActive() && plotState.mb.chart !== 'xy') { renderMbBars(); return; }
         const xCol = plotState.selectedX;
         const yCol = plotState.selectedY;
 
@@ -2154,6 +2331,7 @@
             }
         } catch (e) { }
         setupEvents();
+        setupMbEvents();
         window.lucide?.createIcons();
         updateExclusionControls();
         loadYieldData();
