@@ -1,3 +1,26 @@
+## 6.9.6 (2026-11-12) — Calculation → Mass Balance
+- New page **Calculation → Mass Balance** (General_MB): carbon balance, mass balance closure, conversion, selectivity and
+  yield per liquid sample and reactor, calculated from Online Analysis (Gas and Liquid tabs) and the Run Plan. Conditions
+  without a liquid sample are shown "gas only" (conversion, selectivity, gas-phase carbon balance; the balances that need
+  the liquid say so).
+- One **score card per reactor**: carbon balance in large type with a status (✓ within ±5 %, ! 5–10 %, ✕ more), the
+  split of recovered carbon between gas and liquid, and six figures: conversion of the key reactant, selectivity and
+  yield of the target product, mass balance, C4+ yield, gas-phase carbon balance. Click any number to see its formula
+  with the values used and the GC lines averaged.
+- Detail tabs: **Carbon in → out** (stacked bars per reactor), **Selectivity & yield** (where the converted carbon went,
+  by product group; switch to yield), **Trends vs TOS** (conversion, selectivity or gas-phase carbon balance per GC
+  injection), **C-Balance table** (the workbook sheet, clickable), **Summary (all samples)** (one row per sample and
+  reactor, click a row to open it, CSV export), **Molecules** (in / out / change per molecule in g/h, g C/h, Nl/h).
+- Calculation settings (collapsed): internal standard, key reactant (default acetylene), target product (default
+  ethylene), GC lines averaged (whole condition without the first line — default —, all lines, or ± hours around the
+  liquid sample).
+- Gas feed of each molecule is scaled with the internal standard from the bypass composition of the condition; every
+  carbon-containing feed molecule counts in "C in gas feed" (the workbook counts four). Selectivity and yield on a carbon
+  basis, net of the feed; the workbook's Nl/h ethylene selectivity and C4+ yield are kept for comparison.
+- Saved with the run ("Calculation · Mass Balance summary"). New `backend/services/mass_balance.py`,
+  `POST /api/mass-balance`, `frontend/mass_balance.html`, `js/mass_balance.js`, `css/mass_balance.css`,
+  `tests/test_mass_balance.py`.
+
 ## 6.9.5 (2026-11-12) — Online Analysis: Gas and Liquid tabs
 - General_MB: Online Analysis has two tabs. **Gas** is the imported export (unchanged). **Liquid** holds the liquid side
   of the mass balance, typed by the user (workbook Liq sheet):

@@ -102,6 +102,10 @@ def create_app(test_config=None):
         return send_from_directory(BASE / "frontend", "index.html")
 
     @app.get("/online-analysis")
+    @app.get("/mass-balance")
+    def mass_balance_view():
+        return send_from_directory(BASE / "frontend", "mass_balance.html")
+
     @app.get("/zmb")
     def zmb_view():
         return send_from_directory(BASE / "frontend", "zmb.html")
