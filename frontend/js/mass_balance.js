@@ -14,23 +14,22 @@
         'CO + CO2': '#008300', 'Other gas': '#6250d6', 'Not in the gas product': '#c9c3b8' };
     const INK = '#071a2d', SLATE = '#52514e', GRID = 'rgba(7,26,45,.08)';
 
-    const state = { data: null, selected: '', reactors: null, tab: 'carbon', selMode: 'selectivity', trend: 'conversion',
+    const state = { data: null, selected: '', reactors: null, tab: 'table',
                     options: { is: '', reactant: '', product: '', basis: 'condition-skip', window_h: 2 }, compReactor: '' };
-    const charts = {};
 
     function load() {
         try {
             const s = JSON.parse(sessionStorage.getItem(KEY) || 'null');
             if (!s) return;
             Object.assign(state.options, s.options || {});
-            ['selected', 'tab', 'selMode', 'trend', 'compReactor'].forEach(k => { if (s[k]) state[k] = s[k]; });
+            ['selected', 'tab', 'compReactor'].forEach(k => { if (s[k]) state[k] = s[k]; });
             if (Array.isArray(s.reactors)) state.reactors = s.reactors;
         } catch (e) { sessionStorage.removeItem(KEY); }
     }
     function save() {
         try {
             sessionStorage.setItem(KEY, JSON.stringify({ options: state.options, selected: state.selected, reactors: state.reactors,
-                tab: state.tab, selMode: state.selMode, trend: state.trend, compReactor: state.compReactor,
+                tab: state.tab, compReactor: state.compReactor,
                 summary: summaryRows() }));
         } catch (e) {}
     }
@@ -244,84 +243,6 @@
         if (!e.target.closest('#mbExplain')) $('#mbExplain').hidden = true;
     });
 
-    // ------------------------------------------------------------ charts
-    function baseOptions(extra = {}) {
-        return {
-            responsive: true, maintainAspectRatio: false, animation: false,
-            interaction: { mode: 'nearest', intersect: true },
-            plugins: { legend: { position: 'bottom', labels: { color: INK, boxWidth: 12, boxHeight: 12, font: { family: 'Fira Code, Segoe UI', size: 11 } } },
-                       tooltip: { backgroundColor: INK, titleFont: { family: 'Fira Code' }, bodyFont: { family: 'Fira Code' } } },
-            scales: {}, ...extra,
-        };
-    }
-    function chart(id, config) {
-        if (!window.Chart) return;
-        charts[id]?.destroy();
-        charts[id] = new Chart(document.getElementById(id), config);
-    }
-
-    function renderCarbonChart(view) {
-        const rows = shownRows(view).filter(r => isNum(r.c_gas_in_g_h));
-        const labels = rows.map(r => r.reactor);
-        const ds = (label, key, color, stack) => ({ label, stack, data: rows.map(r => isNum(r[key]) ? r[key] : 0), backgroundColor: color,
-            borderColor: '#fbf5e9', borderWidth: 2, borderRadius: 4, borderSkipped: false, maxBarThickness: 46 });
-        chart('mbCarbonChart', { type: 'bar', data: { labels, datasets: [
-            ds('Gas feed (in)', 'c_gas_in_g_h', '#9bbfe9', 'in'), ds('Liquid feed (in)', 'c_liq_in_g_h', '#2a78d6', 'in'),
-            ds('Gas product (out)', 'c_gas_out_g_h', '#f2b49a', 'out'), ds('Liquid product (out)', 'c_liq_out_g_h', '#eb6834', 'out'),
-        ] }, options: baseOptions({
-            scales: { x: { stacked: true, grid: { display: false }, ticks: { color: INK } },
-                      y: { stacked: true, title: { display: true, text: 'g C/h', color: SLATE }, grid: { color: GRID }, ticks: { color: SLATE } } },
-            plugins: { ...baseOptions().plugins, tooltip: { ...baseOptions().plugins.tooltip, callbacks: {
-                title: (items) => `${items[0].label} · ${items[0].dataset.stack === 'in' ? 'carbon in' : 'carbon out'}`,
-                label: (item) => `${item.dataset.label}: ${fmtG(item.raw)} g C/h`,
-                footer: (items) => { const r = rows[items[0].dataIndex]; return isNum(r.c_balance_pct) ? `Carbon balance ${fmt(r.c_balance_pct, 1)} %` : `Gas-phase C balance ${fmt(r.gas_c_balance_pct, 1)} %`; },
-            } } },
-        }) });
-    }
-
-    function renderSelChart(view) {
-        const rows = shownRows(view).filter(r => r.selectivity && Object.keys(r.selectivity).length);
-        const mode = state.selMode;
-        const groups = (state.data?.groups || []).filter(g => g !== 'Liquid (net)' && rows.some(r => isNum(r[mode]?.[g])));
-        const restLabel = 'Not in the gas product';
-        const total = (r) => groups.reduce((a, g) => a + (isNum(r[mode]?.[g]) ? r[mode][g] : 0), 0);
-        const datasets = groups.map(g => ({ label: g, data: rows.map(r => r[mode]?.[g] ?? 0), backgroundColor: GROUP_COLORS[g] || '#888',
-            borderColor: '#fbf5e9', borderWidth: 2, maxBarThickness: 42 }));
-        datasets.push({ label: restLabel, data: rows.map(r => Math.max(0, (mode === 'selectivity' ? 100 : (isNum(r.conversion_pct) ? r.conversion_pct : 0)) - total(r))),
-            backgroundColor: GROUP_COLORS[restLabel], borderColor: '#fbf5e9', borderWidth: 2, maxBarThickness: 42 });
-        $('#mbSelNote').textContent = mode === 'selectivity'
-            ? `Where the converted ${state.data?.reactant || 'reactant'} carbon went (carbon basis, net of the feed). "${restLabel}" = converted carbon not found as a gas molecule (liquid, heavier products, deposits).`
-            : `Carbon yield = share of the fed ${state.data?.reactant || 'reactant'} carbon turned into each product; the bar length is the conversion.`;
-        chart('mbSelChart', { type: 'bar', data: { labels: rows.map(r => r.reactor), datasets }, options: baseOptions({
-            indexAxis: 'y',
-            scales: { x: { stacked: true, min: 0, max: mode === 'selectivity' ? 100 : undefined, title: { display: true, text: mode === 'selectivity' ? 'Carbon selectivity (%)' : 'Carbon yield (%)', color: SLATE }, grid: { color: GRID }, ticks: { color: SLATE } },
-                      y: { stacked: true, grid: { display: false }, ticks: { color: INK, font: { weight: 'bold' } } } },
-            plugins: { ...baseOptions().plugins, tooltip: { ...baseOptions().plugins.tooltip, callbacks: { label: (i) => `${i.dataset.label}: ${fmt(i.raw, 1)} %` } } },
-        }) });
-    }
-
-    function renderTrendChart(view) {
-        const metric = state.trend;
-        const shown = new Set(shownRows(view).map(r => r.reactor));
-        const all = state.data?.trends || [];
-        const reactors = [...new Set(all.map(t => t.reactor))].filter(r => !state.reactors || state.reactors.includes(r));
-        const label = { conversion: `${state.data?.reactant || 'Reactant'} conversion (%)`, selectivity: `${state.data?.product || 'Product'} selectivity (%)`, gas_c_balance: 'Gas-phase carbon balance (%)' }[metric];
-        $('#mbTrendNote').textContent = `One point per GC injection, all conditions. Reactors of the selected sample: ${[...shown].join(', ') || '—'}. Hover a point for its time and condition.`;
-        chart('mbTrendChart', { type: 'line', data: { datasets: reactors.map(r => ({
-            label: r, data: all.filter(t => t.reactor === r && isNum(t[metric]) && isNum(t.tos_h)).map(t => ({ x: t.tos_h, y: t[metric], t })),
-            borderColor: REACTOR_COLORS[r], backgroundColor: REACTOR_COLORS[r], borderWidth: 2, pointRadius: 3, pointHoverRadius: 6,
-            pointBorderColor: '#fbf5e9', pointBorderWidth: 1, tension: 0, spanGaps: false,
-        })) }, options: baseOptions({
-            interaction: { mode: 'nearest', intersect: false },
-            scales: { x: { type: 'linear', title: { display: true, text: 'Time on stream (h)', color: SLATE }, grid: { color: GRID }, ticks: { color: SLATE } },
-                      y: { title: { display: true, text: label, color: SLATE }, grid: { color: GRID }, ticks: { color: SLATE } } },
-            plugins: { ...baseOptions().plugins, tooltip: { ...baseOptions().plugins.tooltip, callbacks: {
-                title: (items) => `${items[0].dataset.label} · TOS ${fmt(items[0].raw.x, 1)} h`,
-                label: (i) => `${label}: ${fmt(i.raw.y, 1)}`, footer: (items) => `${items[0].raw.t.datetime} · ${items[0].raw.t.condition}`,
-            } } },
-        }) });
-    }
-
     // ------------------------------------------------------------ tables
     function cell(v, digits = 4, key = '', reactor = '') {
         if (typeof v === 'string' && v.startsWith('ERROR')) return `<td class="err" title="${esc(v)}">${esc(v.replace(/ \(Online Analysis → Liquid\)/, ''))}</td>`;
@@ -329,10 +250,23 @@
         return `<td${click}>${isNum(v) ? (digits === 'g' ? fmtG(v) : v.toFixed(digits)) : '–'}</td>`;
     }
 
+    const NOT_GAS = 'Not in the gas product';
+    const valueOf = (r, key) => typeof key === 'function' ? key(r) : r[key];
+    const comp = (r, name, field) => (r.components || []).find(c => c.component === name)?.[field];
+    // Converted carbon not found as a gas molecule (liquid, heavier products, deposits); "Liquid (net)" not counted
+    function notInGas(r, mode) {
+        if (!r[mode] || !Object.keys(r[mode]).length) return null;
+        const total = Object.entries(r[mode]).filter(([g, v]) => g !== 'Liquid (net)' && isNum(v)).reduce((a, [, v]) => a + v, 0);
+        return (mode === 'selectivity' ? 100 : (isNum(r.conversion_pct) ? r.conversion_pct : null)) - total;
+    }
+    let lastCTable = { rows: [], spec: [] };
+
     function renderCTable(view) {
         const rows = shownRows(view);
         const d = state.data || {};
+        const groups = (d.groups || []).filter(g => rows.some(r => isNum(r.selectivity?.[g])));
         const spec = [
+            ['Sample', null], ['Condition', 'condition', 'txt'], ['TOS [h]', 'tos_h', 1], ['GC lines averaged', 'lines', 0],
             ['Carbon in', null], ['C in liquid feed [g C/h]', 'c_liq_in_g_h', 'g'], ['C in gas feed [g C/h]', 'c_gas_in_g_h', 'g'],
             ['Carbon out', null], ['C in liquid product [g C/h]', 'c_liq_out_g_h', 'g'], ['C in gas product [g C/h]', 'c_gas_out_g_h', 'g'],
             ['Carbon balance [%]', 'c_balance_pct', 2, true], ['Gas-phase carbon balance [%]', 'gas_c_balance_pct', 2, true],
@@ -343,11 +277,25 @@
             [`${d.reactant || 'Reactant'} and ${d.product || 'product'}`, null], [`${d.reactant || 'Reactant'} conversion [%]`, 'conversion_pct', 2, true],
             [`${d.product || 'Product'} selectivity, carbon [%]`, 'selectivity_pct', 2, true], [`${d.product || 'Product'} yield, carbon [%]`, 'product_yield_pct', 2, true],
             [`${d.product || 'Product'} selectivity, workbook (Nl/h) [%]`, 'selectivity_workbook_pct', 2],
+            [`${d.reactant || 'Reactant'} in / out`, null],
+            [`${d.reactant || 'Reactant'} in [g/h]`, r => comp(r, d.reactant, 'in_g_h'), 'g'], [`${d.reactant || 'Reactant'} out [g/h]`, r => comp(r, d.reactant, 'out_g_h'), 'g'],
+            [`${d.product || 'Product'} in [g/h]`, r => comp(r, d.product, 'in_g_h'), 'g'], [`${d.product || 'Product'} out [g/h]`, r => comp(r, d.product, 'out_g_h'), 'g'],
+            [`C of ${d.reactant || 'reactant'} converted [g C/h]`, 'converted_c_g_h', 'g'],
+            [`Carbon selectivity by product (where the converted ${d.reactant || 'reactant'} carbon went) [%]`, null],
+            ...groups.map(g => [g, r => r.selectivity?.[g], 2]),
+            [NOT_GAS, r => notInGas(r, 'selectivity'), 2],
+            [`Carbon yield by product (share of the fed ${d.reactant || 'reactant'} carbon) [%]`, null],
+            ...groups.map(g => [g, r => r.yield?.[g], 2]),
+            [NOT_GAS, r => notInGas(r, 'yield'), 2],
+            ['Carbon recovered', null],
+            ['in the gas product [%]', 'c_out_gas_share_pct', 1], ['in the liquid product [%]', 'c_out_liquid_share_pct', 1],
         ];
+        lastCTable = { rows, spec };
         $('#mbCTable').innerHTML = `<thead><tr><th>Quantity</th>${rows.map(r => `<th><i class="mb-dot" style="background:${REACTOR_COLORS[r.reactor]}"></i>${r.reactor}</th>`).join('')}</tr></thead><tbody>`
             + spec.map(([label, key, digits, explainable]) => key === null
                 ? `<tr class="mb-section"><td colspan="${rows.length + 1}">${esc(label)}</td></tr>`
-                : `<tr${explainable ? ' class="mb-key"' : ''}><td>${esc(label)}</td>${rows.map(r => cell(r[key], digits, explainable ? key : '', r.reactor)).join('')}</tr>`).join('')
+                : `<tr${explainable ? ' class="mb-key"' : ''}><td>${esc(label)}</td>${rows.map(r => digits === 'txt' ? `<td class="txt">${esc(r[key])}</td>`
+                    : cell(valueOf(r, key), digits, explainable ? key : '', r.reactor)).join('')}</tr>`).join('')
             + '</tbody>';
     }
 
@@ -357,7 +305,10 @@
             'Carbon balance (%)': r.c_balance_pct, 'Gas-phase C balance (%)': r.gas_c_balance_pct, 'Mass balance (%)': r.mass_balance_pct,
             [`${state.data.reactant} conversion (%)`]: r.conversion_pct, [`${state.data.product} selectivity (%)`]: r.selectivity_pct,
             [`${state.data.product} yield (%)`]: r.product_yield_pct, 'C4+ yield (%)': r.c4_yield_pct,
+            [`${state.data.product} selectivity, workbook (%)`]: r.selectivity_workbook_pct,
+            'C in gas feed (g C/h)': r.c_gas_in_g_h, 'C in liquid feed (g C/h)': r.c_liq_in_g_h,
             'C in gas product (g C/h)': r.c_gas_out_g_h, 'C in liquid product (g C/h)': r.c_liq_out_g_h,
+            'C recovered in gas (%)': r.c_out_gas_share_pct, 'C recovered in liquid (%)': r.c_out_liquid_share_pct,
         }));
     }
 
@@ -379,6 +330,39 @@
         });
     }
 
+    function injectionRows() {
+        const d = state.data || {};
+        return (d.trends || []).filter(t => !state.reactors || state.reactors.includes(t.reactor)).map(t => ({
+            DateTime: t.datetime, 'TOS (h)': t.tos_h, Reactor: t.reactor, Condition: t.condition,
+            'Gas-phase C balance (%)': t.gas_c_balance, [`${d.reactant} conversion (%)`]: t.conversion,
+            [`${d.product} selectivity (%)`]: t.selectivity }));
+    }
+
+    function renderInjections() {
+        const rows = injectionRows();
+        $('#mbInjNote').textContent = `Workbook Summary "by TOS": one row per GC injection of the reactors shown (${rows.length} injections, all conditions). Gas-phase carbon balance and conversion use the feed of the same injection.`;
+        if (!rows.length) { $('#mbInjTable').innerHTML = '<tbody><tr><td>No calculated GC lines.</td></tr></tbody>'; return; }
+        const cols = Object.keys(rows[0]);
+        $('#mbInjTable').innerHTML = `<thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>`
+            + rows.map(r => `<tr>${cols.map(c => {
+                const v = r[c];
+                if (c === 'Reactor') return `<td class="txt"><i class="mb-dot" style="background:${REACTOR_COLORS[v]}"></i>${esc(v)}</td>`;
+                if (typeof v === 'string' || v === null || v === undefined) return `<td class="txt">${esc(v ?? '–')}</td>`;
+                const st = /balance/.test(c) ? balanceStatus(v) : '';
+                return `<td class="${st ? `st-${st}` : ''}">${v.toFixed(c === 'TOS (h)' ? 2 : 2)}</td>`;
+            }).join('')}</tr>`).join('') + '</tbody>';
+    }
+
+    function componentRows(view) {
+        const rows = shownRows(view).filter(r => r.components);
+        const r = rows.find(x => x.reactor === state.compReactor) || rows[0];
+        if (!r) return [];
+        return r.components.filter(c => isNum(c.in_g_h) && c.in_g_h > 0 || isNum(c.out_g_h) && c.out_g_h > 0).map(c => ({
+            Molecule: c.component, Group: c.group === 'reactant' ? 'reactant' : (c.group || '—'), 'C atoms': c.carbon_atoms,
+            'In [g/h]': c.in_g_h, 'Out [g/h]': c.out_g_h, 'Change [g/h]': (c.out_g_h || 0) - (c.in_g_h || 0),
+            'C in [g C/h]': c.c_in_g_h, 'C out [g C/h]': c.c_out_g_h, 'Out [Nl/h]': c.out_nl_h }));
+    }
+
     function renderComponents(view) {
         const rows = shownRows(view).filter(r => r.components);
         if (!rows.length) { $('#mbCompTable').innerHTML = ''; $('#mbCompReactor').innerHTML = ''; return; }
@@ -397,12 +381,8 @@
     function renderPane() {
         document.querySelectorAll('.mb-tabs [data-tab]').forEach(b => { const on = b.dataset.tab === state.tab; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
         document.querySelectorAll('.mb-pane').forEach(p => { p.hidden = p.dataset.pane !== state.tab; });
-        document.querySelectorAll('#mbSelMode [data-mode]').forEach(b => b.classList.toggle('active', b.dataset.mode === state.selMode));
-        document.querySelectorAll('#mbTrendMode [data-metric]').forEach(b => b.classList.toggle('active', b.dataset.metric === state.trend));
         const view = currentView();
-        if (state.tab === 'carbon') renderCarbonChart(view);
-        if (state.tab === 'selectivity') renderSelChart(view);
-        if (state.tab === 'trends') renderTrendChart(view);
+        if (state.tab === 'injections') renderInjections();
         if (state.tab === 'table') renderCTable(view);
         if (state.tab === 'summary') renderSummary();
         if (state.tab === 'components') renderComponents(view);
@@ -419,8 +399,6 @@
     // ------------------------------------------------------------ events
     $('#mbSample').onchange = () => { state.selected = $('#mbSample').value; state.reactors = null; save(); render(); };
     document.querySelectorAll('.mb-tabs [data-tab]').forEach(b => b.onclick = () => { state.tab = b.dataset.tab; save(); renderPane(); });
-    document.querySelectorAll('#mbSelMode [data-mode]').forEach(b => b.onclick = () => { state.selMode = b.dataset.mode; save(); renderPane(); });
-    document.querySelectorAll('#mbTrendMode [data-metric]').forEach(b => b.onclick = () => { state.trend = b.dataset.metric; save(); renderPane(); });
     $('#mbCompReactor').onchange = () => { state.compReactor = $('#mbCompReactor').value; save(); renderPane(); };
     const recalc = () => { save(); calculate(); };
     $('#mbIs').onchange = () => { state.options.is = $('#mbIs').value; recalc(); };
@@ -428,17 +406,32 @@
     $('#mbProduct').onchange = () => { state.options.product = $('#mbProduct').value; recalc(); };
     $('#mbBasis').onchange = () => { state.options.basis = $('#mbBasis').value; recalc(); };
     $('#mbWindow').onchange = () => { state.options.window_h = Number($('#mbWindow').value) || 2; recalc(); };
-    $('#mbExport').onclick = () => {
-        const rows = summaryRows();
+    function downloadCsv(rows, name) {
         if (!rows.length) return;
         const cols = Object.keys(rows[0]);
-        const q = (v) => { const s = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+        const q = (v) => { const t = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
         const csv = [cols.map(q).join(','), ...rows.map(r => cols.map(c => q(r[c])).join(','))].join('\n');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-        a.download = `MassBalance_Run${sessionStorage.getItem('ils_run_number') || ''}.csv`;
+        a.download = `MassBalance_Run${sessionStorage.getItem('ils_run_number') || ''}_${name}.csv`;
         a.click();
-    };
+    }
+    function cTableRows() {
+        const { rows, spec } = lastCTable;
+        let section = '';
+        return spec.flatMap(([label, key]) => {
+            if (key === null) { section = label; return []; }
+            return [{ Section: section, Quantity: label, ...Object.fromEntries(rows.map(r => [r.reactor, valueOf(r, key) ?? ''])) }];
+        });
+    }
+    document.querySelectorAll('[data-export]').forEach(btn => btn.onclick = () => {
+        const kind = btn.dataset.export;
+        const view = currentView();
+        if (kind === 'table') downloadCsv(cTableRows(), `C-Balance_${(view?.sample || '').replace(/\W+/g, '_')}`);
+        if (kind === 'summary') downloadCsv(summaryRows(), 'Summary');
+        if (kind === 'injections') downloadCsv(injectionRows(), 'Summary_per_injection');
+        if (kind === 'components') downloadCsv(componentRows(view), `Molecules_${state.compReactor}`);
+    });
 
     load();
     calculate();

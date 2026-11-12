@@ -1,3 +1,17 @@
+## 6.9.7 (2026-11-12) — Mass Balance: tables only
+- Calculation → Mass Balance keeps the reactor cards and shows the calculated values as tables; the charts were removed
+  (plots belong on the Plots page). Tabs:
+  - **C-Balance**: the workbook sheet per reactor (sample, condition, TOS, GC lines; carbon in / out; carbon and gas-phase
+    carbon balance; mass balance; C4+; conversion, selectivity and yield of the target product, workbook Nl/h
+    selectivity), plus reactant and product in / out, carbon converted, **carbon selectivity and carbon yield per product
+    group** (Ethylene, Ethane, Methane, C3, C4+ gas, CO + CO2, Liquid net, Not in the gas product) and the carbon
+    recovered in gas / liquid.
+  - **Summary (all samples)**: one row per sample and reactor with every figure, including the carbon flows and splits.
+  - **Summary per GC injection** (workbook Summary "by TOS"): gas-phase carbon balance, conversion and selectivity of
+    every injection.
+  - **Molecules**: gas in / out per molecule.
+  - Every table has an **Export CSV** button.
+
 ## 6.9.6 (2026-11-12) — Calculation → Mass Balance
 - New page **Calculation → Mass Balance** (General_MB): carbon balance, mass balance closure, conversion, selectivity and
   yield per liquid sample and reactor, calculated from Online Analysis (Gas and Liquid tabs) and the Run Plan. Conditions
