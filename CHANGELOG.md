@@ -1,3 +1,40 @@
+## 6.9.7 (2026-11-12) — Mass Balance: tables only
+- Calculation → Mass Balance keeps the reactor cards and shows the calculated values as tables; the charts were removed
+  (plots belong on the Plots page). Tabs:
+  - **C-Balance**: the workbook sheet per reactor (sample, condition, TOS, GC lines; carbon in / out; carbon and gas-phase
+    carbon balance; mass balance; C4+; conversion, selectivity and yield of the target product, workbook Nl/h
+    selectivity), plus reactant and product in / out, carbon converted, **carbon selectivity and carbon yield per product
+    group** (Ethylene, Ethane, Methane, C3, C4+ gas, CO + CO2, Liquid net, Not in the gas product) and the carbon
+    recovered in gas / liquid.
+  - **Summary (all samples)**: one row per sample and reactor with every figure, including the carbon flows and splits.
+  - **Summary per GC injection** (workbook Summary "by TOS"): gas-phase carbon balance, conversion and selectivity of
+    every injection.
+  - **Molecules**: gas in / out per molecule.
+  - Every table has an **Export CSV** button.
+
+## 6.9.6 (2026-11-12) — Calculation → Mass Balance
+- New page **Calculation → Mass Balance** (General_MB): carbon balance, mass balance closure, conversion, selectivity and
+  yield per liquid sample and reactor, calculated from Online Analysis (Gas and Liquid tabs) and the Run Plan. Conditions
+  without a liquid sample are shown "gas only" (conversion, selectivity, gas-phase carbon balance; the balances that need
+  the liquid say so).
+- One **score card per reactor**: carbon balance in large type with a status (✓ within ±5 %, ! 5–10 %, ✕ more), the
+  split of recovered carbon between gas and liquid, and six figures: conversion of the key reactant, selectivity and
+  yield of the target product, mass balance, C4+ yield, gas-phase carbon balance. Click any number to see its formula
+  with the values used and the GC lines averaged.
+- Detail tabs: **Carbon in → out** (stacked bars per reactor), **Selectivity & yield** (where the converted carbon went,
+  by product group; switch to yield), **Trends vs TOS** (conversion, selectivity or gas-phase carbon balance per GC
+  injection), **C-Balance table** (the workbook sheet, clickable), **Summary (all samples)** (one row per sample and
+  reactor, click a row to open it, CSV export), **Molecules** (in / out / change per molecule in g/h, g C/h, Nl/h).
+- Calculation settings (collapsed): internal standard, key reactant (default acetylene), target product (default
+  ethylene), GC lines averaged (whole condition without the first line — default —, all lines, or ± hours around the
+  liquid sample).
+- Gas feed of each molecule is scaled with the internal standard from the bypass composition of the condition; every
+  carbon-containing feed molecule counts in "C in gas feed" (the workbook counts four). Selectivity and yield on a carbon
+  basis, net of the feed; the workbook's Nl/h ethylene selectivity and C4+ yield are kept for comparison.
+- Saved with the run ("Calculation · Mass Balance summary"). New `backend/services/mass_balance.py`,
+  `POST /api/mass-balance`, `frontend/mass_balance.html`, `js/mass_balance.js`, `css/mass_balance.css`,
+  `tests/test_mass_balance.py`.
+
 ## 6.9.5 (2026-11-12) — Online Analysis: Gas and Liquid tabs
 - General_MB: Online Analysis has two tabs. **Gas** is the imported export (unchanged). **Liquid** holds the liquid side
   of the mass balance, typed by the user (workbook Liq sheet):

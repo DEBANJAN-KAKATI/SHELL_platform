@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.5). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.7). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -62,7 +62,8 @@ General_MB.
 
 ## Pages (nav order)
 Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
-(`index.html`), Online (`online_analysis.html`), ZMB (`zmb.html`, General_MB only, v6.9.2) → Calculation: Calculation table, Custom table → Data Integrity
+(`index.html`), Online (`online_analysis.html`), ZMB (`zmb.html`, General_MB only, v6.9.2) → Calculation: Calculation table, Custom table,
+Mass Balance (`mass_balance.html`, General_MB only, v6.9.6) → Data Integrity
 (`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
 Process tabs (Isomerization / Reforming / General_MB) after the Run Number on the Run Plan page (locked until a Run Number
 is entered); a read-only Process badge on the other pages.
@@ -70,7 +71,7 @@ is entered); a read-only Process badge on the other pages.
 ## API
 - `/api`: `health`, `settings`, `run-number` (GET/POST), `browse-folder`, `process` (DHA folder),
   `browse-reactor-folder`, `process-reactor-map`, `browse-online-file`, `process-online`, `online-units`,
-  `browse-zmb-file`, `process-zmb` (ZMB export, same loader as Online),
+  `browse-zmb-file`, `process-zmb` (ZMB export, same loader as Online), `mass-balance` (v6.9.6),
   `apply-online-reactor-map`, `browse-run-plan-file`, `process-run-plan`, `feed-properties`,
   `process-calculation-base`, `calculate-yield-table`, `custom-table/{validate-formula,calculate,inspect-cell}`,
   `export-xlsx`.
@@ -84,7 +85,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
+`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_mass_balance_state` (Mass Balance page options, selection, summary rows; v6.9.6); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
 new version. History stores runs in `Historian/Run_<n>.sqlite` and compares tables between runs.
@@ -190,6 +191,17 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   divides by the average TOS — fixed), C out = HC × C wt%, C in = feed × feed C wt%. Ready chips Mass / Carbon + checklist
   of what is missing; Enter moves down, Excel block paste (rows = reactors), US/dotted/ISO dates, decimal comma.
   Optional H, O, N, S, density, aromatics in a collapsed table. Saved as table "Online · Liquid product per sample".
+- **Calculation → Mass Balance** (v6.9.6; `backend/services/mass_balance.py`, `POST /api/mass-balance`, `mass_balance.js/css`):
+  per liquid sample × reactor (else per DOE condition × reactor, "gas only"). GC lines averaged = the reactor's OK lines
+  in the condition without the first (options: all lines, ± h around the sample). Feed of molecule j = F_IS · y_j·MW_j /
+  (y_IS·MW_IS) from the bypass composition; product from convert_online_rows (mass + volume). Carbon balance, gas-phase C
+  balance, mass balance closure, conversion of the key reactant (default Acetylene), carbon selectivity / yield per group
+  (Ethylene, Ethane, Methane, C3, C4+ gas, CO+CO2, Other, Liquid net; rest = "Not in the gas product"), target product
+  (default Ethylene) selectivity/yield, workbook Nl/h ethylene selectivity, workbook C4+ yield. Missing inputs → ERROR text.
+  Page: sample selector + reactor chips, one score card per reactor (carbon balance hero with ±5/±10 % status, gas/liquid
+  carbon split, 6 KPIs), click any number → formula with the numbers; tables only (plots belong on the Plots page, v6.9.7):
+  C-Balance (workbook sheet + reactant/product in/out, carbon selectivity and yield per product group, carbon recovered
+  gas/liquid), Summary (all samples), Summary per GC injection, Molecules; each with CSV export. Tests: `tests/test_mass_balance.py`.
 - Online table column **Condition** (v6.9.4, all processes, `onlineConditionOf` in online_analysis.js): DOE Condition No. of
   the reactor's window containing the line time (latest start wins), blank outside; bypass lines "Block-1: 2, Block-2: 1".
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;
@@ -236,8 +248,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   for Mass Balance runs. The Run Plan gives: Ar / feed gas composition, DOE gas (and liquid) flows per condition and
   reactor, Feed Cut-In.
 - Done: Online Analysis units (g/h, Nl/h, g C/h) with gas feed from the export or the Run Plan DOE, Ar from the Run Plan.
-- Next (not built): liquid product data entry/import, mass balance closure, carbon balance (workbook R#_MB C9:C13,
-  C-Balance), Summary; Plots / Custom table use of the converted online tables.
+- Done (6.9.5–6.9.6): liquid product entry (Online → Liquid), mass balance closure, carbon balance, conversion,
+  selectivity, yield (Calculation → Mass Balance). Next: Plots / Summary Dashboard use of the mass balance results.
 - Ar in feed gas: the workbook uses the verified Ar (Gas!I35, e.g. 4.3 mol%), Run Plans may hold the target (5 mol%) →
   16.8 % difference; the verified value belongs in the Run Plan gas composition (nothing is typed on the Online page).
 

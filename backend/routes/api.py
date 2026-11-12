@@ -208,6 +208,21 @@ def online_units():
         return jsonify({"error": str(e)}), 400
 
 
+@api.post("/mass-balance")
+def mass_balance():
+    """General_MB: mass and carbon balance, conversion, selectivity and yield per liquid sample / condition and reactor."""
+    from backend.services.mass_balance import calculate_mass_balance
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify(calculate_mass_balance(
+            body.get("rows") or [], feed_gas=body.get("feed_gas"), feed_cut_in=body.get("feed_cut_in"),
+            doe_rows=body.get("doe_rows"), internal_standard=body.get("internal_standard") or "Argon",
+            molecular_weights=body.get("molecular_weights"), liquid=body.get("liquid"),
+            options=body.get("options"), reactor_roles=body.get("reactor_roles")))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 @api.post("/apply-online-reactor-map")
 def apply_online_reactor_map():
     body = request.get_json(silent=True) or {}

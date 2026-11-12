@@ -50,9 +50,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const isOnline = path.endsWith('/online_analysis.html') || path.endsWith('/online-analysis') || path.endsWith('/online_analysis');
     const isHistory = path.endsWith('/history.html') || path.endsWith('/history');
     const isZmb = path.endsWith('/zmb.html') || path.endsWith('/zmb');
-    const isOffline = !isRunPlan && !isOnline && !isZmb && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
+    const isMassBalance = path.endsWith('/mass_balance.html') || path.endsWith('/mass-balance');
+    const isOffline = !isRunPlan && !isOnline && !isZmb && !isMassBalance && !isCalculation && !isCustom && !isPlots && !isHistory && !isPlotDashboard && !isIntegrity;
     const analysisActive = isOffline || isOnline || isZmb;
-    const calculationActive = isCalculation || isCustom;
+    const calculationActive = isCalculation || isCustom || isMassBalance;
     const firstAnalysis = `<a aria-current="${isOffline ? 'page' : 'false'}" href="/frontend/index.html">Offline Analysis</a>`;
     const calculationHref = '/frontend/calculation_table.html';
 
@@ -73,6 +74,8 @@ document.addEventListener('DOMContentLoaded', () => {
         `<div class="analysis-menu-items">` +
         `<a aria-current="${isCalculation ? 'page' : 'false'}" href="${calculationHref}">Calculation table</a>` +
         `<a aria-current="${isCustom ? 'page' : 'false'}" href="/frontend/custom_table.html">Custom table</a>` +
+        // General_MB: carbon balance, conversion, selectivity, yield (6.9.6)
+        (window.ILSProcess.isGeneralMB() || isMassBalance ? `<a aria-current="${isMassBalance ? 'page' : 'false'}" href="/frontend/mass_balance.html">Mass Balance</a>` : '') +
         `</div></div>` +
         `<a aria-current="${isPlots ? 'page' : 'false'}" class="analysis-tab${isPlots ? ' active' : ''}" href="/frontend/plots.html">Plots</a>` +
         `<a aria-current="${isPlotDashboard ? 'page' : 'false'}" class="analysis-tab${isPlotDashboard ? ' active' : ''}" href="/frontend/plot_dashboard.html">Summary Dashboard</a>` +
@@ -138,10 +141,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=9';
+        historianScript.src = '/frontend/js/historian_save.js?v=10';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
-            runDataScript.src = '/frontend/js/run_data.js?v=7';
+            runDataScript.src = '/frontend/js/run_data.js?v=8';
             document.head.appendChild(runDataScript);
         };
         document.head.appendChild(historianScript);

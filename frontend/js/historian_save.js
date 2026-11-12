@@ -6,7 +6,7 @@
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
         'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state',
-        'ils_zmb_state', 'ils_zmb_pump', 'ils_liquid_state'
+        'ils_zmb_state', 'ils_zmb_pump', 'ils_liquid_state', 'ils_mass_balance_state'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.
     const LOCAL_FALLBACK_KEYS = ['dhaDashboardState', 'dhaOnlineState'];
@@ -128,6 +128,10 @@
                 'Hydrogen (wt%)': r.h, 'Oxygen (wt%)': r.o, 'Nitrogen (ppmw)': r.n, 'Sulfur (ppmw)': r.s,
                 'Density (g/mL)': r.density, 'Monoaromatics (wt%)': r.mono, 'Diaromatics (wt%)': r.di,
                 'Tri+ aromatics (wt%)': r.tri, Error: r.error })));
+
+        // General_MB: mass balance summary (Calculation → Mass Balance)
+        const mbState = readJson('ils_mass_balance_state') || {};
+        addTable('calculation.mass_balance', 'Calculation · Mass Balance summary', 'Calculation table', mbState.summary || []);
 
         const base = readJson('ils_base_table_state') || {};
         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);
