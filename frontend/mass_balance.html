@@ -8,8 +8,8 @@
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
     <script src="/frontend/js/navigation.js?v=13" defer></script>
-    <link href="/frontend/css/mass_balance.css?v=2" rel="stylesheet">
-    <script src="/frontend/js/mass_balance.js?v=2" defer></script>
+    <link href="/frontend/css/mass_balance.css?v=3" rel="stylesheet">
+    <script src="/frontend/js/mass_balance.js?v=3" defer></script>
 </head>
 
 <body>
@@ -87,9 +87,9 @@
                         <button type="button" role="tab" data-tab="components">Molecules</button>
                     </nav>
                     <section class="mb-pane" data-pane="table">
-                        <div class="mb-pane-head"><p class="mb-pane-note">The workbook's C-Balance sheet for the selected sample, one column per reactor. Click an underlined value to see its formula with the numbers.</p>
+                        <div class="mb-pane-head"><p class="mb-pane-note">The workbook's C-Balance sheet for the selected sample, grouped by topic, one column per reactor. Click a shaded result row to see its formula with the numbers.</p>
                             <button type="button" class="btn secondary" data-export="table">Export CSV</button></div>
-                        <div class="table-wrap"><table class="mb-table" id="mbCTable"></table></div>
+                        <div class="mb-sections" id="mbCTable"></div>
                     </section>
                     <section class="mb-pane" data-pane="summary" hidden>
                         <div class="mb-pane-head"><p class="mb-pane-note">One row per sample and reactor (workbook Summary sheet). Click a row to open that sample above.</p>

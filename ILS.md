@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.7). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.8). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -200,8 +200,9 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   (default Ethylene) selectivity/yield, workbook Nl/h ethylene selectivity, workbook C4+ yield. Missing inputs → ERROR text.
   Page: sample selector + reactor chips, one score card per reactor (carbon balance hero with ±5/±10 % status, gas/liquid
   carbon split, 6 KPIs), click any number → formula with the numbers; tables only (plots belong on the Plots page, v6.9.7):
-  C-Balance (workbook sheet + reactant/product in/out, carbon selectivity and yield per product group, carbon recovered
-  gas/liquid), Summary (all samples), Summary per GC injection, Molecules; each with CSV export. Tests: `tests/test_mass_balance.py`.
+  C-Balance as full-width section cards (v6.9.8: Carbon balance, Mass balance, Conversion · product, Selectivity by product,
+  Yield by product, Reactant/product flows, C4+ incl. liquid feed/product, Carbon recovered, Basis; balances as status
+  pills), Summary (all samples, grouped header, fits the width), Summary per GC injection, Molecules; each with CSV export. Tests: `tests/test_mass_balance.py`.
 - Online table column **Condition** (v6.9.4, all processes, `onlineConditionOf` in online_analysis.js): DOE Condition No. of
   the reactor's window containing the line time (latest start wins), blank outside; bypass lines "Block-1: 2, Block-2: 1".
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;
