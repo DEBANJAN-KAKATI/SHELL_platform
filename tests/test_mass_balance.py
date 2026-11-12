@@ -70,3 +70,15 @@ def test_window_basis_uses_lines_around_the_sample(r08):
     out = run(r08, {"feed_carbon": 85.6, "results": [sample("R1", 0.48, 85.2)]}, basis="window", window_h=2)
     r1 = next(r for r in out["results"] if r["sample"] == "C1-S1")
     assert r1["line_basis"] == "window" and r1["lines"] == 2
+
+
+def test_no_chemistry_is_assumed(r08):
+    """Defaults come from the data (largest net carbon consumed / formed); the user can name any other molecule."""
+    out = run(r08)
+    assert out["reactant"] == "Acetylene" and out["product"] == "Ethylene"     # found from the R08 data, not hard-coded
+    other = run(r08, reactant="Ethylene", product="Ethane")
+    assert other["reactant"] == "Ethylene" and other["product"] == "Ethane"
+    names = {c["component"] for c in out["components"]}
+    assert "Argon" not in names and {"Acetylene", "Ethylene", "Methane"} <= names
+    t = out["trends"][0]                                    # per-injection flows of every molecule for the page
+    assert set(t["in"]) and set(t["out"]) and "Argon" not in t["out"]

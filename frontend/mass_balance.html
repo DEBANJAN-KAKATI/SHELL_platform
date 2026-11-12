@@ -7,9 +7,9 @@
     <title>ILS Mass Balance | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=13" defer></script>
-    <link href="/frontend/css/mass_balance.css?v=3" rel="stylesheet">
-    <script src="/frontend/js/mass_balance.js?v=3" defer></script>
+    <script src="/frontend/js/navigation.js?v=14" defer></script>
+    <link href="/frontend/css/mass_balance.css?v=4" rel="stylesheet">
+    <script src="/frontend/js/mass_balance.js?v=4" defer></script>
 </head>
 
 <body>
@@ -41,9 +41,9 @@
             <section class="content mb-content">
                 <div class="hero mb-hero">
                     <div>
-                        <div class="eyebrow">CARBON · CONVERSION · SELECTIVITY · YIELD</div>
+                        <div class="eyebrow">MASS BALANCE · ANY CHEMISTRY</div>
                         <h1>How each reactor performed.</h1>
-                        <p>Gas from Online Analysis, liquid from its Liquid tab, flows and molecules from the Run Plan. Pick a sample, compare reactors, click any number to see how it was calculated. Plots of these results belong on the Plots page.</p>
+                        <p>Gas from Online Analysis, liquid from its Liquid tab, flows and molecules from the Run Plan. Pick the components, the reference reactant and the metrics you need, as in the Isomerization tables; click any % to see how it was calculated.</p>
                     </div>
                 </div>
                 <div class="error" id="mbError"></div>
@@ -61,10 +61,6 @@
                         <div class="mb-settings-grid">
                             <label>Internal standard
                                 <select class="input" id="mbIs"><option>Argon</option><option>N2</option></select></label>
-                            <label>Key reactant (conversion)
-                                <select class="input" id="mbReactant"></select></label>
-                            <label>Target product (selectivity)
-                                <select class="input" id="mbProduct"></select></label>
                             <label>GC lines averaged
                                 <select class="input" id="mbBasis">
                                     <option value="condition-skip">Whole condition, without the first line</option>
@@ -78,21 +74,28 @@
                 </div>
 
                 <div class="mb-cards" id="mbCards"></div>
+                <p class="mb-card-note" id="mbCardNote"></p>
 
                 <div class="card mb-detail">
                     <nav class="mb-tabs" role="tablist" aria-label="Tables">
-                        <button type="button" role="tab" data-tab="table" class="active">C-Balance</button>
+                        <button type="button" role="tab" data-tab="components" class="active">Components</button>
+                        <button type="button" role="tab" data-tab="balances">Balances</button>
                         <button type="button" role="tab" data-tab="summary">Summary (all samples)</button>
-                        <button type="button" role="tab" data-tab="injections">Summary per GC injection</button>
-                        <button type="button" role="tab" data-tab="components">Molecules</button>
+                        <button type="button" role="tab" data-tab="injections">Per GC injection</button>
                     </nav>
-                    <section class="mb-pane" data-pane="table">
-                        <div class="mb-pane-head"><p class="mb-pane-note">The workbook's C-Balance sheet for the selected sample, grouped by topic, one column per reactor. Click a shaded result row to see its formula with the numbers.</p>
-                            <button type="button" class="btn secondary" data-export="table">Export CSV</button></div>
-                        <div class="mb-sections" id="mbCTable"></div>
+                    <section class="mb-pane" data-pane="components">
+                        <div class="mb-comp-controls" id="mbCompControls"></div>
+                        <div class="mb-pane-head"><p class="mb-pane-note" id="mbCompNote"></p>
+                            <button type="button" class="btn secondary" data-export="components">Export CSV</button></div>
+                        <div class="table-wrap mb-scroll"><table class="mb-table mb-comp-table" id="mbCompTable"></table></div>
+                    </section>
+                    <section class="mb-pane" data-pane="balances" hidden>
+                        <div class="mb-pane-head"><p class="mb-pane-note">Carbon and mass balance of the selected sample, the same for every chemistry. Click a shaded balance to see its formula with the numbers.</p>
+                            <button type="button" class="btn secondary" data-export="balances">Export CSV</button></div>
+                        <div class="mb-sections" id="mbBalances"></div>
                     </section>
                     <section class="mb-pane" data-pane="summary" hidden>
-                        <div class="mb-pane-head"><p class="mb-pane-note">One row per sample and reactor (workbook Summary sheet). Click a row to open that sample above.</p>
+                        <div class="mb-pane-head"><p class="mb-pane-note">One row per sample and reactor. Conversion of the reference reactant and selectivity / yield of the first selected product (Components tab). Click a row to open that sample above.</p>
                             <button type="button" class="btn secondary" data-export="summary">Export CSV</button></div>
                         <div class="table-wrap"><table class="mb-table" id="mbSummaryTable"></table></div>
                     </section>
@@ -100,12 +103,6 @@
                         <div class="mb-pane-head"><p class="mb-pane-note" id="mbInjNote"></p>
                             <button type="button" class="btn secondary" data-export="injections">Export CSV</button></div>
                         <div class="table-wrap mb-scroll"><table class="mb-table" id="mbInjTable"></table></div>
-                    </section>
-                    <section class="mb-pane" data-pane="components" hidden>
-                        <div class="mb-pane-head"><p class="mb-pane-note">Gas in and out per molecule for the selected sample (feed from the bypass lines, product from the reactor lines).</p>
-                            <select class="input mb-small-select" id="mbCompReactor" aria-label="Reactor"></select>
-                            <button type="button" class="btn secondary" data-export="components">Export CSV</button></div>
-                        <div class="table-wrap"><table class="mb-table" id="mbCompTable"></table></div>
                     </section>
                 </div>
                 <div class="mb-explain" id="mbExplain" role="status" hidden></div>
