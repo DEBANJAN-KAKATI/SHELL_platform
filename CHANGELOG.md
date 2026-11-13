@@ -1,3 +1,39 @@
+## 6.9.10 (2026-11-12) — Mass Balance tables as simple as Isomerization; mass balance plots
+- Calculation → Mass Balance is now one plain page like the Isomerization calculation table (no cards, tabs or charts):
+  - **Reactor table**: one row per sample and reactor with TOS, GC lines, carbon in / out (gas, liquid), carbon balance,
+    gas-phase carbon balance, gas / liquid feed, gas / HC / aqueous product, mass balance, carbon in the liquid and the
+    conversion of the reference reactant. Internal standard, GC lines averaged and reactor filter in the header; Export CSV.
+  - **Component table**: Components, Reference and Values filter menus (as the Offline Analysis component filter) and a
+    basis select (carbon / mass / mole); columns grouped per component; Export CSV. Missing inputs show as ERROR text,
+    formulas with the numbers on hover.
+- Plots (General_MB): new row **Data** (mass balance per GC injection, per sample, or the calculation tables), **Chart**
+  (X–Y, Carbon in → out, Selectivity / yield by component), **Component**, **Value** (conversion, selectivity, yield,
+  yield wof%, in, out, net), **Basis** and **Reference reactant**. The X–Y chart is the normal scatter (reactor colours,
+  condition shapes, moving average, axis limits, Export PNG, Add to Dashboard); X can be TOS or any other value
+  (e.g. selectivity vs conversion). Bar charts use the components chosen on the Mass Balance page.
+- New `frontend/js/mb_core.js`: the chemistry-independent engine shared by both pages.
+
+## 6.9.9 (2026-11-12) — Mass Balance for any chemistry (Isomerization-style component table)
+- Nothing on the Mass Balance page assumes acetylene → ethylene any more. Like the Isomerization tables, it lists every
+  component and you choose what to look at:
+  - **Components** picker (search, All / None / Default) grouped as reference reactant(s), in the feed, formed, liquid
+    ("Liquid hydrocarbons": liquid feed in, HC product out) and carbon-number lumps of the gas ("Gas C2", "Gas C4+" …).
+  - **Reference reactant(s)** (one or more): selectivity and yield are relative to what they convert / feed.
+  - **Show**: In, Out, Net (out − in), Conversion (only for consumed components), Selectivity (net formed ÷ reference
+    converted), Yield (net formed ÷ reference fed), Yield wof% (out ÷ total feed, mass, as the Isomerization yield table).
+  - **Basis**: Carbon (g C/h), Mass (g/h), Mole (mmol/h).
+  - **Rows**: Samples × reactors (columns grouped per component, first three columns fixed while scrolling) or the
+    components of the selected sample (columns per reactor).
+  - Click any % to see its formula with the numbers; Export CSV.
+- Default reference and product come from the data (largest net carbon consumed / formed), so R08 still opens on
+  acetylene → ethylene, and another chemistry opens on its own molecules.
+- Reactor cards: carbon balance, conversion of the reference, selectivity and yield of the first selected product, mass
+  balance, gas-phase carbon balance, carbon recovered in the liquid. The workbook-specific rows (ethylene selectivity on
+  Nl/h, C4+ yield) and the fixed product groups were removed from the page; "Gas C4+" etc. can be picked as lumps.
+- Tabs: Components, Balances (carbon, mass, carbon recovered · basis), Summary (all samples), Per GC injection (conversion
+  of the reference and selectivity of the selected products per injection).
+- Saved with the run: "Calculation · Mass Balance summary" and "Calculation · Mass Balance components".
+
 ## 6.9.8 (2026-11-12) — Mass Balance: tables use the full width
 - C-Balance tab: the long single table is now nine cards side by side (three per row on a wide screen): Carbon balance,
   Mass balance, Conversion · target product, Carbon selectivity by product, Carbon yield by product, Reactant and product

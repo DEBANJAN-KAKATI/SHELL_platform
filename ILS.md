@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.8). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.10). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -198,11 +198,17 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   balance, mass balance closure, conversion of the key reactant (default Acetylene), carbon selectivity / yield per group
   (Ethylene, Ethane, Methane, C3, C4+ gas, CO+CO2, Other, Liquid net; rest = "Not in the gas product"), target product
   (default Ethylene) selectivity/yield, workbook Nl/h ethylene selectivity, workbook C4+ yield. Missing inputs → ERROR text.
-  Page: sample selector + reactor chips, one score card per reactor (carbon balance hero with ±5/±10 % status, gas/liquid
-  carbon split, 6 KPIs), click any number → formula with the numbers; tables only (plots belong on the Plots page, v6.9.7):
-  C-Balance as full-width section cards (v6.9.8: Carbon balance, Mass balance, Conversion · product, Selectivity by product,
-  Yield by product, Reactant/product flows, C4+ incl. liquid feed/product, Carbon recovered, Basis; balances as status
-  pills), Summary (all samples, grouped header, fits the width), Summary per GC injection, Molecules; each with CSV export. Tests: `tests/test_mass_balance.py`.
+  **Chemistry-independent since v6.9.9**: backend default reactant / product = largest net carbon consumed / formed (R08 →
+  Acetylene / Ethylene); returns `components` (name, MW, nC), per result `datetime`, per-injection `in`/`out` g/h. Engine shared
+  by both pages in `frontend/js/mb_core.js` (`window.ILSMB`: request, entries (gas + "Liquid hydrocarbons" + lumps "Gas Cn",
+  "Gas Cn+"), lineEntries, metrics in/out/net/conv (consumed only)/sel (net ÷ reference converted)/yld (net ÷ reference
+  fed)/wof (out ÷ total feed, mass), basis carbon/mass/mole). **Page (v6.9.10) is plain like the Isomerization calculation
+  table**: KPI strip, **Reactor table** (sample × reactor: TOS, GC lines, C in/out gas+liquid, carbon and gas-phase C balance,
+  gas/liquid/HC/aqueous flows, mass balance, C in liquid %, reference conversion; IS and GC-line basis selects, reactor
+  filter, CSV) and **Component table** (Components / Reference / Values filter menus like the Offline component filter,
+  basis select, CSV); ERROR text cells, formulas on hover. **Plots (General_MB)**: row Data (per GC injection / per sample /
+  calculation tables), Chart (X–Y, Carbon in → out, Selectivity / yield by component), Component (Y), Value, Basis, Reference;
+  X–Y uses the normal scatter (reactor colours, condition shapes, moving average, PNG, dashboard); state `ils_plot_mb`. Tests: `tests/test_mass_balance.py`.
 - Online table column **Condition** (v6.9.4, all processes, `onlineConditionOf` in online_analysis.js): DOE Condition No. of
   the reactor's window containing the line time (latest start wins), blank outside; bypass lines "Block-1: 2, Block-2: 1".
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;

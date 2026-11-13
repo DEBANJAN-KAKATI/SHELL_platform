@@ -132,6 +132,7 @@
         // General_MB: mass balance summary (Calculation → Mass Balance)
         const mbState = readJson('ils_mass_balance_state') || {};
         addTable('calculation.mass_balance', 'Calculation · Mass Balance summary', 'Calculation table', mbState.summary || []);
+        addTable('calculation.mass_balance_components', 'Calculation · Mass Balance components', 'Calculation table', mbState.components || []);
 
         const base = readJson('ils_base_table_state') || {};
         addTable('calculation.base_table', 'Calculation · Base table', 'Calculation table', base.rows, base.columns);

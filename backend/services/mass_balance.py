@@ -86,12 +86,8 @@ def calculate_mass_balance(rows, feed_gas=None, feed_cut_in=None, doe_rows=None,
     feeds = {f["condition"]: f for f in mass.get("feed_gas_is", [])}
     is_col = f"{ist} to reactor [g/h]"
 
-    # Key reactant and target product (default acetylene → ethylene)
     feed_names = {n for f in feeds.values() for n in (f.get("composition") or {})}
     carbon_feed = [n for n in names if n in feed_names and (comps[n]["carbon_atoms"] or 0) > 0]
-    reactant = options.get("reactant") or next((n for n in names if _key(n) == "acetylene"), None) or \
-        max(carbon_feed, key=lambda n: max((f.get("composition") or {}).get(n, 0) for f in feeds.values()), default=None)
-    product = options.get("product") or next((n for n in names if _key(n) == "ethylene"), None)
 
     def c_of(name, grams):
         c = comps.get(name)
@@ -116,6 +112,18 @@ def calculate_mass_balance(rows, feed_gas=None, feed_cut_in=None, doe_rows=None,
         lines.append({"time": _date(m_row.get("DateTime")), "datetime": m_row.get("DateTime"), "tos": m_row.get("TOS (h)"),
                       "reactor": reactor, "condition": cond, "f_is": f_is, "out": out, "vol": vol, "in": f_in})
 
+    # Default key reactant / target product (no chemistry is assumed): the carbon-containing molecule with the largest
+    # net carbon consumption over all calculated lines, and the one with the largest net carbon formation.
+    net_c = {}
+    for ln in lines:
+        for n in names:
+            if n == ist or not (comps[n]["carbon_atoms"] or 0):
+                continue
+            net_c[n] = net_c.get(n, 0.0) + (c_of(n, ln["out"].get(n) or 0) or 0) - (c_of(n, ln["in"].get(n) or 0) or 0)
+    reactant = options.get("reactant") or (min(net_c, key=net_c.get) if net_c and min(net_c.values()) < 0 else None)
+    product = options.get("product") or (max((n for n in net_c if n != reactant), key=net_c.get, default=None)
+                                         if net_c and max(net_c.values()) > 0 else None)
+
     # Trends: one point per GC injection
     trends = []
     for ln in lines:
@@ -129,7 +137,9 @@ def calculate_mass_balance(rows, feed_gas=None, feed_cut_in=None, doe_rows=None,
             p = (c_of(product, ln["out"].get(product)) or 0) - (c_of(product, ln["in"].get(product)) or 0)
             sel = _pct(p, r_in - r_out)
         trends.append({"reactor": f"R{ln['reactor']}", "condition": ln["condition"], "datetime": ln["datetime"],
-                       "tos_h": ln["tos"], "gas_c_balance": _pct(c_out, c_in), "conversion": conv, "selectivity": sel})
+                       "tos_h": ln["tos"], "gas_c_balance": _pct(c_out, c_in), "conversion": conv, "selectivity": sel,
+                       "in": {n: v for n, v in ln["in"].items() if n != ist and v},
+                       "out": {n: v for n, v in ln["out"].items() if n != ist and v is not None}})
 
     # Conditions and their per-reactor windows (to place liquid samples)
     times = [ln["time"] for ln in lines if ln["time"]]
@@ -182,7 +192,10 @@ def calculate_mass_balance(rows, feed_gas=None, feed_cut_in=None, doe_rows=None,
         chosen, how = pick_lines(reactor, cond, u["mid"])
         res.update({"lines": len(chosen), "line_basis": how,
                     "first_line": chosen[0]["datetime"] if chosen else "", "last_line": chosen[-1]["datetime"] if chosen else "",
-                    "tos_h": liq.get("tos_h") if liq else _avg([ln["tos"] for ln in chosen])})
+                    "tos_h": liq.get("tos_h") if liq else _avg([ln["tos"] for ln in chosen]),
+                    # date-time of the result (middle of the liquid sample, else of the GC lines averaged) for plots
+                    "datetime": (u["mid"].strftime("%Y-%m-%d %H:%M:%S") if u["mid"] else
+                                 chosen[len(chosen) // 2]["datetime"] if chosen else "")})
         if not chosen:
             res["errors"].append(f"ERROR: no calculated GC line of R{reactor} in {cond}"
                                  + (f" within ±{window_h:g} h of the sample" if how == "window" else ""))
@@ -300,6 +313,7 @@ def calculate_mass_balance(rows, feed_gas=None, feed_cut_in=None, doe_rows=None,
         "internal_standard": ist, "reactant": reactant, "product": product,
         "reactant_options": carbon_feed, "product_options": [n for n in names if (comps[n]["carbon_atoms"] or 0) > 0],
         "groups": GROUP_ORDER, "conditions": [c["label"] for c in conditions],
+        "components": [{"component": n, "mw": comps[n]["mw"], "carbon_atoms": comps[n]["carbon_atoms"]} for n in names if n != ist],
         "options": {"basis": basis, "skip_first": bool(skip_first), "window_h": window_h},
         "results": results, "trends": trends,
         "notes": {"mw_missing": mass["basis"].get("mw_missing", []), "lines_ok": mass["ok_count"],
