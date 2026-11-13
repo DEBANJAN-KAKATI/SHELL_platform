@@ -29,7 +29,8 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- `pytest.ini` expects `tests/`, but no tests are committed. Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
+- Tests: `python -m pytest -q tests` (47 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+  conditions, mass balance). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
 
@@ -47,15 +48,18 @@ General_MB.
   (online `.txt` → `ONLINE_COLUMNS`, reactor mapping by `Sampled_reactor`), `online_units.py` (GC mol% → g/h, Nl/h, g C/h), `reactor_map_service.py`
   (valve-opening R1–R8 states), `run_plan_service.py` (+ root `RunPlan.py`), `calculation_table_service.py`
   (Base table), `custom_table_service.py` (safe AST formula engine), `excel_export_service.py`, `run_data.py`
-  (RunData snapshots), `historian.py` (SQLite per run).
+  (RunData snapshots), `historian.py` (SQLite per run), `mass_balance.py` (General_MB mass balance, v6.9.6).
 - `backend/reforming/` — self-contained Reforming package (does not import isomerization code): `dha_loader.py`,
   `unknowns.py`, `service.py`, `operating.py`, `sync_source.py`, `routes.py` (its own Run Plan parser was retired;
   the shared `run_plan_service.py` parses the Run Plan for both processes).
 - `features/data_integrity/` — removable plug-in (own blueprint, HTML/JS/CSS, README).
 - `frontend/` — static HTML pages + vanilla JS (Chart.js, Lucide icons, no build step). `navigation.js` builds the
   top nav, Run Number box, Process selector/badge (`window.ILSProcess`), reset button.
-  `reactor_map.html` is a large self-contained page.
-- `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`.
+  `reactor_map.html` is a large self-contained page. General_MB: `online_liquid.js` (Liquid tab), `zmb.js` (ZMB page),
+  `mb_core.js` (mass balance engine shared by `mass_balance.js` and `plots.js`).
+- `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`, `run_plan_examples/` (template builders, `add_molecular_weights.py`).
+- `documentation/` — `ILS_Dashboard_Documentation.docx` (user + technical documentation, no confidential data, v6.9.10),
+  `MassBal_Workbook_Reference.md` (the MassBal Ver2.2 workbook cell by cell), older v3.4 technical notes.
 - Docker: `Dockerfile` + `docker-compose.yml` (gunicorn `app:app` on 0.0.0.0:5001, `data/` mounted at `/app/data`,
   RunData in volume `dashboard-rundata`); env overrides `DASHBOARD_HOST/PORT/OPEN_BROWSER`,
   `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY`, `DASHBOARD_RUN_PLAN_FILE`.
@@ -85,7 +89,8 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_mass_balance_state` (Mass Balance page options, selection, summary rows; v6.9.6); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
+`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
+`summary` = reactor-table rows, `components` = component-table rows; v6.9.6/6.9.10), `ils_plot_mb` (Plots mass balance choices); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
 new version. History stores runs in `Historian/Run_<n>.sqlite` and compares tables between runs.
@@ -181,7 +186,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
 - ZMB (v6.9.2): Analysis → ZMB imports the blank-run GC export (`process_online_file`) and shows it in mol%; not used in
   calculations yet (planned: feed gas reference; see `documentation/MassBal_Workbook_Reference.md` §3). Liquid pump check
   (v6.9.3, zmb.js): one tab per rep, per reactor start/end → duration, TOS (h), typed TL mass → flow = mass/TOS; verified
-  liquid flow = average of the reps' flows (workbook ZMB!B13:I13 → Liq row 13); not yet used in the mass balance.
+  liquid flow = average of the reps' flows (workbook ZMB!B13:I13 → Liq row 13) = the liquid feed of the mass balance (else the
+  Run Plan DOE liquid flow). The ZMB GC lines are shown only (not used in calculations).
 - Online Analysis **Gas | Liquid** tabs (v6.9.5, General_MB only; `online_liquid.js`, `online_liquid.css`): Gas = the export
   table; Liquid = typed liquid product (workbook Liq sheet). Liquid feed carbon wt% once; liquid feed flow per reactor from
   the ZMB verified flow, else the Run Plan DOE "Liquid flow if fed" of the sample's condition (read-only pills). One tab per
@@ -195,9 +201,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   per liquid sample × reactor (else per DOE condition × reactor, "gas only"). GC lines averaged = the reactor's OK lines
   in the condition without the first (options: all lines, ± h around the sample). Feed of molecule j = F_IS · y_j·MW_j /
   (y_IS·MW_IS) from the bypass composition; product from convert_online_rows (mass + volume). Carbon balance, gas-phase C
-  balance, mass balance closure, conversion of the key reactant (default Acetylene), carbon selectivity / yield per group
-  (Ethylene, Ethane, Methane, C3, C4+ gas, CO+CO2, Other, Liquid net; rest = "Not in the gas product"), target product
-  (default Ethylene) selectivity/yield, workbook Nl/h ethylene selectivity, workbook C4+ yield. Missing inputs → ERROR text.
+  balance, mass balance closure. The backend still returns the v6.9.6 fields (conversion_pct, selectivity / yield per fixed
+  group, workbook Nl/h selectivity, workbook C4+ yield; used by the tests) but the page no longer shows them. Missing inputs → ERROR text.
   **Chemistry-independent since v6.9.9**: backend default reactant / product = largest net carbon consumed / formed (R08 →
   Acetylene / Ethylene); returns `components` (name, MW, nC), per result `datetime`, per-injection `in`/`out` g/h. Engine shared
   by both pages in `frontend/js/mb_core.js` (`window.ILSMB`: request, entries (gas + "Liquid hydrocarbons" + lumps "Gas Cn",
@@ -255,8 +260,10 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   for Mass Balance runs. The Run Plan gives: Ar / feed gas composition, DOE gas (and liquid) flows per condition and
   reactor, Feed Cut-In.
 - Done: Online Analysis units (g/h, Nl/h, g C/h) with gas feed from the export or the Run Plan DOE, Ar from the Run Plan.
-- Done (6.9.5–6.9.6): liquid product entry (Online → Liquid), mass balance closure, carbon balance, conversion,
-  selectivity, yield (Calculation → Mass Balance). Next: Plots / Summary Dashboard use of the mass balance results.
+- Done (6.9.5–6.9.10): liquid product entry (Online → Liquid), ZMB pump check as liquid feed, mass balance closure, carbon
+  balance, conversion / selectivity / yield of any component (Calculation → Mass Balance), mass balance plots.
+- Next: check the numbers against a past run with a finished MassBal workbook; mass balance tables in Summary Dashboard
+  "Add table"; open decisions in `documentation/MassBal_Workbook_Reference.md` §10.4 (mixed-gas MW basis, outlier rule).
 - Ar in feed gas: the workbook uses the verified Ar (Gas!I35, e.g. 4.3 mol%), Run Plans may hold the target (5 mol%) →
   16.8 % difference; the verified value belongs in the Run Plan gas composition (nothing is typed on the Online page).
 

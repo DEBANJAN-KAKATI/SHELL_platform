@@ -320,25 +320,25 @@ systematic offset of the method (an inert reactor should give 0 % and 100 %).
 
 ---
 
-## 10. What the dashboard needs for the mass balance
+## 10. The mass balance in the dashboard (status v6.9.10)
 
 ### 10.1 Inputs and where they come from
 
 | Input | Workbook | ILS dashboard |
 |---|---|---|
 | Run start / feed cut-in | Run_Plan B3 | Run Plan → Plan → Feed Cut-In ✔ |
-| Catalyst per reactor, weights | Run_Plan rows 8–21 | Run Plan → Plan ✔ |
-| Conditions and their windows | Run_Plan rows 79–106 (unused) | Run Plan → DOE (start, end, flows per reactor) ✔ |
+| Catalyst per reactor, weights, reactor role | Run_Plan rows 8–21 | Run Plan → Plan ✔ |
+| Conditions and their windows | Run_Plan rows 79–106 (unused) | Run Plan → DOE (start, end / duration, flows per reactor) ✔; Condition column on Online Analysis ✔ (6.9.4) |
 | Feed gas composition (IS and mixed gas) | ZMB → Run_Plan row 35; Gas I35/J35 typed | **Bypass GC lines per condition** (General_MB) ✔ |
 | Molar masses, carbon numbers | R#_MB col B / AD, Run_Plan row 37 | Run Plan → Feed → Molecular weights ✔ (6.9.1) |
 | Total gas feed (01i14FI01) and FIC per reactor | Gas E5, B11:I11 typed | Online export per line (else Run Plan DOE) ✔ |
 | GC injections per reactor | R#_MB D20:AB48 typed | Online export lines with Sampled_reactor ✔ |
-| Sampling window per sample (start / end) | Liq B5:I6 | **to build** — sample entry per reactor |
-| Liquid feed flow | ZMB row 13 → Liq row 13 | **to build** — pump check (ZMB) or 02i2FIC0r from the export / Run Plan DOE liquid flow |
-| TLP mass, HC and aqueous phase masses | Liq rows 17–19 | **to build** — liquid product entry |
-| Liquid product analysis (C, H, O wt%, N, S, density) | Liq rows 24–35 | **to build** (liquid product entry) |
-| Liquid feed C wt% | Run_Plan B58 | **to build** — with the liquid feed data (not the Run Plan, per the agreed decision) |
-| SIMDIS, DHA of the product | HC_SIMDIS, HC_DHA | Offline Analysis (DHA) exists; SIMDIS optional |
+| Sampling window per sample (start / end) | Liq B5:I6 | Online Analysis → **Liquid** tab ✔ (6.9.5) |
+| Liquid feed flow | ZMB row 13 → Liq row 13 | **ZMB pump check** (verified flow) ✔ (6.9.3), else Run Plan DOE liquid flow ✔ |
+| TLP mass, HC and aqueous phase masses | Liq rows 17–19 | Liquid tab ✔ (one phase: TLP only) |
+| Liquid product analysis (C, H, O wt%, N, S, density, aromatics) | Liq rows 24–35 | Liquid tab ✔ (C used; others stored) |
+| Liquid feed C wt% | Run_Plan B58 | Liquid tab, once per run ✔ (not in the Run Plan, as agreed) |
+| SIMDIS, DHA of the product | HC_SIMDIS, HC_DHA | Offline Analysis (DHA) exists; SIMDIS not used |
 
 ### 10.2 Calculations
 
@@ -347,22 +347,27 @@ systematic offset of the method (an inert reactor should give 0 % and 100 %).
 | Gas feed to reactor | F_r = 01i14FI01 · FIC_r / ΣFIC | done |
 | IS flow to reactor | F_IS = F_r · w_IS, w_IS from the bypass composition | done (General_MB) |
 | Mass / volume / carbon flow per molecule and injection | §6.3–6.5 | done |
-| Averages over the sampling window per reactor | AVERAGE of the injections in Liq B5..B6 (with outlier rule) | to build |
-| Gas feed without IS, gas product without IS | C9, C12 | to build (from existing flows) |
-| Liquid product flows | HC = (TLP − aqueous)/duration, aqueous = aqueous/duration | to build (fix #4) |
-| **Mass balance closure** | (gas out + HC out + aq out)/(gas in + liquid in) ×100 | to build |
-| **Carbon balance** | (C gas out + C liquid out)/(C gas in + C liquid in) ×100, C gas in over every feed component | to build (fixes #6, #7) |
-| Acetylene conversion | (in − out)/in ×100, in = F_r · w_C2H2 | to build |
-| Selectivity / C4+ yield | as defined with the team | to build |
-| Checks | injection inside the window, outliers, decantation loss, inert reactor near 0 % conversion and 100 % balance | to build |
+| Gas feed per molecule | F_j,in = F_IS · y_j,feed·MW_j / (y_IS,feed·MW_IS) (bypass of the condition) | done (6.9.6) |
+| Averages per sample and reactor | all OK lines of the reactor in the condition without the first (default); all lines; or ± h around the sample | done (6.9.6) |
+| Gas feed without IS, gas product without IS | C9, C12 | done |
+| Liquid product flows | HC = (TLP − aqueous)/duration, aqueous = aqueous/duration (fix #4) | done (6.9.5) |
+| **Mass balance closure** | (gas out + HC out + aq out)/(gas in + liquid in) ×100 | done (6.9.6) |
+| **Carbon balance** | (C gas out + C liquid out)/(C gas in + C liquid in) ×100, C gas in over every feed component (fixes #6, #7) | done (6.9.6) |
+| Conversion, selectivity, yield | any component and any reference reactant(s), carbon / mass / mole basis: conversion = (in − out)/in; selectivity = (out − in)/reference converted; yield = (out − in)/reference fed; yield wof% = out / total feed | done, chemistry-independent (6.9.9–6.9.10) |
+| Workbook ethylene selectivity (Nl/h), C4+ yield | C-Balance rows 15, 21 | kept in the backend for comparison; not shown on the page |
+| Checks | explicit ERROR texts for missing liquid / carbon wt% / DOE condition / bypass / IS peak | done; outlier rule and inert-reactor check open |
 
-### 10.3 Outputs (Summary)
-Per reactor and sample: TOS, mass balance %, carbon balance %, carbon in gas product (g C/h), acetylene conversion %,
-ethylene selectivity %, C4+ yield %; per injection: gas-phase carbon balance and acetylene conversion vs TOS (plots).
+### 10.3 Outputs
+Calculation → Mass Balance: **Reactor table** (per sample and reactor: TOS, GC lines, carbon in / out, carbon balance,
+gas-phase carbon balance, mass flows, mass balance, carbon in liquid %, reference conversion) and **Component table**
+(chosen components × in / out / net / conversion / selectivity / yield / yield wof%). Plots: any component and value per GC
+injection or per sample (X–Y), carbon in → out bars, selectivity / yield by component bars.
 
-### 10.4 Decisions to take with the team before building
-1. Mixed-gas MW convention (#3): divide by Σy of the analysed gas (dashboard) or by 100 (workbook)? It changes every flow by ~7 %.
-2. Which injections count in the average: all (workbook flows), all but the first (workbook statistics), or without outliers?
-3. Definition of ethylene selectivity and of the C4+ yield (which components, subtract the feed or not).
-4. Liquid feed: flow from the ZMB pump check, the export (02i2FIC0r) or the Run Plan DOE; carbon wt% from the feed analysis.
-5. Whether R5-type inert reactors are used as a correction reference.
+### 10.4 Decisions
+| # | Question | Current choice in the dashboard |
+|---|---|---|
+| 1 | Mixed-gas MW convention (#3): divide by Σy of the analysed gas or by 100 (workbook)? (~7 % on every flow) | Σy of the analysed gas — **to confirm with the team** |
+| 2 | Which injections count in the average | whole condition without the first line (selectable: all lines, ± h around the sample); no outlier rule yet |
+| 3 | Selectivity / yield definitions | carbon basis by default, net of the feed, against user-chosen reference reactant(s); mass and mole basis selectable |
+| 4 | Liquid feed flow / carbon | ZMB pump check, else Run Plan DOE; carbon wt% typed on the Liquid tab |
+| 5 | Inert reactors as a correction reference | open |

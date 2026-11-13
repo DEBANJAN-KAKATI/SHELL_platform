@@ -1,89 +1,167 @@
-# DHA Data Dashboard v6.4.0
-Double-click `run_dashboard.bat`. Table-1 accepts Unknown, Unknowns, or Unidentified as the Unknown component. If the optional Unknown source column is absent, the other five Table-1 components still process and an empty Unknown row is retained.
+# ILS Dashboard (DHA Data Dashboard) v6.9.10
 
-### Reforming process (v6.4)
-On the single **Run Plan** page, enter the Run Number and choose **Process: Reforming** (default is Isomerization). Both processes use the same `RunPlan.xlsx` workbook format with `Plan`, `DOE`, and `Feed` sheets; the process selector, not the workbook, controls the process. The optional Plan labels `Feed SL ID` and `Feed Cut-In` identify reforming feed samples and TOS. Other pages show the selected process as a badge; switching the process clears the loaded Run Plan.
+Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
+online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
+tables, the mass balance (any chemistry), plots, a printable summary and saved runs. Double-click `run_dashboard.bat`;
+the version is shown on the right of the menu bar. The full technical reference is [ILS.md](ILS.md); the history of
+changes is [CHANGELOG.md](CHANGELOG.md); the user and technical documentation is
+`documentation/ILS_Dashboard_Documentation.docx`.
 
-In Reforming mode, **Offline Analysis** reads the reforming DHA (.XLS) folder: Table-1 is CARBON_TABULAR(%WGT) with the Unknown row split by Carbon#, Table-2 lists every unknown COMPONENT_LIST row with its assigned Carbon# and the reason, and Table-3 holds RON, Molecular Weight, Carbon, Hydrogen and Specific Gravity. Unknown Carbon#:
-- rows that carry a Carbon# (`C8 Unknowns`, `C7-Unknowns`, ...) keep it;
-- rows without one (`Unidentified`, Carbon# 0) take the Carbon# of the neighbouring identified peaks when both match, otherwise the previous identified peak's Carbon#;
-- a lumped row already counted in a CARBON_TABULAR family (e.g. `Below C4 Unknowns` under Olefins C4) is not counted twice.
+## Workflow
 
-**Calculation** shows the Base table (temperature tag 10i2TIC01) and the **Reforming CARBON_TABULAR(%WGT)** tab: Date, Condition (from the DOE), TOS (h, from the Feed Cut-In), Reactor, UID, then Paraffins / Iso Paraffins / Naphthenes / Aromatics / Olefins / Unknowns x C1-C15, Total and the properties, with decimals, date filter and CSV export (two header rows). The Feed sample (Run Plan "Feed SL ID") is labelled Condition "Feed". The Yield (wof%) table is not used for reforming yet. Isomerization behaviour is unchanged.
+| Step | Page | What to do |
+|---|---|---|
+| 1 | **Run Plan** | Enter the Run Number, click the process tab (Isomerization, Reforming, General_MB), load the Run Plan; check Feed, Plan, DOE, Pre-run |
+| 2 | **Analysis → Offline** | Process the DHA report folder; optional Reactor Map (valve states) |
+| 3 | **Analysis → Online** | Import the GC / process export (Gas tab); General_MB: choose the Internal Standard and units |
+| 4 | **Analysis → ZMB** (General_MB) | Import the blank-run export; enter the liquid pump check |
+| 5 | **Analysis → Online → Liquid** (General_MB) | Enter the liquid samples (collection window, TLP or HC + aqueous mass, carbon wt%) |
+| 6 | **Calculation** | Calculation table (Base, Yield wof%), Custom table, and for General_MB the **Mass Balance** |
+| 7 | **Data Integrity** | Statistics and MAD-based outlier flags (never changes data) |
+| 8 | **Plots / Summary Dashboard** | Scatter plots by reactor and condition; mass balance plots; A4 board with 12 plots and one table |
+| 9 | **Save** | Save Run Details (RunData snapshot) or Save to Historian (one SQLite file per run); reload from **Runs**, compare in **History** |
 
-### Run workspace (v6.0)
-The app opens at `/`, where you can select a saved run, view its metadata, load it, or start with fresh data. **Save Run Details** is available in the header of every analysis page and on the run workspace. It saves the browser tab's loaded source data, calculated-table definitions/results, and plot settings as a small gzip-compressed JSON snapshot under `RunData/` (without duplicating display tables). Multiple snapshots of the same Run Number are kept independently. Use the same browser tab across pages; Load Run replaces the current tab's state and returns to the page from which the run was saved. Start with fresh data clears the active tab's state but leaves saved RunData files intact.
+Use one browser tab for a run: the working data is kept per tab. The ↻ button resets the tab and the Run Number.
 
+## Processes (v6.9)
+On the **Run Plan** page the process tabs follow the Run Number (locked until a Run Number is entered); the other pages
+show the process as a badge. Switching the process clears the loaded Run Plan; the process is never taken from the workbook.
 
-### Reactor Map (v3.4.0)
-Open the **Reactor Map** tab beside **Table-3 · Octane Table**. The packaged page is served locally from `/frontend/reactor_map.html` and retains From/To filtering for R1-R8 valve states.
+| Process | What it adds |
+|---|---|
+| **Isomerization** (default) | DHA tables (CARBON_TABULAR, COMPONENT_LIST, octane), Base table, Yield wof%, Custom table, Plots |
+| **Reforming** | Reforming DHA with unknown peaks assigned to a carbon number, Reforming CARBON_TABULAR tab with CSV / Export Complete, optional sync from a synced SharePoint folder |
+| **General_MB** | Isomerization pages plus the internal-standard gas flows, Liquid tab, ZMB page, Calculation → Mass Balance and mass balance plots |
 
-### Plots (v6.0.0)
-On the Plots page, use **Show moving-average trends** to draw separate dashed trends for each reactor and DOE condition. The centered 3/5/7-point moving average sorts by the selected X value, averages duplicate X values, and requires at least as many distinct X values as the window size; scatter points remain unconnected. Choose **Plot size** for physical paper dimensions (mm); fixed-size PNG exports use 300 DPI. Click an axis title in the chart to change its displayed label without changing the selected data column. X/Y selectors include Base Table tags and offer Custom Calculated Table tags after they have been calculated on the Custom table page in the same browser tab.
-The multi-select **Condition Filter** uses each selected Run Plan DOE condition's Start Date and End Date as an inclusive time window. Date-only End Dates include the entire day. Conditions without a valid date range cannot be selected; load the Run Plan in the same browser tab before opening Plots.
-Plot colors identify reactors; marker shapes identify matched DOE conditions. The separate condition legend shows the shape and point count for each plotted condition.
+## Run Plan: one template for every experiment (v6.6)
+The universal template has the sheets **Plan** (run, objective, catalyst loading plan with the role of each reactor),
+**DOE** (conditions per block and reactor with start / end or duration, flows; Step 0 pre-run programme) and **Feed**
+(feed properties, liquid components, group-type summary, gas feed composition and, since v6.9.1, the **Molecular
+weights** table). The dashboard shows Feed, Plan, DOE and **Pre-run** (steps and one temperature / pressure chart per
+block). Older RunPlan.xlsx files still load.
 
-### Summary Dashboard (v6.0)
-Open **Summary Dashboard** in the top navigation. The desktop board has three columns and four rows, with responsive layouts on smaller screens and no sidebar. On **Plots**, use **Add to Dashboard** to capture the current plot and its visible legends. Empty slots fill first; when all twelve are occupied, choose a plot to replace or cancel. Click a plot to enlarge it, or use its delete icon to free the slot.
+**Molecular weights (v6.9.1).** Every molar mass and carbon number comes from the Run Plan: the gas feed table has
+**MW (g/mol)** and **Carbon #** columns, and the **Molecular weights** table lists every component as it is named in the GC
+export (ESTD_<name>), with spare rows for new molecules. Add them to an older Run Plan with
+`python scripts/run_plan_examples/add_molecular_weights.py RunPlan.xlsx`. The values are used by the calculations only
+and are not shown on the Run Plan page.
 
-New plot snapshots are rendered at card proportions with larger axis labels, without changing the original plot's paper dimensions or settings. Existing snapshots retain their proportions; re-add older plots to use the sharper card-sized rendering. Axes and legends are retained rather than cropped.
+For a mass balance the Run Plan needs: DOE conditions with condition number, block, reactor, start and end (or duration);
+the total gas flow per reactor and condition (used when the export has no flow columns); the Feed Cut-In; the measured
+gas feed composition. The liquid feed analysis is not part of the Run Plan (it is entered on the Liquid tab).
 
-Use **Add table** on the dashboard to select a loaded Yield, Base, Custom, Plan, or DOE table and its columns. Plan and DOE become available after loading a Run Plan in the same tab. **Reactor** and **Condition** filters select matching rows when those fields exist; the Plan table's Reactor filter selects reactor columns instead. Unavailable filters are disabled. The first eight columns are selected initially; the chosen columns and matching rows are captured as a full-width table snapshot, with applied filters shown in the report metadata. Table and plot snapshots persist across reloads within the same browser tab, but are not a separate saved RunData report and do not survive closing the tab. Later source/filter changes do not change captured snapshots.
+## Analysis
 
-The dashboard's reset icon asks for confirmation before removing all plots and the table; it does not reset source data or the Run Number. **Print / PDF** opens the browser print dialog with A4 portrait styling. Select **Save as PDF** for a PDF file. Empty slots and controls are excluded; long tables continue onto additional pages with repeated column headers.
+### Offline Analysis
+Process the DHA (.XLS) folder: Table-1 CARBON_TABULAR(%WGT) (Unknown, Unknowns or Unidentified accepted), Table-2
+COMPONENT_LIST, Table-3 octane numbers; the **Reactor Map** tab shows the R1–R8 valve states with a From / To filter.
+In Reforming, Table-1 splits the Unknown row by carbon number (lumped `Cn Unknowns` keep n; `Unidentified` takes the
+neighbouring identified peaks' carbon number; lumps already counted in a family are not counted twice), Table-2 lists
+every unknown peak with the reason, Table-3 holds RON, MW, Carbon, Hydrogen and SG.
 
-### Optional Data Integrity (v6.0)
-Open **Data Integrity** between Calculation and Plots to review loaded Base or Yield data in the same tab. Statistical summaries and MAD-based potential outlier checks run independently per Run / Condition / Reactor / Parameter. Small and zero-MAD groups are unscored; ambiguous assignments, missing or invalid values, and duplicate selected measurements are flagged. Source records are never changed. Results can be exported to CSV or deliberately added to Summary Dashboard.
+### Online Analysis (Gas)
+Import the tab-delimited SystemTxt export. Every line has a **Condition** column (v6.9.4): the Run Plan DOE condition
+whose window of that reactor contains the line time, blank outside every window; bypass lines list the condition of each
+block when they differ ("Block-1: 2, Block-2: 1").
 
-This feature has no new dependencies, external AI calls, or database migrations. To hide it, set `DASHBOARD_DATA_INTEGRITY=0` and restart. The complete feature lives in `features/data_integrity/`; the app continues to start if that folder is absent. See [the feature guide](features/data_integrity/README.md) for assumptions, limits, and exact clean-removal instructions.
+With **General_MB**, choose the **Internal Standard** (Argon or N2). The bypass (reactor 0) lines of each DOE condition give
+the feed gas composition; a side panel shows it with the average IS flow to each reactor. The **Units** selector then shows
+**mass (g/h)**, **volumetric (Nl/h)** or **carbon (g C/h)** flows, calculated like the MassBal workbook. The gas feed comes
+from the export line, else from the Run Plan DOE condition running at that time; TOS counts from the Feed Cut-In. Lines
+that cannot be calculated show an ERROR status (bypass, no internal-standard peak, gas off, no DOE condition), never zero.
+The formulas, flow sources and molecular weights are in the collapsed **Conversion basis** block. Isomerization and
+Reforming show mol% only.
 
-### Yield Timestamp Matching
-Yield rows keep the Offline Table-2 sample timestamp. Base readings are matched using full timestamps within an inclusive 60-minute window in either direction, including across midnight, month, and year boundaries. If the sample identifies a reactor, readings for that reactor are preferred within the window; otherwise the nearest reading is used. Equal-distance matches prefer the earlier timestamp. Missing matches and invalid Naphtha values remain explicit errors rather than being replaced with zero. Restart the app after updating the backend, then sync Calculation data to recalculate saved Yield rows.
+### Online Analysis (Liquid, General_MB, v6.9.5)
+The liquid side of the mass balance, typed by the user: the carbon wt% of the liquid feed (once) and, per sample (one tab
+per sample, "+ New sample") and reactor, sample collection started / finished ("Apply times" for all reactors), TLP mass
+(or the HC and aqueous phases with **Two phases seen**) and the carbon wt% of the HC product; optional H, O, N, S,
+density and aromatics. The tab calculates duration, TOS, decantation loss, HC and aqueous product flows over the sampling
+duration and the carbon in the liquid product and feed; the liquid feed flow comes from the ZMB pump check, else the Run
+Plan DOE. Each reactor shows whether it is ready for the mass and the carbon balance. Enter moves to the next reactor; a
+block copied from Excel can be pasted into any cell (US, dotted or ISO dates, decimal comma).
 
-### Save Run Details
-The first save creates a RunData snapshot. Saving the same Run Number again asks whether to cancel, replace the latest file, or save a new version. Replacement updates only the selected latest snapshot; earlier versions remain available in Populate Run. Cancel leaves existing files unchanged.
+### ZMB (General_MB, v6.9.2 – v6.9.3)
+**Analysis → ZMB** imports the GC export of the blank run and shows it like the Online table. The **Liquid collected per
+reactor** card is the liquid pump check: one tab per repeat, collection start / end and collected mass per reactor; it
+shows the duration, TOS and liquid flow, and the **verified liquid flow** averaged over the repeats, which the mass
+balance uses as the liquid feed.
 
-### Process tabs: Isomerization, Reforming, General_MB (v6.9)
-On the **Run Plan** page, enter the Run Number and click the process tab: **Isomerization** (default), **Reforming** or **General_MB**. Other pages show the process as a badge; switching the process clears the loaded Run Plan. General_MB works like Isomerization and adds, on **Analysis → Online**, the **Internal Standard** (Argon or N2): the bypass (reactor 0) GC lines of every Run Plan DOE condition give the feed gas composition (IS mol% and mixed gas mol%, raw averages) and the side panel next to the table shows it with the average IS flow to each reactor; the Units g/h, Nl/h and g C/h are calculated with that IS. In Isomerization and Reforming, and without an Internal Standard, the Online table shows mol% only.
+## Calculation
 
-### One Run Plan template for every experiment (v6.6)
-Load the universal Run Plan template (Plan, DOE, Feed) on the **Run Plan** page. Feed shows the feed properties and the Liquid components, Group-type summary and Gas feed composition tables separately (empty rows hidden, "Show empty rows" to see the full template); DOE shows the filled conditions; **Pre-run** shows the DOE Step 0 steps (Step … Remarks) and one chart per block (temperature by phase, pressure or the chosen flow on the right axis). Older RunPlan.xlsx files still load. The other pages work in the Isomerization format for now.
+### Calculation table and Custom table
+**Base table**: TOS, H2 / naphtha flows and ratios from the online data and the Run Plan feed properties. **Yield (wof%)**:
+each Table-2 sample is matched to the nearest Base row within ±60 min (same reactor preferred, equal distance → earlier);
+missing matches and invalid naphtha values are explicit errors. **Custom table**: Excel-like formulas on any column
+(whitelisted evaluator, cycle detection, cell inspector, CSV / JSON templates). Reforming adds the Reforming
+CARBON_TABULAR(%WGT) tab (Date, Condition, TOS, Reactor, UID, families × C1–C15, properties) with CSV export.
 
-### ZMB import (v6.9.2)
-With the **General_MB** process, **Analysis → ZMB** imports the GC export of the blank (ZMB) run that precedes the experiment and shows its lines in normalised mol%, like Online Analysis (filter reactor 0 for the bypass lines). It is saved with the run; its use in the mass balance calculations comes later. The **Liquid collected per reactor** card (v6.9.3) holds the liquid pump check: one tab per repeat, collection start and end per reactor (or "Apply to all reactors"), the TL collected mass in g; it shows the duration, TOS (h), the liquid flow rate (g/h) and the verified liquid flow averaged over the repeats.
+### Mass Balance (General_MB, v6.9.6 – v6.9.10)
+One plain page like the Isomerization calculation table, for **any chemistry** (no reaction, reactant or product is fixed;
+the default reference reactant is the component whose carbon is consumed most):
 
-Online Analysis shows a **Condition** column (v6.9.4): the Run Plan DOE Condition No. whose Start/End window of that reactor contains the line's date and time; blank when no condition matches. Bypass lines list the condition of each block when they differ ("Block-1: 2, Block-2: 1").
+- **Reactor table** – one row per liquid sample and reactor (a condition without a liquid sample is "gas only"): TOS, GC
+  lines averaged, carbon in / out of gas and liquid, **carbon balance**, gas-phase carbon balance, gas / liquid feed, gas,
+  HC and aqueous product, **mass balance**, carbon recovered in the liquid, conversion of the reference reactant. The header
+  holds the internal standard and how the GC lines are averaged (whole condition without the first line – default –, all
+  lines, or ± hours around the liquid sample).
+- **Component table** – like the Offline component filter, pick the **Components** (grouped: reference, in the feed,
+  formed, "Liquid hydrocarbons", gas lumps by carbon number "Gas C2", "Gas C4+" …), the **Reference** reactant(s), the
+  **Values** and the **Basis** (carbon g C/h, mass g/h, mole mmol/h):
 
-With **General_MB**, Online Analysis has two tabs (v6.9.5): **Gas** (the imported export) and **Liquid**, where the liquid product of each sample is typed: one tab per sample, one row per reactor with sample collection start/finish, TLP mass (or HC and aqueous phases), and Carbon wt%; plus the Carbon wt% of the liquid feed once. The liquid feed flow comes from the ZMB pump check or the Run Plan DOE. The page calculates duration, TOS, product flows and carbon flows, and shows per reactor whether the mass and carbon balance can be calculated. Paste from Excel and Enter-to-next-row make entry quick.
+| Value | Definition |
+|---|---|
+| In, Out, Net | flow into and out of the reactor, and out − in |
+| Conversion | (in − out) / in × 100, consumed components only |
+| Selectivity | (out − in) / reference reactant(s) converted × 100 |
+| Yield | (out − in) / reference reactant(s) fed × 100 (= conversion × selectivity) |
+| Yield wof% | out / total feed × 100 (mass), as the Isomerization yield table |
 
-**Calculation → Mass Balance** (General_MB, any chemistry) is one plain page like the Isomerization calculation table: a **Reactor table** (carbon and mass balance, flows, conversion per sample and reactor) and a **Component table** where you pick the components, the reference reactant(s), the values (in, out, net, conversion, selectivity, yield, yield wof%) and the basis (carbon, mass, mole). On **Plots**, General_MB adds a row to plot any component and value per GC injection or per sample (X–Y), and two bar charts: carbon in → out and selectivity / yield by component.
+Missing inputs show as ERROR text; hover a value to see its formula with the numbers. Both tables export to CSV and are
+saved with the run. The workbook (MassBal Ver2.2) is described cell by cell in
+[documentation/MassBal_Workbook_Reference.md](documentation/MassBal_Workbook_Reference.md).
 
-### Molecular weights in the Run Plan (v6.9.1)
-Every molar mass and carbon number comes from the Run Plan's Feed sheet: the gas feed table has **MW (g/mol)** and **Carbon #** columns, and the **Molecular weights** table lists every analysed component as it is named in the GC export (ESTD_<name>), with spare rows. For a new molecule, add a row with its name, MW and carbon number; the Online Analysis then converts it. Add the columns and table to an older Run Plan with `python scripts/run_plan_examples/add_molecular_weights.py RunPlan.xlsx`.
+## Plots and Summary Dashboard
+**Plots**: X / Y from the Yield, Base, octane and Custom table columns; colours = reactors, marker shapes = DOE
+conditions; Reactor and Condition filters (DOE Start / End windows), date range, optional centred 3/5/7-point moving
+average per reactor and condition, reactor-wise connecting lines, axis limits and editable axis titles, point exclusion,
+paper-size PNG export at 300 DPI. With **General_MB** a row of choices adds the mass balance (v6.9.10): **Data** (per GC
+injection, per sample, or the calculation tables), **Chart** (X–Y; Carbon in → out; Selectivity / yield by component),
+**Component**, **Value**, **Basis** and **Reference reactant**. The X–Y chart keeps all the plot features; X can be TOS or any
+other value (for example selectivity vs conversion).
 
-### Online Analysis units (v6.8; General_MB with an Internal Standard since v6.9)
-On **Analysis → Online**, the **Units** selector shows the GC values as **Normalised mol%** (as imported), **Mass flow rates (g/h)**, **Volumetric flow rates (Nl/h)** or **TOS carbon of each molecule (g C/h)**, calculated like the MassBal workbook with argon as internal standard and the workbook's molecular weights. The Ar content of the feed gas comes from the Run Plan (Feed → Gas feed composition); when the export has no gas flow columns (01i14FIC0r / 01i14FI01) the gas feed comes from the Run Plan DOE (gas flow of the condition running at that time). Nothing is typed on the page; TOS counts from the Run Plan Feed Cut-In. Lines that cannot be calculated (bypass, no argon peak, gas feed stopped) show an ERROR status. The formulas and the MW table are in the collapsed Conversion basis block under the table.
+**Summary Dashboard**: a 3 × 4 board; **Add to Dashboard** on Plots captures the current plot, **Add table** adds a Yield,
+Base, Custom, Plan or DOE table with Reactor / Condition filters. **Print / PDF** prints A4 portrait; long tables continue
+with repeated headers. Snapshots persist in the browser tab.
 
-### Run v6.4 on Windows
-Double-click `run_dashboard.bat` (or run `./run_dashboard.ps1` in PowerShell). The launcher uses, in order: a working `.venv` / `.venv-local`; an installed Python 3.9 or newer (Python launcher `py`, PATH, or the standard install folders, including the Python Install Manager's `%LOCALAPPDATA%\Python\pythoncore-*`) that already has the packages, which starts with no downloads; a new `.venv` created from an installed Python; and only when no Python is installed, a private Python 3.12 downloaded into `.python-runtime`. Packages in `requirements.txt` are installed only when missing or after `requirements.txt` changes (Python 3.15+ gets pandas 3, older Python pandas 2). If the company network blocks pypi.org ("403 Forbidden"), run `py -m pip download -r requirements.txt -d wheels` in this folder on a computer with internet and the same Python version, copy the `wheels` folder here and start again: the launcher then installs offline from it. It opens http://127.0.0.1:5001 (host/port in `config/settings.json`); when that port is busy or blocked it uses the next free port and prints the address, and when the dashboard is already running it just opens it. To start it directly from the v6.4 folder, use `.\.venv\Scripts\python.exe .\run_app.py` in PowerShell.
+**Data Integrity** (optional plug-in): statistics and MAD-based potential outliers per Run / Condition / Reactor / Parameter;
+hide it with `DASHBOARD_DATA_INTEGRITY=0`; see [features/data_integrity/README.md](features/data_integrity/README.md).
 
-### Run v6.4 with Docker
-Docker packages the Flask application and its frontend, calculation services, feature modules, and Python dependencies into one image. From the v6.4 folder, build and start it with:
+## Saving runs
+**Save Run Details** writes the tab's sources, table definitions, Liquid / ZMB entries, mass balance choices and plot
+settings as a gzip JSON snapshot in `RunData/`; saving the same Run Number again offers cancel, replace latest or new
+version. The **Runs** page (`/`) lists and loads saved runs, or starts with fresh data. **Save to Historian** writes `Historian/Run_<n>.sqlite`;
+**History** compares tables between runs.
 
+## Run on Windows
+Double-click `run_dashboard.bat` (or `./run_dashboard.ps1`). The launcher uses, in order: a working `.venv` /
+`.venv-local`; an installed Python 3.9+ that already imports the app (no downloads); a new `.venv` from an installed
+Python; only when no Python is installed, a private Python 3.12 in `.python-runtime`. Packages are installed only when
+missing or after `requirements.txt` changes (Python 3.15+ gets pandas 3, older Python pandas 2). If the network blocks
+pypi.org (403), run `py -m pip download -r requirements.txt -d wheels` on a computer with internet and the same Python
+version, copy the `wheels` folder here and start again. The dashboard opens at http://127.0.0.1:5001 (host / port in
+`config/settings.json`); a busy port moves to the next free one, and a dashboard already running from the same folder is
+reused. After an update, close the old dashboard window first and press Ctrl+F5 once. Set `DASHBOARD_USER` and
+`DASHBOARD_PASS` to require a login when sharing.
+
+## Run with Docker
 ```powershell
 $env:DASHBOARD_SECRET_KEY = "replace-with-a-long-random-secret"
 docker compose up --build
 ```
+Open http://localhost:5001. `data/` is mounted at `/app/data`; RunData is kept in the `dashboard-rundata` volume. Override
+the sources with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY` or `DASHBOARD_RUN_PLAN_FILE`.
 
-Open http://localhost:5001. The Compose setup mounts the local `data/` folder at `/app/data` so source files and Run Plan workbooks are available to the container, while saved RunData is retained in the named `dashboard-rundata` volume. Set `DASHBOARD_USER` and `DASHBOARD_PASS` before `docker compose up` to enable login protection. The direct image command is:
-
-```powershell
-docker build -t dha-data-dashboard:6.4 .
-docker run --rm -p 5001:5001 `
-  -e DASHBOARD_SECRET_KEY="replace-with-a-long-random-secret" `
-  -v dashboard-rundata:/app/RunData `
-  -v "${PWD}\data:/app/data" `
-  dha-data-dashboard:6.4
-```
-
-The container listens on `0.0.0.0:5001`, disables browser auto-opening, and uses `/app/data/input` and `/app/data/RunPlan.xlsx` as its default source locations. Override these with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY`, or `DASHBOARD_RUN_PLAN_FILE` when needed.
+## Tests
+`python -m pytest -q tests` (47 tests: Run Plan reader and molecular weights, online units and the internal standard
+against the MassBal workbook, R08 conditions, mass balance).
