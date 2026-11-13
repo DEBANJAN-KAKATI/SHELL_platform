@@ -1,3 +1,13 @@
+## Documentation update (2026-11-13, v6.9.10)
+- README rewritten for the current dashboard: workflow table, processes, Run Plan, Analysis (Offline, Online Gas / Liquid,
+  ZMB), Calculation (tables, Mass Balance), Plots and Summary Dashboard, saving, Windows / Docker start, tests.
+- ILS.md: tests, layout (mass balance files, documentation), state keys `ils_mass_balance_state` / `ils_plot_mb`, ZMB pump
+  check as liquid feed, status and next steps of the mass balance.
+- `documentation/MassBal_Workbook_Reference.md` §10: inputs, calculations and decisions with their status in v6.9.10.
+- New `documentation/ILS_Dashboard_Documentation.docx` (user and technical documentation v6.9.10, no confidential data):
+  condition column, Liquid tab, ZMB, Mass Balance page (reactor and component tables, definitions), mass balance plots,
+  updated modules, tests, troubleshooting, version history and glossary.
+
 ## 6.9.10 (2026-11-12) — Mass Balance tables as simple as Isomerization; mass balance plots
 - Calculation → Mass Balance is now one plain page like the Isomerization calculation table (no cards, tabs or charts):
   - **Reactor table**: one row per sample and reactor with TOS, GC lines, carbon in / out (gas, liquid), carbon balance,
