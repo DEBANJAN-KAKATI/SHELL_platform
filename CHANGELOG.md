@@ -1,3 +1,11 @@
+## Documentation: formula reference (2026-11-13, v6.9.10)
+- `documentation/ILS_Dashboard_Documentation.docx` gets **Section 10 Formula reference** (16 pages in total): every value of
+  the dashboard as a Word equation (49 equations) with a symbol table (meaning, where it comes from) and "how to get it":
+  10.1 Run Plan (planned flows, condition windows, TOS, pre-run timeline), 10.2 Offline and Calculation table (Base table,
+  Yield wof%, lumps), 10.3 Online internal-standard flows, 10.4 Liquid tab and ZMB pump check, 10.5 Mass Balance (averages,
+  gas feed per component, mass and carbon balance, basis, conversion, selectivity, yield, yield wof%, lumps), 10.6 Plots
+  (moving average) and Data Integrity (robust score). Technical sections renumbered 11–15.
+
 ## Documentation update (2026-11-13, v6.9.10)
 - README rewritten for the current dashboard: workflow table, processes, Run Plan, Analysis (Offline, Online Gas / Liquid,
   ZMB), Calculation (tables, Mass Balance), Plots and Summary Dashboard, saving, Windows / Docker start, tests.

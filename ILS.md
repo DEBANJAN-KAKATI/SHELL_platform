@@ -58,7 +58,8 @@ General_MB.
   `reactor_map.html` is a large self-contained page. General_MB: `online_liquid.js` (Liquid tab), `zmb.js` (ZMB page),
   `mb_core.js` (mass balance engine shared by `mass_balance.js` and `plots.js`).
 - `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`, `run_plan_examples/` (template builders, `add_molecular_weights.py`).
-- `documentation/` — `ILS_Dashboard_Documentation.docx` (user + technical documentation, no confidential data, v6.9.10),
+- `documentation/` — `ILS_Dashboard_Documentation.docx` (user + technical documentation with a formula reference of every
+  calculation as equations, Section 10; no confidential data, v6.9.10; built by a docx-js script),
   `MassBal_Workbook_Reference.md` (the MassBal Ver2.2 workbook cell by cell), older v3.4 technical notes.
 - Docker: `Dockerfile` + `docker-compose.yml` (gunicorn `app:app` on 0.0.0.0:5001, `data/` mounted at `/app/data`,
   RunData in volume `dashboard-rundata`); env overrides `DASHBOARD_HOST/PORT/OPEN_BROWSER`,
