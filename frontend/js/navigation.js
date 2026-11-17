@@ -138,6 +138,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!event.target.closest('.analysis-menu')) closeMenus();
     });
 
+    // Step-by-step guide on every page (6.9.11)
+    if (!document.querySelector('script[src*="guide.js"]')) {
+        const guideScript = document.createElement('script');
+        guideScript.src = '/frontend/js/guide.js?v=1';
+        document.head.appendChild(guideScript);
+    }
+
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');

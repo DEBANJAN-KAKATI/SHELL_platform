@@ -1,11 +1,12 @@
-# ILS Dashboard (DHA Data Dashboard) v6.9.10
+# ILS Dashboard (DHA Data Dashboard) v6.9.11
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
 tables, the mass balance (any chemistry), plots, a printable summary and saved runs. Double-click `run_dashboard.bat`;
 the version is shown on the right of the menu bar. The full technical reference is [ILS.md](ILS.md); the history of
 changes is [CHANGELOG.md](CHANGELOG.md); the user and technical documentation is
-`documentation/ILS_Dashboard_Documentation.docx`.
+`documentation/ILS_Dashboard_Documentation.docx` (formulas in Section 10) and the picture guide
+`documentation/ILS_Dashboard_Picture_Guide.docx`.
 
 ## Workflow
 
@@ -22,6 +23,10 @@ changes is [CHANGELOG.md](CHANGELOG.md); the user and technical documentation is
 | 9 | **Save** | Save Run Details (RunData snapshot) or Save to Historian (one SQLite file per run); reload from **Runs**, compare in **History** |
 
 Use one browser tab for a run: the working data is kept per tab. The ↻ button resets the tab and the Run Number.
+
+**New here?** Every page has a **? Guide** button that highlights its controls one by one and explains them; on the first
+visit of a page it is offered automatically. `documentation/ILS_Dashboard_Picture_Guide.docx` shows the same steps with
+screenshots for each process (Isomerization, Reforming, General_MB).
 
 ## Processes (v6.9)
 On the **Run Plan** page the process tabs follow the Run Number (locked until a Run Number is entered); the other pages
