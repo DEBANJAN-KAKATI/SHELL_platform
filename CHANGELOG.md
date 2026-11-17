@@ -1,3 +1,14 @@
+## 6.9.11 (2026-11-17) — Step-by-step guide and picture guide
+- **"? Guide" button on every page** (`frontend/js/guide.js`, `css/guide.css`, loaded by navigation.js; also on the Runs
+  page): highlights the controls of the page one by one with a short explanation (Next / Back, arrow keys, Esc). The
+  Online page has a separate tour for the Liquid tab; steps of other processes or hidden tabs are skipped. On the first
+  visit of a page a small box offers the guide ("Start guide", "Not now", "Don't show again").
+- **Step-by-step picture guide** `documentation/ILS_Dashboard_Picture_Guide.docx` (25 pages): one page per step with a
+  screenshot, numbered markers on every control and the matching explanation, for Getting started, Isomerization (10
+  steps), Reforming (3) and General_MB (8). All data in the screenshots is blurred. Built from the same texts as the
+  in-app guide (`scripts/docs/`).
+- User and technical documentation: Guide button mentioned, version history.
+
 ## Documentation: formula reference (2026-11-13, v6.9.10)
 - `documentation/ILS_Dashboard_Documentation.docx` gets **Section 10 Formula reference** (16 pages in total): every value of
   the dashboard as a Word equation (49 equations) with a symbol table (meaning, where it comes from) and "how to get it":

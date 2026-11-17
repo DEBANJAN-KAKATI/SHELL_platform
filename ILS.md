@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.10). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.9.11). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -56,11 +56,16 @@ General_MB.
 - `frontend/` — static HTML pages + vanilla JS (Chart.js, Lucide icons, no build step). `navigation.js` builds the
   top nav, Run Number box, Process selector/badge (`window.ILSProcess`), reset button.
   `reactor_map.html` is a large self-contained page. General_MB: `online_liquid.js` (Liquid tab), `zmb.js` (ZMB page),
-  `mb_core.js` (mass balance engine shared by `mass_balance.js` and `plots.js`).
+  `mb_core.js` (mass balance engine shared by `mass_balance.js` and `plots.js`). `guide.js` + `css/guide.css` (6.9.11): "? Guide"
+  tour on every page (loaded by navigation.js; Runs page loads it directly); `TOURS[pageKey]` = [selector, title, text];
+  `online_liquid` when the Liquid tab is open; hidden steps skipped; first-visit prompt (localStorage `ils_guide_seen:<page>`,
+  `ils_guide_off`). The same texts feed the picture guide (`scripts/docs/`). Add steps there when a page gets new controls.
 - `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`, `run_plan_examples/` (template builders, `add_molecular_weights.py`).
 - `documentation/` — `ILS_Dashboard_Documentation.docx` (user + technical documentation with a formula reference of every
   calculation as equations, Section 10; no confidential data, v6.9.10; built by a docx-js script),
-  `MassBal_Workbook_Reference.md` (the MassBal Ver2.2 workbook cell by cell), older v3.4 technical notes.
+  `ILS_Dashboard_Picture_Guide.docx` (screenshots with numbered markers per process, data blurred, v6.9.11),
+  `MassBal_Workbook_Reference.md` (the MassBal Ver2.2 workbook cell by cell), older v3.4 technical notes. Build scripts in
+  `scripts/docs/`.
 - Docker: `Dockerfile` + `docker-compose.yml` (gunicorn `app:app` on 0.0.0.0:5001, `data/` mounted at `/app/data`,
   RunData in volume `dashboard-rundata`); env overrides `DASHBOARD_HOST/PORT/OPEN_BROWSER`,
   `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY`, `DASHBOARD_RUN_PLAN_FILE`.
