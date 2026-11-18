@@ -246,7 +246,10 @@ if %errorlevel% neq 0 goto :embedded_pip_failed
 goto :embedded_ready
 :embedded_pip_offline
 echo Installing the Python package installer from the wheels folder...
-for %%W in ("%ROOT%wheels\pip-*.whl") do set "PIP_WHEEL=%%~fW"
+set "PIP_WHEEL="
+rem dir /b handles spaces and brackets in the path; the newest pip wheel (sorted by name) wins.
+for /f "delims=" %%W in ('dir /b /o-n "%ROOT%wheels\pip-*.whl" 2^>nul') do if not defined PIP_WHEEL set "PIP_WHEEL=%ROOT%wheels\%%W"
+if not defined PIP_WHEEL goto :embedded_pip_failed
 "%EMBED%" "%PIP_WHEEL%/pip" install --disable-pip-version-check --no-warn-script-location --no-index "%PIP_WHEEL%"
 if %errorlevel% neq 0 goto :embedded_pip_failed
 
