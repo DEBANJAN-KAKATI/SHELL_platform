@@ -1,6 +1,10 @@
 /* ILS step-by-step guide (6.9.11) */
-.ils-guide-btn{height:38px;padding:0 13px;border:1px solid rgba(7,26,45,.28);border-radius:6px;background:#fffaf0;color:#071a2d;font:inherit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
-.ils-guide-btn:hover{border-color:#c95512;background:#fff0df}
+.ils-guide-dock{position:fixed;right:20px;bottom:20px;z-index:9996;display:flex;align-items:center;gap:10px}
+.ils-guide-btn{width:46px;height:46px;padding:0;border:0;border-radius:50%;background:#071a2d;color:#fbf5e9;font:700 22px Georgia,serif;cursor:pointer;box-shadow:0 8px 22px rgba(7,26,45,.35)}
+.ils-guide-btn:hover,.ils-guide-btn:focus-visible{background:#c95512}
+.ils-next-btn{display:inline-flex;align-items:center;gap:8px;height:46px;padding:0 18px;border-radius:23px;background:#c95512;color:#fbf5e9;font-family:"Fira Code","Segoe UI",Consolas,monospace;font-size:12.5px;font-weight:800;text-decoration:none;box-shadow:0 8px 22px rgba(7,26,45,.3)}
+.ils-next-btn:hover,.ils-next-btn:focus-visible{background:#ad450c}
+.ils-next-label{opacity:.8;text-transform:uppercase;letter-spacing:.08em;font-size:10.5px}
 .ils-guide-spot{position:absolute;z-index:9998;border-radius:8px;box-shadow:0 0 0 3px #c95512,0 0 0 9999px rgba(7,26,45,.55);pointer-events:none;transition:all .18s ease}
 .ils-guide-card{position:absolute;z-index:9999;width:340px;padding:14px 16px 12px;border-radius:10px;background:#fbf5e9;color:#071a2d;box-shadow:0 18px 40px rgba(7,26,45,.35);font-family:"Fira Code","Segoe UI",Consolas,monospace}
 .ils-guide-card h4{margin:2px 0 6px;font:700 17px Georgia,serif}
@@ -12,9 +16,9 @@
 .ils-guide-actions button[data-g="skip"]{border:0;color:#6f746f;padding-left:0}
 .ils-guide-actions button:disabled{opacity:.4;cursor:default}
 .ils-guide-actions .primary,.ils-guide-prompt .primary{background:#c95512;border-color:#ad450c;color:#fbf5e9}
-.ils-guide-prompt{position:fixed;right:20px;bottom:20px;z-index:9997;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;max-width:420px;padding:12px 14px;border-radius:10px;background:#071a2d;color:#fbf5e9;box-shadow:0 14px 34px rgba(7,26,45,.35);font-family:"Fira Code","Segoe UI",Consolas,monospace;font-size:12px}
+.ils-guide-prompt{position:fixed;right:20px;bottom:80px;z-index:9997;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;max-width:420px;padding:12px 14px;border-radius:10px;background:#071a2d;color:#fbf5e9;box-shadow:0 14px 34px rgba(7,26,45,.35);font-family:"Fira Code","Segoe UI",Consolas,monospace;font-size:12px}
 .ils-guide-prompt b{width:100%;font:700 15px Georgia,serif}
 .ils-guide-prompt span{width:100%;opacity:.85}
 .ils-guide-prompt button{color:#fbf5e9;border-color:rgba(251,245,233,.4)}
 .ils-guide-prompt button[data-g="off"]{border:0;opacity:.7;margin-left:auto}
-@media print{.ils-guide-btn,.ils-guide-prompt,.ils-guide-card,.ils-guide-spot{display:none!important}}
+@media print{.ils-guide-dock,.ils-guide-btn,.ils-guide-prompt,.ils-guide-card,.ils-guide-spot{display:none!important}}

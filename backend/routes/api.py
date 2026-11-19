@@ -414,6 +414,29 @@ def custom_table_calculate():
         return jsonify({"error": str(e), "rows": rows, "columns": columns}), 400
 
 
+@api.get("/sync-source")
+def sync_source_status():
+    """OneDrive-synced folder of Isomerization / General_MB (6.10.0); Reforming uses /api/reforming/sync-source."""
+    from backend.services.sync_source import sync_status
+
+    try:
+        return jsonify(sync_status(request.args.get("process")))
+    except (OSError, ValueError) as e:
+        return jsonify({"found": False, "error": str(e), "message": str(e)}), 400
+
+
+@api.post("/sync-source")
+def sync_source_save():
+    from backend.services.sync_source import save_folder, sync_status
+
+    body = request.get_json(silent=True) or {}
+    try:
+        save_folder(body.get("process"), body.get("folder"))
+        return jsonify(sync_status(body.get("process")))
+    except (OSError, ValueError) as e:
+        return jsonify({"found": False, "error": str(e), "message": str(e)}), 400
+
+
 @api.post("/export-xlsx")
 def export_xlsx():
     """Multi-sheet Excel export (Yield Table + Online Analysis tab)."""

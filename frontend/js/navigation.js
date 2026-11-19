@@ -94,7 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
             link.href = '/data-integrity';
             link.textContent = 'Data Integrity';
             link.setAttribute('aria-current', active ? 'page' : 'false');
-            tabs.querySelector('a[href="/frontend/plots.html"]').before(link);
+            // Menu order (6.10.0): … Calculation → Plots → Data Integrity → Summary Dashboard → History
+            tabs.querySelector('a[href="/frontend/plots.html"]').after(link);
         } catch (error) { }
     }
     addOptionalIntegrityTab();
@@ -141,8 +142,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // Step-by-step guide on every page (6.9.11)
     if (!document.querySelector('script[src*="guide.js"]')) {
         const guideScript = document.createElement('script');
-        guideScript.src = '/frontend/js/guide.js?v=1';
+        guideScript.src = '/frontend/js/guide.js?v=2';
         document.head.appendChild(guideScript);
+    }
+
+    // Export Complete (6.10.0): one Excel workbook with every table of the run, on the Calculation pages and the plot pages
+    if ((isCalculation || isCustom || isMassBalance || isPlots || isPlotDashboard) && !document.querySelector('script[src*="export_complete.js"]')) {
+        const exportScript = document.createElement('script');
+        exportScript.src = '/frontend/js/export_complete.js?v=1';
+        document.head.appendChild(exportScript);
     }
 
     // Manual Historian save button (logic lives in historian_save.js)

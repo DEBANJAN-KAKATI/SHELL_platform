@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.9.11). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.10.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,8 +33,8 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (47 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
-  conditions, mass balance). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
+- Tests: `python -m pytest -q tests` (53 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+  conditions, mass balance, synced folder + Export Complete workbook). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
 
@@ -60,10 +60,18 @@ General_MB.
 - `frontend/` — static HTML pages + vanilla JS (Chart.js, Lucide icons, no build step). `navigation.js` builds the
   top nav, Run Number box, Process selector/badge (`window.ILSProcess`), reset button.
   `reactor_map.html` is a large self-contained page. General_MB: `online_liquid.js` (Liquid tab), `zmb.js` (ZMB page),
-  `mb_core.js` (mass balance engine shared by `mass_balance.js` and `plots.js`). `guide.js` + `css/guide.css` (6.9.11): "? Guide"
-  tour on every page (loaded by navigation.js; Runs page loads it directly); `TOURS[pageKey]` = [selector, title, text];
+  `mb_core.js` (mass balance engine shared by `mass_balance.js` and `plots.js`). `guide.js` + `css/guide.css` (6.9.11; 6.10.0:
+  round "?" fixed at the bottom right with a "Next →" workflow button, `workflow()` / `nextStep()`: Run Plan → Offline →
+  Online [→ ZMB] → Calculation table [→ Mass Balance] → Plots) tour on every page (loaded by navigation.js; Runs page loads
+  it directly); `TOURS[pageKey]` = [selector, title, text];
   `online_liquid` when the Liquid tab is open; hidden steps skipped; first-visit prompt (localStorage `ils_guide_seen:<page>`,
   `ils_guide_off`). The same texts feed the picture guide (`scripts/docs/`). Add steps there when a page gets new controls.
+- `frontend/js/data_sync.js` (6.10.0, replaces `reforming_sync.js`): OneDrive sync bar on Run Plan, Offline, Online, ZMB
+  for every process (Reforming → `/api/reforming/sync-source`, others → `/api/sync-source?process=`; backend
+  `backend/services/sync_source.py`, folders in `config/sync_sources.json`, git-ignored). It fills the page's own path
+  box and clicks its own button. `frontend/js/export_complete.js` (6.10.0): Export Complete workbook (Summary + one sheet
+  per table, empty sheets say where to import, plot images) via `/api/export-xlsx` (sheets accept `title`, `notes`,
+  `images` [{title, data_url}]).
 - `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`, `run_plan_examples/` (template builders, `add_molecular_weights.py`).
 - `documentation/` — `ILS_Dashboard_Documentation.docx` (user + technical documentation with a formula reference of every
   calculation as equations, Section 10; no confidential data, v6.9.10; built by a docx-js script),
@@ -77,15 +85,15 @@ General_MB.
 ## Pages (nav order)
 Runs `/` (`run_data_home.html`) → Run Plan (`run_plan.html`, shared by all processes) → Analysis: Offline
 (`index.html`), Online (`online_analysis.html`), ZMB (`zmb.html`, General_MB only, v6.9.2) → Calculation: Calculation table, Custom table,
-Mass Balance (`mass_balance.html`, General_MB only, v6.9.6) → Data Integrity
-(`/data-integrity`) → Plots → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
+Mass Balance (`mass_balance.html`, General_MB only, v6.9.6) → Plots → Data Integrity (`/data-integrity`; after Plots since
+6.10.0) → Summary Dashboard (`plot_dashboard.html`) → History (`history.html`).
 Process tabs (Isomerization / Reforming / General_MB) after the Run Number on the Run Plan page (locked until a Run Number
 is entered); a read-only Process badge on the other pages.
 
 ## API
 - `/api`: `health`, `settings`, `run-number` (GET/POST), `browse-folder`, `process` (DHA folder),
   `browse-reactor-folder`, `process-reactor-map`, `browse-online-file`, `process-online`, `online-units`,
-  `browse-zmb-file`, `process-zmb` (ZMB export, same loader as Online), `mass-balance` (v6.9.6),
+  `browse-zmb-file`, `process-zmb` (ZMB export, same loader as Online), `mass-balance` (v6.9.6), `sync-source` (GET/POST, 6.10.0),
   `apply-online-reactor-map`, `browse-run-plan-file`, `process-run-plan`, `feed-properties`,
   `process-calculation-base`, `calculate-yield-table`, `custom-table/{validate-formula,calculate,inspect-cell}`,
   `export-xlsx`.
@@ -99,7 +107,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
+`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_plot_extra` (Plots → Additional graphs {open, graph, sample, scale}, 6.10.0), `ils_data_sync` (signatures loaded from the synced folder per page; localStorage `ils_data_autosync`), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
 `summary` = reactor-table rows, `components` = component-table rows; v6.9.6/6.9.10), `ils_plot_mb` (Plots mass balance choices); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
@@ -223,7 +231,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   filter, CSV) and **Component table** (Components / Reference / Values filter menus like the Offline component filter,
   basis select, CSV); ERROR text cells, formulas on hover. **Plots (General_MB)**: row Data (per GC injection / per sample /
   calculation tables), Chart (X–Y, Carbon in → out, Selectivity / yield by component), Component (Y), Value, Basis, Reference;
-  X–Y uses the normal scatter (reactor colours, condition shapes, moving average, PNG, dashboard); state `ils_plot_mb`. Tests: `tests/test_mass_balance.py`.
+  X–Y uses the normal scatter (reactor colours, condition shapes, moving average, PNG, dashboard); state `ils_plot_mb`.
+  6.10.0: these are "Additional graphs" (hidden until "+ Additional graphs"; closed = the calculation tables X–Y). Tests: `tests/test_mass_balance.py`.
 - Online table column **Condition** (v6.9.4, all processes, `onlineConditionOf` in online_analysis.js): DOE Condition No. of
   the reactor's window containing the line time (latest start wins), blank outside; bypass lines "Block-1: 2, Block-2: 1".
 - Condition window per reactor: Start → End, else Start + Duration, else next condition of the reactor, else end of data;

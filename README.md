@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.9.11
+# ILS Dashboard (DHA Data Dashboard) v6.10.0
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -18,14 +18,17 @@ changes is [CHANGELOG.md](CHANGELOG.md); the user and technical documentation is
 | 4 | **Analysis → ZMB** (General_MB) | Import the blank-run export; enter the liquid pump check |
 | 5 | **Analysis → Online → Liquid** (General_MB) | Enter the liquid samples (collection window, TLP or HC + aqueous mass, carbon wt%) |
 | 6 | **Calculation** | Calculation table (Base, Yield wof%), Custom table, and for General_MB the **Mass Balance** |
-| 7 | **Data Integrity** | Statistics and MAD-based outlier flags (never changes data) |
-| 8 | **Plots / Summary Dashboard** | Scatter plots by reactor and condition; mass balance plots; A4 board with 12 plots and one table |
-| 9 | **Save** | Save Run Details (RunData snapshot) or Save to Historian (one SQLite file per run); reload from **Runs**, compare in **History** |
+| 7 | **Plots / Summary Dashboard** | Scatter plots by reactor and condition; **Additional graphs** on request; A4 board with 12 plots and one table |
+| 8 | **Data Integrity** | Statistics and MAD-based outlier flags (never changes data) |
+| 9 | **Export Complete** | One Excel workbook with the Run Plan, Analysis, Calculation tables and Plots, one sheet per table |
+| 10 | **Save** | Save Run Details (RunData snapshot) or Save to Historian (one SQLite file per run); reload from **Runs**, compare in **History** |
 
 Use one browser tab for a run: the working data is kept per tab. The ↻ button resets the tab and the Run Number.
 
-**New here?** Every page has a **? Guide** button that highlights its controls one by one and explains them; on the first
-visit of a page it is offered automatically. `documentation/ILS_Dashboard_Picture_Guide.docx` shows the same steps with
+**New here?** Every page has a round **?** button at the bottom right that highlights its controls one by one and explains
+them; on the first visit of a page it is offered automatically. Next to it, **Next →** opens the next page of the
+workflow: Run Plan → Analysis (Offline → Online) → Calculation table → Plots (General_MB adds ZMB after Online and Mass
+Balance after the Calculation table). `documentation/ILS_Dashboard_Picture_Guide.docx` shows the same steps with
 screenshots for each process (Isomerization, Reforming, General_MB).
 
 ## Processes (v6.9)
@@ -35,8 +38,18 @@ show the process as a badge. Switching the process clears the loaded Run Plan; t
 | Process | What it adds |
 |---|---|
 | **Isomerization** (default) | DHA tables (CARBON_TABULAR, COMPONENT_LIST, octane), Base table, Yield wof%, Custom table, Plots |
-| **Reforming** | Reforming DHA with unknown peaks assigned to a carbon number, Reforming CARBON_TABULAR tab with CSV / Export Complete, optional sync from a synced SharePoint folder |
+| **Reforming** | Reforming DHA with unknown peaks assigned to a carbon number, Reforming CARBON_TABULAR tab with CSV / Export Complete CSV |
 | **General_MB** | Isomerization pages plus the internal-standard gas flows, Liquid tab, ZMB page, Calculation → Mass Balance and mass balance plots |
+
+## Import from a OneDrive-synced SharePoint folder (Reforming 6.4; all processes since 6.10.0)
+Instead of browsing for every file, sync the run's SharePoint folder to the PC with OneDrive (Add shortcut / Sync). A bar
+under the file box of the **Run Plan**, **Offline Analysis**, **Online Analysis** and (General_MB) **ZMB** pages shows what
+it found and loads it with **Sync now**; with **Auto-sync** on, the page loads new files by itself (checked on open and
+every 5 minutes). **Change folder** sets the folder once per process (Isomerization and General_MB each have their own,
+saved in `config/sync_sources.json`; Reforming keeps its auto-detected "… Online DHA Results" folder). In the folder:
+DHA reports (.XLS, in the folder or the sub-folder with most of them), the online export (`Operating Data.txt`, else the
+newest .txt), the ZMB export (newest .txt with "ZMB" or "blank" in its name) and the Run Plan (newest .xlsx with
+"RunPlan" in its name).
 
 ## Run Plan: one template for every experiment (v6.6)
 The universal template has the sheets **Plan** (run, objective, catalyst loading plan with the role of each reactor),
@@ -130,10 +143,13 @@ saved with the run. The workbook (MassBal Ver2.2) is described cell by cell in
 **Plots**: X / Y from the Yield, Base, octane and Custom table columns; colours = reactors, marker shapes = DOE
 conditions; Reactor and Condition filters (DOE Start / End windows), date range, optional centred 3/5/7-point moving
 average per reactor and condition, reactor-wise connecting lines, axis limits and editable axis titles, point exclusion,
-paper-size PNG export at 300 DPI. With **General_MB** a row of choices adds the mass balance (v6.9.10): **Data** (per GC
-injection, per sample, or the calculation tables), **Chart** (X–Y; Carbon in → out; Selectivity / yield by component),
-**Component**, **Value**, **Basis** and **Reference reactant**. The X–Y chart keeps all the plot features; X can be TOS or any
-other value (for example selectivity vs conversion).
+paper-size PNG export at 300 DPI. The page opens with this standard X–Y plot; **+ Additional graphs** (6.10.0) opens more
+chart types only when they are needed: **Group type (PIONA) per sample** and **Carbon-number distribution of one sample**
+(from the DHA Table-1, or the Reforming CARBON_TABULAR table; as measured or normalised to 100 %), **Average per condition
+and reactor** (mean of the Y axis value, ± standard deviation in the tooltip) and, with **General_MB**, the mass balance
+graphs of v6.9.10 (X–Y per GC injection or per liquid sample, Carbon in → out, Selectivity / yield by component) with their
+**Component**, **Value**, **Basis** and **Reference reactant** choices. The mass balance X–Y keeps all the plot features; X
+can be TOS or any other value (for example selectivity vs conversion).
 
 **Summary Dashboard**: a 3 × 4 board; **Add to Dashboard** on Plots captures the current plot, **Add table** adds a Yield,
 Base, Custom, Plan or DOE table with Reactor / Condition filters. **Print / PDF** prints A4 portrait; long tables continue
@@ -141,6 +157,17 @@ with repeated headers. Snapshots persist in the browser tab.
 
 **Data Integrity** (optional plug-in): statistics and MAD-based potential outliers per Run / Condition / Reactor / Parameter;
 hide it with `DASHBOARD_DATA_INTEGRITY=0`; see [features/data_integrity/README.md](features/data_integrity/README.md).
+
+## Export Complete (6.10.0)
+**Export Complete** in the header of the Calculation pages, Plots and the Summary Dashboard downloads one Excel workbook
+(`ILS_Run<n>_<process>_Complete_<date>.xlsx`) with a **Summary** sheet (which tables are included and which are not
+imported) and one sheet per table: Run Plan (information, feed, liquid and gas composition, molecular weights, plan, DOE,
+pre-run), Analysis (Offline Table-1/2/3 and Reactor Map, Online export; General_MB: feed gas IS, average IS flow, Liquid
+samples, ZMB lines, pump check, verified flow), Calculation (Base table, Yield wof% or the Reforming tables, Custom table
+and its formulas; General_MB: Mass Balance reactor and component tables) and Plots (settings, the plot on screen and the
+Summary Dashboard plots as images). Every sheet of the process is written even when its data was not imported: it then
+says where to import it. The Reforming CSV export of the operating data joined to the DHA is now labelled **Export
+Complete CSV**.
 
 ## Saving runs
 **Save Run Details** writes the tab's sources, table definitions, Liquid / ZMB entries, mass balance choices and plot
@@ -169,5 +196,5 @@ Open http://localhost:5001. `data/` is mounted at `/app/data`; RunData is kept i
 the sources with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY` or `DASHBOARD_RUN_PLAN_FILE`.
 
 ## Tests
-`python -m pytest -q tests` (47 tests: Run Plan reader and molecular weights, online units and the internal standard
-against the MassBal workbook, R08 conditions, mass balance).
+`python -m pytest -q tests` (53 tests: Run Plan reader and molecular weights, online units and the internal standard
+against the MassBal workbook, R08 conditions, mass balance, synced folder and Export Complete workbook).

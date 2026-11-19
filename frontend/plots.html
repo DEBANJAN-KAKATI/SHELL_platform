@@ -11,10 +11,10 @@
     <script src="/frontend/js/lucide.min.js" defer></script>
     <script src="/frontend/js/plot_dashboard_store.js" defer></script>
     <script src="/frontend/js/plot_dashboard.js" defer></script>
-    <script src="/frontend/js/navigation.js?v=15" defer></script>
+    <script src="/frontend/js/navigation.js?v=16" defer></script>
     <script src="/frontend/js/chart.umd.min.js" defer></script>
     <script src="/frontend/js/mb_core.js?v=1" defer></script>
-    <script src="/frontend/js/plots.js?v=12" defer></script>
+    <script src="/frontend/js/plots.js?v=13" defer></script>
     <style>
         .controls-card {
             position: relative;
@@ -527,7 +527,7 @@
             font-size: 13px;
         }
     </style>
-    <style>.plot-mb-controls{border-bottom:1px solid var(--border);margin-bottom:4px}.plot-mb-controls[hidden]{display:none}</style>
+    <style>.plot-mb-controls,.plot-extra-controls{border-bottom:1px solid var(--border);margin-bottom:4px}.plot-mb-controls[hidden],.plot-extra-controls[hidden],.plot-control-group[hidden]{display:none}.plot-extra-bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}.plot-extra-bar .btn{padding:7px 14px;font-size:12px}#plotExtraToggle[aria-expanded="true"]{background:var(--navy,#071a2d);color:#fbf5e9;border-color:var(--navy,#071a2d)}.plot-extra-hint{font-size:12px;color:var(--slate)}.plot-extra-graph-group{grid-column:span 2}</style>
 </head>
 
 <body>
@@ -574,9 +574,32 @@
 
                 <!-- Controls Card -->
                 <div class="card controls-card">
-                    <!-- General_MB (6.9.10): mass balance data, chart type, component and value -->
+                    <!-- Additional graphs (6.10.0): hidden until the user asks for them; the standard X–Y plot stays simple -->
+                    <div class="plot-extra-bar">
+                        <button type="button" class="btn secondary" id="plotExtraToggle" aria-expanded="false" aria-controls="plotExtraControls">+ Additional graphs</button>
+                        <span class="plot-extra-hint" id="plotExtraHint">Standard X–Y plot of the calculation tables. Open “Additional graphs” for more chart types.</span>
+                    </div>
+                    <div class="plots-controls-grid plot-extra-controls" id="plotExtraControls" hidden>
+                        <div class="plot-control-group plot-extra-graph-group">
+                            <label for="plotExtraGraph">Graph</label>
+                            <select class="input" id="plotExtraGraph"></select>
+                        </div>
+                        <div class="plot-control-group" id="plotExtraSampleGroup" hidden>
+                            <label for="plotExtraSample">Sample</label>
+                            <select class="input" id="plotExtraSample"></select>
+                        </div>
+                        <div class="plot-control-group" id="plotExtraScaleGroup" hidden>
+                            <label for="plotExtraScale">Scale</label>
+                            <select class="input" id="plotExtraScale">
+                                <option value="abs">As measured (wt%)</option>
+                                <option value="norm">Normalised to 100 %</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- General_MB (6.9.10): mass balance component, value, basis and reference; shown for the mass balance
+                         graphs of "Additional graphs" (6.10.0: Data and Chart are chosen with the Graph list) -->
                     <div class="plots-controls-grid plot-mb-controls" id="plotMbControls" hidden>
-                        <div class="plot-control-group">
+                        <div class="plot-control-group" hidden>
                             <label for="plotMbSource">Data</label>
                             <select class="input" id="plotMbSource">
                                 <option value="mb_injection">Mass balance · per GC injection</option>
@@ -584,7 +607,7 @@
                                 <option value="yield">Calculation tables (yield / base)</option>
                             </select>
                         </div>
-                        <div class="plot-control-group">
+                        <div class="plot-control-group" hidden>
                             <label for="plotMbChart">Chart</label>
                             <select class="input" id="plotMbChart">
                                 <option value="xy">X–Y (trend vs TOS or any value)</option>

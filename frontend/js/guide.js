@@ -1,5 +1,5 @@
 // ILS step-by-step guide (6.9.11): a short tour on every page that highlights each control and says what it does.
-// "? Guide" in the header starts it; on the first visit of a page a small prompt offers it. Steps whose control is not on
+// The round "?" at the bottom right starts it (6.10.0; next to it "Next" opens the next workflow page); on the first visit of a page a small prompt offers it. Steps whose control is not on
 // the page (another process, hidden tab) are skipped. window.ILSGuide.visibleSteps() is also used to build the picture
 // documentation, so the texts below are the single source for both.
 (() => {
@@ -10,13 +10,14 @@
 
     // ------------------------------------------------------------ texts
     const HEADER = [
-        ['.analysis-tabs', 'Menu bar', 'Work from left to right: Runs → Run Plan → Analysis → Calculation → Data Integrity → Plots → Summary Dashboard → History. Analysis and Calculation open a small menu.'],
+        ['.analysis-tabs', 'Menu bar', 'Work from left to right: Runs → Run Plan → Analysis → Calculation → Plots → Data Integrity → Summary Dashboard → History. Analysis and Calculation open a small menu.'],
         ['#runNumberDisplay', 'Run Number', 'The Run Number of this browser tab. It is entered on the Run Plan page and shown here read-only.'],
         ['#processDisplay', 'Process', 'The process chosen on the Run Plan page (Isomerization, Reforming or General_MB). It decides which tables and calculations appear.'],
         ['#saveRunDetails', 'Save Run Details', 'Saves everything loaded in this tab (sources, tables, entries, plot settings) as a snapshot you can reload later from Runs.'],
         ['#historianSave', 'Save to Historian', 'Writes the run into its own database file so History can compare it with other runs.'],
         ['#pageRefresh', 'Reset (↻)', 'Clears this browser tab and the Run Number to start again. Saved runs are not touched.'],
-        ['#ilsGuideBtn', 'Guide', 'Starts this tour again on any page.'],
+        ['#ilsNextBtn', 'Next', 'Opens the next page of the workflow: Run Plan → Offline → Online → Calculation table → Plots.'],
+        ['#ilsGuideBtn', 'Guide (?)', 'Starts this tour again on any page.'],
     ];
     const TOURS = {
         runs: [
@@ -24,7 +25,8 @@
             ['#runMetadata', 'Run details', 'Run Number, process, date and what the snapshot contains.'],
             ['#loadRunBtn', 'Load run', 'Loads the chosen run into this tab and opens the page it was saved from.'],
             ['#startFreshBtn', 'Start Fresh', 'Empties this tab for a new run and opens the dashboard. Next step: the Run Plan page.'],
-            ['#ilsGuideBtn', 'Guide', 'Every page has this button: it walks you through the controls of that page.'],
+            ['#ilsNextBtn', 'Next', 'Every page has a Next button: it leads through Run Plan → Analysis (Offline → Online) → Calculation table → Plots.'],
+            ['#ilsGuideBtn', 'Guide (?)', 'Every page has this button at the bottom right: it walks you through the controls of that page.'],
         ],
         run_plan: [
             ['#runNumberInput', '1 · Run Number', 'Type the Run Number first. All pages use it, and the process tabs unlock.'],
@@ -137,8 +139,11 @@
             ['#integrityFlags', 'Flags', 'Values flagged as potential outliers, with the reason.'],
         ],
         plots: [
-            ['#plotMbControls', 'Mass balance plots', 'General_MB: choose the data (per GC analysis or per sample), the chart, the component, the value, the basis and the reference reactant.'],
-            ['#plotMbChart', 'Chart', 'X–Y plot, carbon in → out bars, or selectivity / yield split by component.'],
+            ['#plotExtraToggle', 'Additional graphs', 'Opens more chart types when you need them: group type (PIONA) per sample, carbon-number distribution of a sample, average per condition and, for General_MB, the mass balance graphs. Closed, the page shows the standard X–Y plot.'],
+            ['#plotExtraGraph', 'Graph', 'Choose the additional graph. Mass balance graphs (General_MB) also show component, value, basis and reference reactant.'],
+            ['#plotMbControls', 'Mass balance options', 'General_MB: the component, the value (in, out, conversion, selectivity, yield), the basis and the reference reactant.'],
+            ['#plotExtraSample', 'Sample', 'The DHA sample shown in the carbon-number distribution.'],
+            ['#plotExtraScale', 'Scale', 'As measured (wt%) or normalised to 100 %.'],
             ['#plotXSelect', '1 · X axis', 'The value on the horizontal axis, usually time on stream.'],
             ['#plotSwapAxes', 'Swap X/Y', 'Exchanges the two axes.'],
             ['#plotYSelect', '2 · Y axis', 'The value to plot.'],
@@ -199,7 +204,7 @@
     function css() {
         if ($('#ilsGuideCss')) return;
         const link = document.createElement('link');
-        link.id = 'ilsGuideCss'; link.rel = 'stylesheet'; link.href = '/frontend/css/guide.css?v=1';
+        link.id = 'ilsGuideCss'; link.rel = 'stylesheet'; link.href = '/frontend/css/guide.css?v=2';
         document.head.appendChild(link);
     }
     function end() {
@@ -249,17 +254,51 @@
         tour.card.querySelector('[data-g="next"]').focus({ preventScroll: true });
     }
 
+    // ------------------------------------------------------------ floating buttons (6.10.0)
+    // "?" (this page's tour) and "Next" (the next page of the workflow) sit at the bottom right of every page.
+    // Workflow: Run Plan → Analysis (Offline → Online) → Calculation table → Plots; General_MB adds ZMB and Mass Balance.
+    function workflow() {
+        const steps = [
+            { key: 'run_plan', label: 'Run Plan', href: '/frontend/run_plan.html' },
+            { key: 'offline', label: 'Offline Analysis', href: '/frontend/index.html' },
+            { key: 'online', label: 'Online Analysis', href: '/frontend/online_analysis.html' },
+        ];
+        if (isMB()) steps.push({ key: 'zmb', label: 'ZMB', href: '/frontend/zmb.html' });
+        steps.push({ key: 'calculation', label: 'Calculation table', href: '/frontend/calculation_table.html' });
+        if (isMB()) steps.push({ key: 'mass_balance', label: 'Mass Balance', href: '/frontend/mass_balance.html' });
+        steps.push({ key: 'plots', label: 'Plots', href: '/frontend/plots.html' });
+        return steps;
+    }
+    function nextStep(key = pageKey()) {
+        const steps = workflow();
+        const k = key === 'online_liquid' ? 'online' : key;
+        if (k === 'runs') return { step: steps[0], index: -1, total: steps.length };
+        const i = steps.findIndex(s => s.key === k);
+        if (i < 0 || i === steps.length - 1) return null;
+        return { step: steps[i + 1], index: i, total: steps.length };
+    }
     function addButton() {
         if ($('#ilsGuideBtn') || !pageKey()) return;
-        const host = document.querySelector('main > header .header-actions') || document.querySelector('.run-home-controls') || document.querySelector('main > header');
-        if (!host) return;
+        const dock = document.createElement('div');
+        dock.className = 'ils-guide-dock';
+        const next = nextStep();
+        if (next) {
+            const a = document.createElement('a');
+            a.id = 'ilsNextBtn'; a.className = 'ils-next-btn'; a.href = next.step.href;
+            const where = next.index < 0 ? 'Start' : `Step ${next.index + 1} of ${next.total} done`;
+            a.title = `${where} · next: ${next.step.label}`;
+            a.setAttribute('aria-label', `Next step: ${next.step.label}`);
+            a.innerHTML = '<span class="ils-next-label">Next</span><span class="ils-next-page"></span><span aria-hidden="true">→</span>';
+            a.querySelector('.ils-next-page').textContent = next.step.label;
+            dock.appendChild(a);
+        }
         const btn = document.createElement('button');
         btn.type = 'button'; btn.id = 'ilsGuideBtn'; btn.className = 'ils-guide-btn';
         btn.title = 'Step-by-step guide of this page'; btn.setAttribute('aria-label', 'Step-by-step guide of this page');
-        btn.textContent = '? Guide';
+        btn.textContent = '?';
         btn.onclick = () => start();
-        const refresh = host.querySelector('#pageRefresh');
-        refresh ? host.insertBefore(btn, refresh) : host.appendChild(btn);
+        dock.appendChild(btn);
+        document.body.appendChild(dock);
     }
     function firstVisitPrompt() {
         const key = pageKey();
@@ -276,7 +315,7 @@
         el.querySelector('[data-g="off"]').onclick = () => { el.remove(); try { localStorage.setItem('ils_guide_off', '1'); } catch (e) {} };
     }
 
-    window.ILSGuide = { start, end, visibleSteps, pageKey, tours: TOURS };
+    window.ILSGuide = { start, end, visibleSteps, pageKey, workflow, nextStep, tours: TOURS };
     const init = () => { css(); addButton(); setTimeout(firstVisitPrompt, 1200); };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
