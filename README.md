@@ -153,8 +153,9 @@ Double-click `run_dashboard.bat` (or `./run_dashboard.ps1`). The launcher uses, 
 `.venv-local`; an installed Python 3.9+ that already imports the app (no downloads); a new `.venv` from an installed
 Python; only when no Python is installed, a private Python 3.12 in `.python-runtime`. Packages are installed only when
 missing or after `requirements.txt` changes (Python 3.15+ gets pandas 3, older Python pandas 2). If the network blocks
-pypi.org (403), run `py -m pip download -r requirements.txt -d wheels` on a computer with internet and the same Python
-version, copy the `wheels` folder here and start again. The dashboard opens at http://127.0.0.1:5001 (host / port in
+pypi.org or bootstrap.pypa.io (403), unzip `ILS_wheels_win.zip` so that a `wheels` folder is next to the launcher and start
+again: pip and all packages are installed offline (rebuild the zip with `bash scripts/make_wheels.sh`). pip uses the
+Windows proxy settings. The dashboard opens at http://127.0.0.1:5001 (host / port in
 `config/settings.json`); a busy port moves to the next free one, and a dashboard already running from the same folder is
 reused. After an update, close the old dashboard window first and press Ctrl+F5 once. Set `DASHBOARD_USER` and
 `DASHBOARD_PASS` to require a login when sharing.
