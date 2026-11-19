@@ -22,3 +22,6 @@ backups/
 # Local editor and runtime files
 .vscode/
 *.log
+# Local OneDrive sync folders (per PC)
+config/reforming_sync.json
+config/sync_sources.json

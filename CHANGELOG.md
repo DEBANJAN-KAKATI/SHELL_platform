@@ -1,3 +1,24 @@
+## 6.10.0 (2026-11-19) — Easier first use: floating guide and Next, OneDrive sync for every process, additional graphs, Export Complete
+- **Guide button moved** from the header to a round **?** at the bottom right of every page (`guide.js`, `guide.css`).
+- **Next →** next to it opens the next page of the workflow: Run Plan → Offline Analysis → Online Analysis → Calculation
+  table → Plots (General_MB: ZMB after Online, Mass Balance after the Calculation table; Runs → Run Plan). Tour texts
+  updated (`window.ILSGuide.workflow()` / `nextStep()`).
+- **Menu order**: Runs → Run Plan → Analysis → Calculation → **Plots → Data Integrity** → Summary Dashboard → History.
+- **OneDrive / SharePoint sync for Isomerization and General_MB** like Reforming: `frontend/js/data_sync.js` replaces
+  `reforming_sync.js` and adds the bar to the Run Plan, Offline, Online and ZMB pages for every process;
+  `backend/services/sync_source.py` + `GET/POST /api/sync-source?process=…` (one folder per process in
+  `config/sync_sources.json`, set with Change folder) finds the DHA .XLS folder, the online export, the ZMB export and the
+  RunPlan .xlsx, with a signature per item for Auto-sync. The Reforming sync also finds a RunPlan .xlsx now.
+- **Plots: + Additional graphs** — the page opens with the standard X–Y plot; the button shows the extra chart types:
+  Group type (PIONA) per sample, Carbon-number distribution of one sample (as measured / normalised), Average per
+  condition and reactor (all processes) and, for General_MB, the mass balance graphs (the Data / Chart / Component / Value
+  / Basis / Reference row of 6.9.10 is hidden until a mass balance graph is chosen). State `ils_plot_extra`.
+- **Export Complete** (`frontend/js/export_complete.js`, Calculation pages, Plots, Summary Dashboard): one Excel workbook
+  with a Summary sheet and one sheet per Run Plan, Analysis, Calculation and Plot table; sheets without data say where to
+  import it; the plot on screen and the Summary Dashboard plots are embedded as images (`excel_export_service.py`: titles,
+  notes and images, without Pillow). The Reforming CSV button is renamed **Export Complete CSV**.
+- Tests: `tests/test_sync_and_export.py` (6 tests, 53 in total).
+
 ## 6.9.11 (2026-11-17) — Step-by-step guide and picture guide
 - **"? Guide" button on every page** (`frontend/js/guide.js`, `css/guide.css`, loaded by navigation.js; also on the Runs
   page): highlights the controls of the page one by one with a short explanation (Next / Back, arrow keys, Esc). The

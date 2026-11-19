@@ -184,6 +184,9 @@
     const plotState = {
         // General_MB (6.9.10): mass balance source / chart / component / value / basis / reference
         mb: { source: 'mb_injection', chart: 'xy', comp: '', metric: 'sel', basis: 'carbon', ref: '', data: null },
+        // Additional graphs (6.10.0): closed = the standard X–Y plot of the calculation tables
+        extra: { open: false, graph: '', sample: '', scale: 'abs' },
+        extraSamples: [],
         rows: [],
         columns: [],
         baseRows: [],
@@ -775,8 +778,10 @@
         setStatus('Loading...', false);
         showError('');
         loadConditionRanges();
+        syncExtraControls();
         syncMbControls();
         if (mbActive()) { await loadMbData(); return; }
+        if (extraDha()) { loadDhaSamples(); return; }
 
         // Get Base Table rows
         const baseRows = getBaseTableRows();
@@ -933,7 +938,8 @@
     // ------------------------------------------------------------ General_MB mass balance plots (6.9.10)
     const MB_SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
     const isGeneralMB = () => Boolean(window.ILSProcess?.isGeneralMB?.()) && Boolean(window.ILSMB);
-    const mbActive = () => isGeneralMB() && plotState.mb.source !== 'yield';
+    // 6.10.0: the mass balance graphs are "Additional graphs"; with the panel closed General_MB plots the calculation tables
+    const mbActive = () => isGeneralMB() && plotState.extra.open && String(plotState.extra.graph).startsWith('mb_');
     const mbColumn = (comp, metric) => `${comp} · ${window.ILSMB.METRICS[metric]} (${window.ILSMB.unitOf(metric, plotState.mb.basis)})`;
     const mbRefs = () => plotState.mb.ref ? [plotState.mb.ref] : window.ILSMB.refsOf(plotState.mb.data, window.ILSMB.settings().comp);
 
@@ -943,8 +949,8 @@
     function syncMbControls() {
         const box = $('#plotMbControls');
         if (!box) return;
-        box.hidden = !isGeneralMB();
-        if (!isGeneralMB()) return;
+        box.hidden = !mbActive();
+        if (!mbActive()) return;
         const mb = plotState.mb;
         $('#plotMbSource').value = mb.source;
         $('#plotMbChart').value = mb.chart;
@@ -1099,6 +1105,227 @@
         on('plotMbMetric', () => { mb.metric = $('#plotMbMetric').value; rebuild(); });
         on('plotMbBasis', () => { mb.basis = $('#plotMbBasis').value; rebuild(); });
         on('plotMbRef', () => { mb.ref = $('#plotMbRef').value; rebuild(); });
+    }
+
+
+    // ------------------------------------------------------------ Additional graphs (6.10.0)
+    // Hidden until "+ Additional graphs" is clicked, so the page opens with the plain X–Y plot. The graph list depends on
+    // the process: every process gets the DHA carbon-number distribution, the group-type (PIONA) split per sample and
+    // the average per condition; General_MB adds the four mass balance graphs (data, chart, component, value, basis,
+    // reference — the controls of 6.9.10).
+    const DHA_FAMILIES = {
+        iso: [['Paraffin', 'n-Paraffins'], ['I-Paraffins', 'i-Paraffins'], ['Olefins', 'Olefins'], ['Naphthenes', 'Naphthenes'], ['Aromatics', 'Aromatics'], ['Unknown', 'Unknown']],
+        reforming: [['Paraffins', 'n-Paraffins'], ['Iso Paraffins', 'i-Paraffins'], ['Olefins', 'Olefins'], ['Naphthenes', 'Naphthenes'], ['Aromatics', 'Aromatics'], ['Unknowns', 'Unknown']],
+    };
+    const FAMILY_COLORS = { 'n-Paraffins': '#2a78d6', 'i-Paraffins': '#9bbfe9', Olefins: '#1baf7a', Naphthenes: '#eda100', Aromatics: '#eb6834', Unknown: '#c9c3b8' };
+    function extraGraphs() {
+        const list = [];
+        if (isGeneralMB()) {
+            list.push(['mb_injection', 'Mass balance · X–Y per GC injection'], ['mb_sample', 'Mass balance · X–Y per liquid sample'],
+                ['mb_carbon', 'Mass balance · Carbon in → out per sample'], ['mb_distribution', 'Mass balance · Selectivity / yield by component']);
+        }
+        list.push(['group_type', 'DHA · Group type (PIONA) per sample'], ['carbon_dist', 'DHA · Carbon-number distribution of one sample'],
+            ['condition_avg', 'Average per condition and reactor (Y axis value)']);
+        return list;
+    }
+    const extraActive = () => plotState.extra.open && Boolean(plotState.extra.graph);
+    const extraDha = () => extraActive() && ['group_type', 'carbon_dist'].includes(plotState.extra.graph);
+    const extraBars = () => extraActive() && ['group_type', 'carbon_dist', 'condition_avg'].includes(plotState.extra.graph);
+    function saveExtraPrefs() {
+        try { sessionStorage.setItem('ils_plot_extra', JSON.stringify(plotState.extra)); } catch (e) { }
+    }
+    function syncExtraControls() {
+        const ex = plotState.extra;
+        const graphs = extraGraphs();
+        if (!graphs.some(([v]) => v === ex.graph)) ex.graph = graphs[0][0];
+        const toggle = $('#plotExtraToggle');
+        if (toggle) {
+            toggle.setAttribute('aria-expanded', String(ex.open));
+            toggle.textContent = ex.open ? '× Close additional graphs' : '+ Additional graphs';
+        }
+        if ($('#plotExtraControls')) $('#plotExtraControls').hidden = !ex.open;
+        if ($('#plotExtraHint')) {
+            $('#plotExtraHint').textContent = ex.open
+                ? 'Close to go back to the standard X–Y plot of the calculation tables.'
+                : 'Standard X–Y plot of the calculation tables. Open “Additional graphs” for more chart types.';
+        }
+        const select = $('#plotExtraGraph');
+        if (select) select.innerHTML = graphs.map(([v, label]) => `<option value="${v}"${v === ex.graph ? ' selected' : ''}>${label}</option>`).join('');
+        if ($('#plotExtraSampleGroup')) $('#plotExtraSampleGroup').hidden = !(ex.open && ex.graph === 'carbon_dist');
+        if ($('#plotExtraScaleGroup')) $('#plotExtraScaleGroup').hidden = !(ex.open && ['group_type', 'carbon_dist'].includes(ex.graph));
+        if ($('#plotExtraScale')) $('#plotExtraScale').value = ex.scale;
+        // General_MB graphs drive the mass balance data source and chart type
+        if (ex.open && ex.graph.startsWith('mb_')) {
+            const map = { mb_injection: ['mb_injection', 'xy'], mb_sample: ['mb_sample', 'xy'], mb_carbon: ['mb_sample', 'carbon'], mb_distribution: ['mb_sample', 'distribution'] };
+            [plotState.mb.source, plotState.mb.chart] = map[ex.graph];
+        }
+        const noAxes = ex.open && ['group_type', 'carbon_dist'].includes(ex.graph);
+        const noX = ex.open && ex.graph === 'condition_avg';
+        if (!(ex.open && ex.graph.startsWith('mb_'))) {
+            if ($('#plotXSelect')) $('#plotXSelect').disabled = noAxes || noX;
+            if ($('#plotYSelect')) $('#plotYSelect').disabled = noAxes;
+            if ($('#plotSwapAxes')) $('#plotSwapAxes').disabled = noAxes || noX;
+        }
+    }
+
+    // One entry per DHA sample: {UID, DateTime, Reactor, families: {label: [C1..C15]}}
+    function readDhaSamples() {
+        const num = v => { const n = typeof v === 'number' ? v : parseFloat(v); return Number.isFinite(n) ? n : 0; };
+        if (window.ILSProcess?.isReforming()) {
+            let state = null;
+            try { state = JSON.parse(sessionStorage.getItem('ils_reforming_carbon_state') || 'null'); } catch (e) { }
+            return (state?.rows || []).map(row => ({
+                UID: row.UID || '', DateTime: row.DateTime || row.Date || '', Reactor: row.Reactor || 'R1', Condition: row.Condition || '',
+                families: Object.fromEntries(DHA_FAMILIES.reforming.map(([key, label]) => [label,
+                    Array.from({ length: 15 }, (_, i) => num(row[`${key} C${i + 1}`]))])),
+            }));
+        }
+        let state = null;
+        try { state = JSON.parse(sessionStorage.getItem('dhaDashboardState') || localStorage.getItem('dhaDashboardState') || 'null'); } catch (e) { }
+        const bySample = new Map();
+        (state?.r1 || []).forEach(row => {
+            const key = row.UID || row['File Name'] || row.DateTime;
+            if (!bySample.has(key)) bySample.set(key, { UID: row.UID || row['File Name'] || '', DateTime: row.DateTime || '', Reactor: row.Reactor || row['Active Reactor'] || '', families: {} });
+            const fam = DHA_FAMILIES.iso.find(([k]) => k === row.Component);
+            if (fam) bySample.get(key).families[fam[1]] = Array.from({ length: 15 }, (_, i) => num(row[`C${i + 1}`]));
+        });
+        return [...bySample.values()];
+    }
+    function loadDhaSamples() {
+        const samples = enrichRowsWithReactors(readDhaSamples());
+        plotState.extraSamples = samples;
+        if (!samples.length) {
+            showError(window.ILSProcess?.isReforming()
+                ? 'This graph needs the Reforming CARBON_TABULAR table: process the DHA files (Offline Analysis), then open Calculation table once.'
+                : 'This graph needs the offline DHA results: process the DHA folder on Offline Analysis first.');
+            showEmptyNotice(true); setStatus('No Data', true); return;
+        }
+        // Rows for the filters (reactor, condition, dates) and the X–Y lists: family totals per sample
+        plotState.rows = samples.map(sm => ({ DateTime: sm.DateTime, UID: sm.UID, Reactor: sm.Reactor,
+            ...Object.fromEntries(Object.entries(sm.families).map(([label, values]) => [`${label} (wt%)`, values.reduce((a, b) => a + b, 0)])) }));
+        plotState.columns = Object.keys(plotState.rows[0]).filter(c => !['DateTime', 'UID', 'Reactor'].includes(c));
+        plotState.customColumns = [];
+        const sel = $('#plotExtraSample');
+        if (sel) {
+            if (!samples.some(sm => sm.UID === plotState.extra.sample)) plotState.extra.sample = samples[samples.length - 1].UID;
+            sel.innerHTML = samples.map(sm => `<option value="${String(sm.UID).replace(/"/g, '&quot;')}"${sm.UID === plotState.extra.sample ? ' selected' : ''}>${sm.UID}${sm.Reactor ? ` · ${sm.Reactor}` : ''}${sm.DateTime ? ` · ${sm.DateTime}` : ''}</option>`).join('');
+        }
+        onDataLoaded();
+    }
+
+    function drawBars({ labels, datasets, title, xTitle, yTitle, horizontal = false, stacked = true, max, unit, points, reactors }) {
+        if (plotState.chart) { plotState.chart.destroy(); plotState.chart = null; }
+        const ctx = $('#scatterCanvas').getContext('2d');
+        const axisTitle = (text) => ({ display: Boolean(text), text, color: '#071a2d', font: { size: 13, weight: '700' } });
+        plotState.chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false, animation: false, indexAxis: horizontal ? 'y' : 'x',
+                plugins: { legend: { display: true, position: 'bottom' },
+                           tooltip: { callbacks: { label: (it) => {
+                               const v = Number(it.raw);
+                               const extra = it.dataset.sd ? ` ± ${Number(it.dataset.sd[it.dataIndex] || 0).toPrecision(3)} (n = ${it.dataset.n[it.dataIndex]})` : '';
+                               return `${it.dataset.label}: ${Number.isFinite(v) ? v.toPrecision(4) : '—'}${unit ? ` ${unit}` : ''}${extra}`;
+                           } } } },
+                scales: {
+                    x: { stacked, max: horizontal ? max : undefined, title: axisTitle(xTitle), grid: { color: 'rgba(7, 26, 45, 0.06)' } },
+                    y: { stacked, max: horizontal ? undefined : max, title: axisTitle(yTitle), grid: { color: 'rgba(7, 26, 45, 0.06)' } },
+                },
+            },
+        });
+        $('#plotChartTitle').textContent = title;
+        $('#plotEyebrow').textContent = `ADDITIONAL GRAPH · ${title.toUpperCase()}`;
+        if ($('#plotLegend')) $('#plotLegend').innerHTML = '';
+        if ($('#conditionLegend')) $('#conditionLegend').hidden = true;
+        if ($('#kpiPlotPoints')) $('#kpiPlotPoints').textContent = points;
+        if ($('#kpiPlotReactors')) $('#kpiPlotReactors').textContent = reactors;
+        if ($('#kpiPlotX')) $('#kpiPlotX').textContent = xTitle || '—';
+        if ($('#kpiPlotY')) $('#kpiPlotY').textContent = yTitle || title;
+    }
+
+    function renderExtraBars() {
+        const ex = plotState.extra;
+        const rows = getFilteredRows();
+        const norm = (values) => {
+            if (ex.scale !== 'norm') return values;
+            const total = values.reduce((a, b) => a + b, 0);
+            return total ? values.map(v => v / total * 100) : values;
+        };
+        const unit = ex.scale === 'norm' ? '% (normalised)' : 'wt%';
+        if (ex.graph === 'group_type') {
+            const uids = new Set(rows.map(r => r.UID));
+            const samples = plotState.extraSamples.filter(sm => uids.has(sm.UID));
+            const families = Object.keys(FAMILY_COLORS).filter(f => samples.some(sm => sm.families[f]));
+            const totals = samples.map(sm => norm(families.map(f => (sm.families[f] || []).reduce((a, b) => a + b, 0))));
+            drawBars({
+                labels: samples.map(sm => `${sm.UID}${sm.Reactor ? ` · ${sm.Reactor}` : ''}`),
+                datasets: families.map((f, i) => ({ label: f, data: totals.map(t => t[i]), backgroundColor: FAMILY_COLORS[f], borderColor: '#fbf5e9', borderWidth: 1, maxBarThickness: 46 })),
+                title: 'Group type (PIONA) per sample', xTitle: 'Sample · reactor', yTitle: `Group type (${unit})`, unit,
+                max: ex.scale === 'norm' ? 100 : undefined, points: samples.length, reactors: new Set(samples.map(sm => sm.Reactor)).size,
+            });
+            return;
+        }
+        if (ex.graph === 'carbon_dist') {
+            const sample = plotState.extraSamples.find(sm => sm.UID === ex.sample) || plotState.extraSamples[0];
+            if (!sample) return;
+            const families = Object.keys(FAMILY_COLORS).filter(f => sample.families[f]);
+            const all = families.map(f => sample.families[f]);
+            const grand = all.flat().reduce((a, b) => a + b, 0);
+            const scale = ex.scale === 'norm' && grand ? 100 / grand : 1;
+            drawBars({
+                labels: Array.from({ length: 15 }, (_, i) => `C${i + 1}`),
+                datasets: families.map((f, i) => ({ label: f, data: all[i].map(v => v * scale), backgroundColor: FAMILY_COLORS[f], borderColor: '#fbf5e9', borderWidth: 1, maxBarThickness: 46 })),
+                title: `Carbon-number distribution · ${sample.UID}`, xTitle: 'Carbon number', yTitle: `Share of the sample (${unit})`, unit,
+                points: 1, reactors: sample.Reactor ? 1 : 0,
+            });
+            return;
+        }
+        // condition_avg: mean ± standard deviation of the Y axis value per DOE condition and reactor
+        const yCol = plotState.selectedY;
+        if (!yCol) return;
+        const groups = new Map();
+        const reactorSet = new Set();
+        rows.forEach(row => {
+            const v = typeof row[yCol] === 'number' ? row[yCol] : parseFloat(row[yCol]);
+            if (!Number.isFinite(v)) return;
+            const condition = matchingConditions(row.DateTime || row['Date/Time'])[0] || row.Condition || 'No condition';
+            const reactor = getRowReactor(row);
+            reactorSet.add(reactor);
+            const key = `${condition}\u0000${reactor}`;
+            if (!groups.has(key)) groups.set(key, []);
+            groups.get(key).push(v);
+        });
+        const conditions = [...new Set([...groups.keys()].map(k => k.split('\u0000')[0]))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        const reactors = [...reactorSet].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        const stats = (values) => {
+            if (!values?.length) return { mean: null, sd: 0, n: 0 };
+            const mean = values.reduce((a, b) => a + b, 0) / values.length;
+            const sd = values.length > 1 ? Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / (values.length - 1)) : 0;
+            return { mean, sd, n: values.length };
+        };
+        const datasets = reactors.map(reactor => {
+            const st = conditions.map(c => stats(groups.get(`${c}\u0000${reactor}`)));
+            const color = REACTOR_THEME[reactor]?.border || '#64748b';
+            return { label: reactor, data: st.map(x => x.mean), sd: st.map(x => x.sd), n: st.map(x => x.n),
+                     backgroundColor: color, borderColor: '#fbf5e9', borderWidth: 1, maxBarThickness: 40 };
+        });
+        drawBars({ labels: conditions, datasets, stacked: false, title: `Average per condition · ${getParamLabel(yCol)}`,
+                   xTitle: 'Run Plan condition', yTitle: `${getParamLabel(yCol)} (mean, ± std in the tooltip)`,
+                   points: rows.length, reactors: reactors.length });
+    }
+
+    function setupExtraEvents() {
+        try { Object.assign(plotState.extra, JSON.parse(sessionStorage.getItem('ils_plot_extra') || '{}')); } catch (e) { }
+        const ex = plotState.extra;
+        $('#plotExtraToggle')?.addEventListener('click', () => {
+            ex.open = !ex.open; saveExtraPrefs(); loadYieldData();
+        });
+        $('#plotExtraGraph')?.addEventListener('change', () => {
+            ex.graph = $('#plotExtraGraph').value; saveExtraPrefs(); loadYieldData();
+        });
+        $('#plotExtraSample')?.addEventListener('change', () => { ex.sample = $('#plotExtraSample').value; saveExtraPrefs(); renderPlot(); });
+        $('#plotExtraScale')?.addEventListener('change', () => { ex.scale = $('#plotExtraScale').value; saveExtraPrefs(); renderPlot(); });
     }
 
     function showEmptyNotice(show) {
@@ -1466,6 +1693,7 @@
      */
     function renderPlot() {
         if (mbActive() && plotState.mb.chart !== 'xy') { renderMbBars(); return; }
+        if (extraBars()) { renderExtraBars(); return; }
         const xCol = plotState.selectedX;
         const yCol = plotState.selectedY;
 
@@ -2332,6 +2560,7 @@
         } catch (e) { }
         setupEvents();
         setupMbEvents();
+        setupExtraEvents();
         window.lucide?.createIcons();
         updateExclusionControls();
         loadYieldData();

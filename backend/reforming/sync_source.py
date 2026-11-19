@@ -9,6 +9,7 @@ The platform reads the synced copy from disk; it never calls SharePoint itself.
 import hashlib
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -73,6 +74,13 @@ def _operating_file(folder):
     return texts[0] if texts else None
 
 
+def _run_plan_file(folder):
+    """Newest RunPlan*.xlsx in the folder (6.10.0: the Run Plan page can load it from the synced folder)."""
+    files = [p for p in folder.iterdir() if p.is_file() and not p.name.startswith("~$")
+             and p.suffix.lower() in (".xlsx", ".xlsm") and re.search(r"run[\s_-]*plan", p.stem, re.IGNORECASE)]
+    return max(files, key=lambda p: p.stat().st_mtime) if files else None
+
+
 def _stamp(path):
     return datetime.fromtimestamp(path.stat().st_mtime).strftime("%d/%m/%Y %H:%M")
 
@@ -111,5 +119,11 @@ def sync_status():
         "operating_file": str(operating) if operating else "",
         "operating_modified": _stamp(operating) if operating else "",
         "operating_signature": _signature([operating]) if operating else "",
+    })
+    run_plan = _run_plan_file(folder)
+    status.update({
+        "run_plan_file": str(run_plan) if run_plan else "",
+        "run_plan_modified": _stamp(run_plan) if run_plan else "",
+        "run_plan_signature": _signature([run_plan]) if run_plan else "",
     })
     return status
