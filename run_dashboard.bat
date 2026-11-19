@@ -1,7 +1,7 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 
-rem ILS Dashboard v6.4 - self-contained Windows launcher
+rem ILS Dashboard - self-contained Windows launcher
 rem Python is chosen in this order (nothing is downloaded when an earlier step works):
 rem   1. a working .venv or .venv-local in this folder
 rem   2. a Python installed on this computer (3.9 or newer) that already has the dashboard packages
@@ -116,6 +116,7 @@ exit /b 0
 :pip_install
 echo.
 if exist "%ROOT%wheels\*.whl" goto :pip_install_offline
+call :system_proxy
 echo Installing dashboard packages from pypi.org (first start or after an update)...
 "%PYTHON%" -m pip install --disable-pip-version-check --no-input --no-warn-script-location -r "%ROOT%requirements.txt"
 if %errorlevel% neq 0 exit /b 1
@@ -124,6 +125,19 @@ exit /b 0
 echo Installing dashboard packages from the wheels folder (offline)...
 "%PYTHON%" -m pip install --disable-pip-version-check --no-input --no-warn-script-location --no-index --find-links "%ROOT%wheels" -r "%ROOT%requirements.txt"
 if %errorlevel% neq 0 exit /b 1
+exit /b 0
+
+:system_proxy
+rem pip does not read the Windows proxy settings (PowerShell and the browser do), so a company proxy that let
+rem Python download can still block pip. Pass the Windows proxy for pypi.org to pip unless one is set already.
+if defined HTTPS_PROXY exit /b 0
+set "SYS_PROXY="
+for /f "delims=" %%X in ('powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$u=[Uri]'https://pypi.org/simple/'; $p=[System.Net.WebRequest]::GetSystemWebProxy().GetProxy($u); if ($p -and $p.Host -ne $u.Host) { $p.AbsoluteUri.TrimEnd('/') }" 2^>nul') do set "SYS_PROXY=%%X"
+if not defined SYS_PROXY exit /b 0
+if /i not "%SYS_PROXY:~0,4%"=="http" exit /b 0
+echo Using the Windows proxy for pip: %SYS_PROXY%
+set "HTTPS_PROXY=%SYS_PROXY%"
+set "HTTP_PROXY=%SYS_PROXY%"
 exit /b 0
 
 :create_venv
@@ -246,8 +260,15 @@ if %errorlevel% neq 0 goto :embedded_pip_failed
 goto :embedded_ready
 :embedded_pip_offline
 echo Installing the Python package installer from the wheels folder...
-for %%W in ("%ROOT%wheels\pip-*.whl") do set "PIP_WHEEL=%%~fW"
-"%EMBED%" "%PIP_WHEEL%/pip" install --disable-pip-version-check --no-warn-script-location --no-index "%PIP_WHEEL%"
+set "PIP_WHEEL="
+rem dir /b handles spaces and brackets in the path; the newest pip wheel (sorted by name) wins.
+for /f "delims=" %%W in ('dir /b /o-n "%ROOT%wheels\pip-*.whl" 2^>nul') do if not defined PIP_WHEEL set "PIP_WHEEL=%ROOT%wheels\%%W"
+if not defined PIP_WHEEL goto :embedded_pip_failed
+rem A wheel is a zip file: unpack it into site-packages (newer pip refuses to install itself when run from the wheel).
+if not exist "%RUNTIME%\Lib\site-packages" mkdir "%RUNTIME%\Lib\site-packages"
+"%EMBED%" -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "%PIP_WHEEL%" "%RUNTIME%\Lib\site-packages"
+if %errorlevel% neq 0 goto :embedded_pip_failed
+"%EMBED%" -m pip --version >nul 2>&1
 if %errorlevel% neq 0 goto :embedded_pip_failed
 
 :embedded_ready
@@ -265,6 +286,8 @@ echo ERROR: Could not unpack the private Python runtime.
 exit /b 0
 :embedded_pip_download_failed
 echo ERROR: Could not download the Python package installer from bootstrap.pypa.io.
+echo The company network blocks it. Put the "wheels" folder of the offline package (ILS_wheels_win.zip) into
+echo this folder and run this file again: pip and all packages are then installed without internet.
 exit /b 0
 :embedded_pip_failed
 echo ERROR: Could not install the Python package installer.
@@ -296,6 +319,8 @@ echo.
 echo ERROR: Dashboard packages could not be installed (see the pip message above).
 echo "403 Forbidden" or "from versions: none" means the company network or proxy blocks pypi.org.
 echo Options:
+echo   - easiest: unzip ILS_wheels_win.zip so that a "wheels" folder is next to this file, and run it again
+echo     (offline install, nothing is downloaded), or
 echo   - run this file once on a network that allows pypi.org and files.pythonhosted.org, or
 echo   - ask IT to allow pypi.org and files.pythonhosted.org, or
 echo   - on a computer with internet and the same Python version, run

@@ -25,3 +25,5 @@ backups/
 # Local OneDrive sync folders (per PC)
 config/reforming_sync.json
 config/sync_sources.json
+# offline package files for the launcher (ILS_wheels_win.zip)
+wheels/

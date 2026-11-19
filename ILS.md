@@ -18,7 +18,11 @@ General_MB.
   directly if venv fails → downloaded embeddable 3.12 in `.python-runtime` only when no Python is installed (its
   `python312._pth` includes `..` so `import app` works). pip runs only when packages are missing or `requirements.txt`
   differs from the stamp `ils-requirements.txt` next to python.exe; a `wheels` folder enables offline install; a failed pip
-  is tolerated when the app still imports. Company networks may answer 403 for python.org / pypi.org.
+  is tolerated when the app still imports. Company networks may answer 403 for python.org / pypi.org. 6.9.11 launcher fixes
+  (tested end to end under Wine): offline pip for the private Python = the pip wheel unpacked with zipfile (newer pip
+  refuses `pip.whl/pip install pip.whl`; the old `for %%W` gave an empty path); pip gets the Windows proxy
+  (`:system_proxy`, PowerShell GetSystemWebProxy) because pip ignores it while the PowerShell download uses it.
+  Offline package `ILS_wheels_win.zip` (`scripts/make_wheels.sh`: cp312/313/314 + pip + colorama) → `wheels/` (git-ignored).
   `run_app.py` moves to the next free port when 5001 is busy/reserved and reuses an already running dashboard only
   when `/api/health` `root` is the same folder (another copy/version on the port → next free port). Nav shows `vX.Y.Z`.
   Keep `.bat` files CRLF (`.gitattributes`); test exit codes with `neq 0`; avoid set-and-use of a variable inside one

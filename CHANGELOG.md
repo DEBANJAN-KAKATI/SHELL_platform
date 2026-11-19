@@ -19,6 +19,16 @@
   notes and images, without Pillow). The Reforming CSV button is renamed **Export Complete CSV**.
 - Tests: `tests/test_sync_and_export.py` (6 tests, 53 in total).
 
+## 6.9.11 launcher fix (2026-11-18) — run_dashboard.bat after the private Python is downloaded
+- Offline pip for the downloaded Python: the pip wheel path came out empty ("can't open file '…\pip'") and newer pip
+  refuses to install itself from its wheel ("To modify pip, please run … -m pip"). The launcher now unpacks the pip
+  wheel into the runtime and checks `python -m pip`.
+- pip now uses the Windows proxy settings (as the PowerShell download of Python already does), so a company proxy
+  that let Python download no longer blocks the package install.
+- Offline package `ILS_wheels_win.zip` (built by `scripts/make_wheels.sh`): unzip the "wheels" folder next to
+  run_dashboard.bat and nothing is needed from pypi.org or bootstrap.pypa.io. The error messages point to it.
+- Tested under Wine from a freshly downloaded Python 3.12: pip, all packages, the import check and the dashboard start.
+
 ## 6.9.11 (2026-11-17) — Step-by-step guide and picture guide
 - **"? Guide" button on every page** (`frontend/js/guide.js`, `css/guide.css`, loaded by navigation.js; also on the Runs
   page): highlights the controls of the page one by one with a short explanation (Next / Back, arrow keys, Esc). The
