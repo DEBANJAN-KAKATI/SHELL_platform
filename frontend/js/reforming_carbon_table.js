@@ -32,118 +32,60 @@ window.ILSReformingCarbon = (() => {
         try { return JSON.parse(storage.getItem(key) || 'null'); } catch (error) { return null; }
     }
 
-    function runPlanInfo() {
-        const plan = readJson(sessionStorage, 'runPlanDashboardState');
-        const info = {};
-        (plan?.planData?.info || []).forEach(item => { info[String(item.parameter).trim().toLowerCase()] = item.value; });
-        const reactor = plan?.summary?.active_reactors?.[0]
-            || plan?.doeData?.rows?.map(row => String(row['Reactor ID'] || row[Object.keys(row).find(key => key.replace(/\n/g, ' ').trim() === 'Reactor ID')] || '').trim()).find(Boolean)
-            || 'R1';
-        const activeReactors = (plan?.summary?.active_reactors || []).map(normReactor).filter(Boolean);
-        return { info, reactor, activeReactors, doeRows: plan?.doeData?.rows || [] };
-    }
-
-    // ---------------------------------------------------------------- reactor of each DHA sample (6.10.1)
-    // Several reactors can run at the same time (e.g. R2 and R6). Each DHA sample takes the reactor of its own GC line
-    // in the operating data (.txt of Online Analysis): DHA file time = GC Date/Time, matched within -10..+60 min,
-    // closest pairs first, each line used once (the same rule as Export Complete CSV). The lines are read once per file
-    // and kept in REACTOR_LINES_KEY. Without the operating data a single active reactor is used; with several, the
-    // Reactor cell says so (ERROR text, never a guessed reactor).
-    const REACTOR_LINES_KEY = 'ils_reforming_reactor_lines';
-    const MATCH_BEFORE_MS = 10 * 60000;
+    // ---------------------------------------------------------------- several reactors (6.10.1 / 6.10.2)
+    // Reactor, block and TOS origin of each sample come from window.ILSReformingReactors (reforming_reactors.js, shared
+    // with the Offline page): each DHA sample takes the reactor of its own GC line in the operating data.
+    const RR = window.ILSReformingReactors;
+    const MATCH_BEFORE_MS = 10 * 60000;   // Export Complete CSV pairing window (same as RR)
     const MATCH_AFTER_MS = 60 * 60000;
-    function normReactor(value) {
-        const match = String(value ?? '').trim().match(/^R?\s*(\d+)(?:\.0+)?$/i);
-        if (!match) return '';
-        return Number(match[1]) === 0 ? 'R0' : `R${Number(match[1])}`;
-    }
-    const timeOf = value => parseCalcDateTime(value)?.getTime() ?? null;
-    // Closest (sample, line) pairs first; returns Map sampleIndex -> lineIndex
-    function pairByTime(sampleTimes, lineTimes) {
-        const pairs = [];
-        lineTimes.forEach((gc, i) => sampleTimes.forEach((at, j) => {
-            if (gc === null || at === null) return;
-            const diff = at - gc;
-            if (diff >= -MATCH_BEFORE_MS && diff <= MATCH_AFTER_MS) pairs.push({ i, j, gap: Math.abs(diff) });
-        }));
-        const usedLines = new Set();
-        const result = new Map();
-        pairs.sort((a, b) => a.gap - b.gap).forEach(({ i, j }) => {
-            if (usedLines.has(i) || result.has(j)) return;
-            usedLines.add(i);
-            result.set(j, i);
-        });
-        return result;
-    }
-    function reactorLines() {
-        const online = readJson(sessionStorage, 'dhaOnlineState') || readJson(localStorage, 'dhaOnlineState');
-        const cached = readJson(sessionStorage, REACTOR_LINES_KEY);
-        if (!cached || !Array.isArray(cached.lines)) return null;
-        // A different operating file was loaded since: the cached lines no longer apply
-        if (online?.path && cached.path && online.path !== cached.path) return null;
-        return cached.lines;
-    }
-    let reactorLinesLoading = null;
-    async function loadReactorLines() {
-        const online = readJson(sessionStorage, 'dhaOnlineState') || readJson(localStorage, 'dhaOnlineState');
-        if (!online?.path) return false;
-        const cached = readJson(sessionStorage, REACTOR_LINES_KEY);
-        if (cached?.path === online.path && Array.isArray(cached.lines)) return false;
-        if (reactorLinesLoading) return reactorLinesLoading;
-        reactorLinesLoading = (async () => {
-            try {
-                const response = await fetch('/api/reforming/operating-data', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: online.path }),
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || 'Could not read the operating data file.');
-                const lines = (data.rows || []).map(row => ({ gc: row['GC Date/Time'] || '', reactor: normReactor(row.Sampled_reactor) }))
-                    .filter(line => line.gc);
-                sessionStorage.setItem(REACTOR_LINES_KEY, JSON.stringify({ path: online.path, lines }));
-                return true;
-            } catch (error) {
-                console.warn('Reforming: reactor per sample not read from the operating data:', error);
-                return false;
-            } finally {
-                reactorLinesLoading = null;
-            }
-        })();
-        return reactorLinesLoading;
-    }
-    function assignReactors(sorted, isFeed, activeReactors, fallback) {
-        const lines = reactorLines();
-        const pairs = lines ? pairByTime(sorted.map(row => timeOf(row.DateTime)), lines.map(line => timeOf(line.gc))) : new Map();
-        sorted.forEach((row, index) => {
-            if (isFeed(row)) { row.Reactor = ''; return; }
-            if (lines) {
-                const line = pairs.has(index) ? lines[pairs.get(index)] : null;
-                if (!line) row.Reactor = 'ERROR: no GC line of the operating data within -10…+60 min';
-                else if (line.reactor === 'R0') { row.Reactor = ''; row._bypass = true; }
-                else row.Reactor = line.reactor || 'ERROR: GC line without Sampled_reactor';
-                return;
-            }
-            if (activeReactors.length <= 1) row.Reactor = activeReactors[0] || fallback;
-            else row.Reactor = `ERROR: reactor unknown (${activeReactors.join(', ')} active) – load the operating data (.txt) on Online Analysis`;
-        });
-    }
+    const loadReactorLines = () => RR.load();
+
     // DOE condition of the sample's own reactor (DOE rows with a Reactor ID); without a reactor: the dates only
     function assignReactorConditions(sorted) {
-        const { doeRows } = runPlanInfo();
+        const { doeRows } = RR.plan();
         const ranges = doeRows.map(row => ({
             condition: String(doeValue(row, 'Condition No.') || row.Condition || '').trim(),
-            reactor: normReactor(doeValue(row, 'Reactor ID')),
+            reactor: RR.norm(doeValue(row, 'Reactor ID')),
             start: parseDoeBoundary(doeValue(row, 'Start Date'), false),
             end: parseDoeBoundary(doeValue(row, 'End Date'), true),
         })).filter(range => range.condition && range.start && range.end && range.start <= range.end);
         sorted.forEach(row => {
             const date = parseCalcDateTime(row.DateTime);
-            const reactor = /^R\d+$/.test(row.Reactor || '') ? row.Reactor : '';
+            const reactor = RR.isReactor(row.Reactor) ? row.Reactor : '';
             const hits = date ? ranges.filter(range => date >= range.start && date < range.end
                 && (!reactor || !range.reactor || range.reactor === reactor)) : [];
             const matches = [...new Set(hits.map(range => range.condition))];
             row.Condition = row._bypass ? 'Bypass' : matches.length === 1 ? matches[0]
                 : matches.length > 1 ? (reactor ? `ERROR: Ambiguous DOE conditions (${matches.join(', ')})` : '') : '';
         });
+    }
+
+    // Base table (Reforming only): the GC lines of every reactor are listed, and a line's Condition is the DOE row of
+    // its own reactor, because reactors can run different conditions at the same time. calculation_table.js is not
+    // changed: its date-only assignBaseConditions is wrapped here in Reforming mode (bypass lines keep the date match).
+    if (active && typeof assignBaseConditions === 'function') {
+        const dateOnly = assignBaseConditions;
+        window.assignBaseConditions = function (rows, columns, flagAmbiguous = false) {
+            const result = dateOnly(rows, columns, flagAmbiguous);
+            const { doeRows } = RR.plan();
+            const ranges = doeRows.map(row => ({
+                condition: String(doeValue(row, 'Condition No.') || row.Condition || '').trim(),
+                reactor: RR.norm(doeValue(row, 'Reactor ID')),
+                start: parseDoeBoundary(doeValue(row, 'Start Date'), false),
+                end: parseDoeBoundary(doeValue(row, 'End Date'), true),
+            })).filter(range => range.condition && range.reactor && range.start && range.end && range.start <= range.end);
+            if (!ranges.length) return result;
+            (result.rows || rows).forEach(row => {
+                const reactor = RR.norm(row.Reactor ?? row.Sampled_reactor);
+                if (!RR.isReactor(reactor)) return;
+                const date = parseCalcDateTime(row.DateTime ?? row['Date/Time'] ?? row['Date and Time']);
+                const matches = [...new Set(date ? ranges.filter(range => range.reactor === reactor && date >= range.start && date < range.end)
+                    .map(range => range.condition) : [])];
+                row.Condition = matches.length === 1 ? matches[0]
+                    : matches.length > 1 && flagAmbiguous ? `ERROR: Ambiguous DOE conditions (${matches.join(', ')})` : '';
+            });
+            return result;
+        };
     }
 
     // Column groups for the two-row header: [{label, keys:[...], carbon:true|false}]
@@ -188,25 +130,28 @@ window.ILSReformingCarbon = (() => {
             return;
         }
         const dataColumns = (offline.columns || []).filter(column => !['File Name', 'UID', 'DateTime'].includes(column));
-        const { info, reactor, activeReactors } = runPlanInfo();
-        const cutIn = parseCalcDateTime(info['feed cut-in']);
-        const feedId = String(info['feed sl id'] || '').trim().toUpperCase();
-
         const sorted = sortDateTimeRows(offline.rows.map(row => ({ ...row })));
         const firstSample = sorted.map(row => parseCalcDateTime(row.DateTime)).find(Boolean);
-        const origin = cutIn || firstSample;
-        const isFeed = row => !!feedId && String(row.UID || '').toUpperCase().includes(feedId);
-
-        assignReactors(sorted, isFeed, activeReactors, reactor);
+        // Reactor of every sample from its GC line; ERROR text when it cannot be known (never a guessed reactor)
+        const found = RR.assign(sorted, row => row.DateTime);
+        sorted.forEach((row, index) => {
+            const f = found[index];
+            row._feed = !!f.feed;
+            row._bypass = !!f.bypass;
+            row._block = f.block || '';
+            row.Reactor = f.reactor || f.error || '';
+        });
         assignReactorConditions(sorted);
         rows = sorted.map(row => {
             const date = parseCalcDateTime(row.DateTime);
-            const feed = isFeed(row);
+            const feed = row._feed;
+            // TOS from the Feed Cut-In of the reactor's block (reactors of Block-1 and Block-2 can start apart)
+            const origin = RR.cutInOf(row._block) ?? firstSample?.getTime() ?? null;
             const out = {
                 Date: row.DateTime,
                 DateTime: row.DateTime,
                 Condition: feed ? 'Feed' : row.Condition,
-                'TOS(h)': !feed && date && origin ? Math.round((date - origin) / 36000) / 100 : null,
+                'TOS(h)': !feed && !row._bypass && date && origin !== null ? Math.round((date.getTime() - origin) / 36000) / 100 : null,
                 Reactor: feed ? '' : row.Reactor,
                 UID: row.UID,
                 'File Name': row['File Name'],
@@ -235,11 +180,34 @@ window.ILSReformingCarbon = (() => {
         } catch (error) {}
     }
 
+    // Reactor filter (6.10.2): All, one reactor, "Feed / bypass" or "No reactor (ERROR)"
+    function reactorKey(row) {
+        if (RR.isReactor(row.Reactor)) return row.Reactor;
+        if (String(row.Reactor || '').startsWith('ERROR')) return '__error__';
+        return '__feed__';
+    }
+    function fillReactorFilter(selector, source) {
+        const select = $(selector);
+        if (!select) return;
+        const current = select.value;
+        // Every reactor of the experiment (Run Plan: role Catalyst or Inert) is listed, also before it has samples
+        const counts = Object.fromEntries(RR.plan().active.map(reactor => [reactor, 0]));
+        source.forEach(row => { const key = reactorKey(row); counts[key] = (counts[key] || 0) + 1; });
+        const reactors = Object.keys(counts).filter(RR.isReactor).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+        const options = [['', `All reactors (${source.length})`], ...reactors.map(r => [r, `${r} (${counts[r]})`])];
+        if (counts.__feed__) options.push(['__feed__', `Feed / bypass (${counts.__feed__})`]);
+        if (counts.__error__) options.push(['__error__', `No reactor – ERROR (${counts.__error__})`]);
+        select.innerHTML = options.map(([value, label]) => `<option value="${value}">${esc(label)}</option>`).join('');
+        select.value = options.some(([value]) => value === current) ? current : '';
+    }
+    const reactorPasses = (selector, row) => { const value = $(selector)?.value || ''; return !value || reactorKey(row) === value; };
+
     function filtered() {
         const from = parseFilterTimestamp($('#reformingFrom')?.value);
         const to = parseFilterTimestamp($('#reformingTo')?.value);
         const query = ($('#reformingSearch')?.value || '').toLowerCase().trim();
         return rows.filter(row => {
+            if (!reactorPasses('#reformingReactorFilter', row)) return false;
             const time = parseCalcDateTime(row.Date)?.getTime();
             if (from !== null && from !== undefined && (time === undefined || time < from)) return false;
             if (to !== null && to !== undefined && (time === undefined || time > to)) return false;
@@ -255,6 +223,7 @@ window.ILSReformingCarbon = (() => {
 
     function render() {
         build();
+        fillReactorFilter('#reformingReactorFilter', rows);
         const visible = filtered();
         const dataColumns = columns.slice(LEAD_COLUMNS.length);
         const groups = displayGroups(dataColumns);
@@ -293,6 +262,7 @@ window.ILSReformingCarbon = (() => {
         const to = parseFilterTimestamp($('#reformingSummaryTo')?.value);
         const query = ($('#reformingSummarySearch')?.value || '').toLowerCase().trim();
         return summaryRows.filter(row => {
+            if (!reactorPasses('#reformingSummaryReactorFilter', row)) return false;
             const time = parseCalcDateTime(row.Date)?.getTime();
             if (from !== null && (time === undefined || time < from)) return false;
             if (to !== null && (time === undefined || time > to)) return false;
@@ -302,6 +272,7 @@ window.ILSReformingCarbon = (() => {
 
     function renderSummary() {
         build();
+        fillReactorFilter('#reformingSummaryReactorFilter', summaryRows);
         const visible = filteredSummary();
         const thead = $('#reformingSummaryThead');
         const tbody = $('#reformingSummaryTbody');
@@ -496,6 +467,8 @@ window.ILSReformingCarbon = (() => {
             $('#reformingExportComplete').onclick = exportComplete;
             $('#reformingSummaryExportCsv').onclick = exportSummaryCsv;
             $('#reformingSearch').oninput = render;
+            if ($('#reformingReactorFilter')) $('#reformingReactorFilter').onchange = render;
+            if ($('#reformingSummaryReactorFilter')) $('#reformingSummaryReactorFilter').onchange = renderSummary;
             $('#reformingFrom').oninput = render;
             $('#reformingTo').oninput = render;
             $('#reformingClearDates').onclick = () => {

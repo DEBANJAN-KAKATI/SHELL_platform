@@ -1,11 +1,11 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.10.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.10.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
-**Reforming** (v6.4, Reactor 1; its UI was switched off in v6.6–6.8.3 and is active again) and **General_MB** (Isomerization
+**Reforming** (v6.4; any number of reactors, catalyst and inert, since 6.10.2; its UI was switched off in v6.6–6.8.3 and is active again) and **General_MB** (Isomerization
 pages + Internal Standard mass balance on Online Analysis, below). The universal Run Plan template (v6.6) describes every
 experiment for all three. The first Mass Balance (v6.5) was removed in v6.8; the Mass Balance is rebuilt step by step in
 General_MB.
@@ -193,6 +193,14 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   run); Condition = DOE row of that Reactor ID; bypass line → "Bypass"; no line → ERROR text; no operating data → the
   single active reactor, else ERROR text. Do not use the online table's `Date/Time` for this: it is ~17–20 min before
   `GC Date/Time` and the reactor changes every ~27 min.
+- **Many reactors (6.10.2)** — `frontend/js/reforming_reactors.js` (`window.ILSReformingReactors`: norm, time, lines, load,
+  assign, blockOf, cutInOf, plan) is shared by the Offline page (`reforming_offline.js` replaces dashboard.js's
+  `onlineReactorAt` / `activeReactorAt` after load, Reforming only) and the Calculation page (`reforming_carbon_table.js`:
+  Reactor filter on both Reforming tabs incl. active reactors without samples; TOS from the Feed Cut-In of the reactor's
+  block, per-block cut-ins derived from `doeData.pretreatment.settings` / DOE Block starts; Base-table conditions per
+  reactor by wrapping `assignBaseConditions` in Reforming mode). Plots: only R1–R8 rows, no Date axis. Rule: Isomerization /
+  General_MB code is not touched for Reforming work — gate or wrap from the Reforming files. Open: Base-table temperature
+  is still `10i2TIC01` for every Reforming reactor.
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

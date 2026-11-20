@@ -52,8 +52,47 @@ window.ILSReformingOffline = (() => {
         } catch (error) {}
     });
 
+    // Active Reactor of a sample (6.10.2, several reactors, catalyst and inert): the same assignment as the Calculation
+    // page (reforming_reactors.js: the reactor of the sample's own GC line in the operating data), over the same sample
+    // list (ils_reforming_offline), so both pages always agree. Feed / Bypass / ERROR text when there is no reactor.
+    // dashboard.js is not changed: in Reforming mode its two lookups (onlineReactorAt, activeReactorAt) are replaced
+    // once the page has loaded, and fall back to the originals for any time that is not a DHA sample.
+    let memo = { sig: '', byDate: new Map() };
+    function reactorAt(dateTime) {
+        const RR = window.ILSReformingReactors;
+        if (!active || !RR) return undefined;
+        let offline = null;
+        try { offline = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); } catch (error) {}
+        const samples = offline?.rows || [];
+        const lines = RR.lines();
+        const sig = `${offline?.processed_at || ''}|${samples.length}|${lines ? lines.length : 'none'}|${sessionStorage.getItem('runPlanDashboardState')?.length || 0}`;
+        if (sig !== memo.sig) {
+            const found = RR.assign(samples, sample => sample.DateTime);
+            const byDate = new Map();
+            samples.forEach((sample, index) => {
+                const f = found[index];
+                byDate.set(String(sample.DateTime), f.feed ? 'Feed' : f.bypass ? 'Bypass' : (f.reactor || f.error || ''));
+            });
+            memo = { sig, byDate };
+        }
+        return memo.byDate.get(String(dateTime));
+    }
+    if (active) {
+        document.addEventListener('DOMContentLoaded', () => {
+            if (typeof onlineReactorAt !== 'function' || typeof activeReactorAt !== 'function') return;
+            const originalOnline = onlineReactorAt;
+            const originalActive = activeReactorAt;
+            window.onlineReactorAt = function (value) { const r = reactorAt(value); return r !== undefined ? r : originalOnline.apply(this, arguments); };
+            window.activeReactorAt = function (value) { const r = reactorAt(value); return r !== undefined ? r : originalActive.apply(this, arguments); };
+            if (typeof render === 'function') render();
+            // Read the GC lines of the operating data once, then redraw the tables with the reactors
+            window.ILSReformingReactors?.load().then(changed => { if (changed && typeof render === 'function') render(); });
+        });
+    }
+
     return {
         active,
+        reactorAt,
         processUrl: '/api/reforming/process',
         table3Columns: ['File Name', 'UID', 'DateTime', 'TOS(h)', 'Active Reactor', 'RON', 'Molecular Weight', 'Carbon', 'Hydrogen', 'Specific Gravity'],
         titles,

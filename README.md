@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.10.1
+# ILS Dashboard (DHA Data Dashboard) v6.10.2
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -38,7 +38,7 @@ show the process as a badge. Switching the process clears the loaded Run Plan; t
 | Process | What it adds |
 |---|---|
 | **Isomerization** (default) | DHA tables (CARBON_TABULAR, COMPONENT_LIST, octane), Base table, Yield wof%, Custom table, Plots |
-| **Reforming** | Reforming DHA with unknown peaks assigned to a carbon number, Reforming CARBON_TABULAR tab with CSV / Export Complete CSV |
+| **Reforming** | Any number of reactors (catalyst and inert) in parallel; Reforming DHA with unknown peaks assigned to a carbon number, Reforming CARBON_TABULAR tab with CSV / Export Complete CSV |
 | **General_MB** | Isomerization pages plus the internal-standard gas flows, Liquid tab, ZMB page, Calculation → Mass Balance and mass balance plots |
 
 ## Import from a OneDrive-synced SharePoint folder (Reforming 6.4; all processes since 6.10.0)
