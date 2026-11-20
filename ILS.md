@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.10.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.10.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,7 +33,7 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (54 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+- Tests: `python -m pytest -q tests` (55 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
   conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
@@ -71,7 +71,8 @@ General_MB.
   `backend/services/sync_source.py`, folders in `config/sync_sources.json`, git-ignored). It fills the page's own path
   box and clicks its own button. `frontend/js/export_complete.js` (6.10.0): Export Complete workbook (Summary + one sheet
   per table, empty sheets say where to import, plot images) via `/api/export-xlsx` (sheets accept `title`, `notes`,
-  `images` [{title, data_url}]).
+  `images` [{title, data_url}], `subheader` = second header row). Reforming: last tab **Final Raw_Data** (6.10.3) = the
+  rows of Export Complete CSV, built by `ILSReformingReactors.completeTable` (also used by the CSV).
 - `scripts/` — `ValveOpening.py`, `build_static_snapshot.py`, `run_plan_examples/` (template builders, `add_molecular_weights.py`).
 - `documentation/` — `ILS_Dashboard_Documentation.docx` (user + technical documentation with a formula reference of every
   calculation as equations, Section 10; no confidential data, v6.9.10; built by a docx-js script),

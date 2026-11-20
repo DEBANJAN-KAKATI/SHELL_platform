@@ -160,5 +160,47 @@ window.ILSReformingReactors = (() => {
         return time(p.cutIns[block]) ?? time(p.info['feed cut-in']);
     }
 
-    return { LINES_KEY, norm, isReactor, time, lines, load, pair, plan, blockOf, assign, cutInOf, doeValue };
+    // ---------------------------------------------------------------- Reforming "complete" raw data (6.10.3)
+    // The Raw Data layout of ILS_Chemical Validation_Reforming.xlsx: one row per operating record of the .txt; a DHA sample
+    // joins the record whose GC Date/Time is within -10..+60 min (closest pairs first, each used once); DHA samples
+    // without a record are kept with blank operating data. Used by "Export Complete CSV" (Calculation, Reforming tab) and
+    // the "Final Raw_Data" sheet of the Export Complete workbook, so both always hold the same rows.
+    async function fetchOperating() {
+        const online = onlineState();
+        if (!online?.path) throw new Error('Load the operating data (.txt) on the Online Analysis page first.');
+        const response = await fetch('/api/reforming/operating-data', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: online.path }),
+        });
+        let data;
+        try { data = JSON.parse(await response.text()); } catch (error) {
+            throw new Error('The dashboard server is running older code. Close the dashboard window and start run_dashboard.bat again, then retry.');
+        }
+        if (!response.ok) throw new Error(data.error || 'Could not read the operating data file.');
+        return data;
+    }
+    // dhaRows: Reforming CARBON_TABULAR rows (Date + flat columns 'Paraffins C1' … 'Specific Gravity');
+    // returns {top, units, opColumns, dataColumns, entries: [{op, dha, key}]} sorted by time
+    function completeTable(operating, dhaRows, dataColumns) {
+        const opRows = (operating.rows || []).map(row => ({ op: row, gc: time(row['GC Date/Time']), dha: null }));
+        const dha = dhaRows.map(row => ({ row, at: time(row.Date ?? row.DateTime), used: false }));
+        pair(dha.map(d => d.at), opRows.map(o => o.gc)).forEach((i, j) => { opRows[i].dha = dha[j].row; dha[j].used = true; });
+        const entries = [
+            ...opRows.map(e => ({ op: e.op, dha: e.dha, key: e.dha ? time(e.dha.Date ?? e.dha.DateTime) : e.gc })),
+            ...dha.filter(d => !d.used).map(d => ({ op: null, dha: d.row, key: d.at })),
+        ].sort((a, b) => (a.key ?? Infinity) - (b.key ?? Infinity));
+        // Two header rows: family / property name over its first column, then C1…C15 and units
+        const top = [...operating.columns, 'DHA Date/Time'];
+        const units = top.map(() => '');
+        let lastFamily = null;
+        dataColumns.forEach(key => {
+            const match = key.match(/^(.*) (C\d+)$/);
+            const family = match ? match[1] : null;
+            top.push(match ? (family !== lastFamily ? family : '') : key);
+            units.push(match ? match[2] : (['Carbon', 'Hydrogen'].includes(key) ? 'wt%' : ''));
+            lastFamily = family;
+        });
+        return { top, units, opColumns: operating.columns, dataColumns, entries };
+    }
+
+    return { LINES_KEY, norm, isReactor, time, lines, load, pair, plan, blockOf, assign, cutInOf, doeValue, fetchOperating, completeTable };
 })();

@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.10.2
+# ILS Dashboard (DHA Data Dashboard) v6.10.3
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -165,8 +165,9 @@ imported) and one sheet per table: Run Plan (information, feed, liquid and gas c
 pre-run), Analysis (Offline Table-1/2/3 and Reactor Map, Online export; General_MB: feed gas IS, average IS flow, Liquid
 samples, ZMB lines, pump check, verified flow), Calculation (Base table, Yield wof% or the Reforming tables, Custom table
 and its formulas; General_MB: Mass Balance reactor and component tables) and Plots (settings, the plot on screen and the
-Summary Dashboard plots as images). Every sheet of the process is written even when its data was not imported: it then
-says where to import it. The Reforming CSV export of the operating data joined to the DHA is now labelled **Export
+Summary Dashboard plots as images). For Reforming the last tab is **Final Raw_Data**: the same rows as Export Complete CSV
+(every operating record with the DHA sample of its GC line, two header rows from A1, all rows). Every sheet of the process
+is written even when its data was not imported: it then says where to import it. The Reforming CSV export of the operating data joined to the DHA is now labelled **Export
 Complete CSV**.
 
 ## Saving runs

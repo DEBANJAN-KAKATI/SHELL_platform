@@ -1,3 +1,15 @@
+## 6.10.3 (2026-11-20) — Export Complete: "Final Raw_Data" tab for Reforming
+- The Export Complete workbook of a Reforming run ends with a **Final Raw_Data** tab holding the same data as the
+  Reforming **Export Complete CSV**: every operating record of the online .txt (all valid columns) with the DHA sample of
+  its GC line joined (DHA Date/Time, the six families × C1–C15, Total, Molecular Weight, RON, Carbon, Hydrogen, Specific
+  Gravity), DHA samples without a record kept; the CSV's two header rows (names, then C1…C15 / wt%) start at A1, all
+  rows (no date filter), numbers stored as numbers, dates as written in the file. Listed on the Summary sheet; when the
+  DHA data or the operating file is missing the tab says what to import.
+- The join moved to `reforming_reactors.js` (`fetchOperating`, `completeTable`) and is used by both the CSV and the tab
+  (checked identical: 172 rows × 107 columns, 0 differing cells); Export Complete loads that module on Plots / Summary
+  Dashboard. `excel_export_service.py`: optional second header row (`subheader`). Isomerization / General_MB workbooks
+  are unchanged. Test added (55 tests).
+
 ## 6.10.2 (2026-11-20) — Reforming with many reactors (catalyst and inert)
 Reforming was built for one reactor; experiments now run several reactors in parallel, inert ones included. Every
 reactor of the experiment is now shown. Isomerization and General_MB code is not changed (the Reforming scripts return

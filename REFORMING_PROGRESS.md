@@ -17,6 +17,7 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   sample the reactor of its GC line and that reactor's DOE condition; v6.10.2 shows every reactor everywhere (Offline
   Active Reactor, Calculation Reactor filter, TOS per block cut-in, Base-table condition per reactor, Plots). Open: the
   Base-table temperature tag per reactor (now `10i2TIC01` for all). See CHANGELOG 6.10.1 / 6.10.2.
+  6.10.3: the Export Complete workbook ends with "Final Raw_Data" = the Export Complete CSV rows (same join, two headers).
 - Process selector (Isomerization / Reforming) goes right after the Run Number on the Run Plan page.
 - Export = CSV of the image-1 layout (Paraffins, Iso Paraffins, Naphthenes, Aromatics, Olefins, Unknowns ×
   C1..C15, then Total, Molecular Weight, RON, Carbon wt%, Hydrogen wt%, Specific Gravity).

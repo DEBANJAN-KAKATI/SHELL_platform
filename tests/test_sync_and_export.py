@@ -103,3 +103,15 @@ def test_export_complete_workbook_has_every_sheet():
     assert wb["Offline T1 Carbon"]["A1"].value.startswith("Not imported")
     plots = wb["Plots"]
     assert any("image not readable" in str(c.value) for row in plots.iter_rows() for c in row if c.value)
+
+
+def test_final_raw_data_sheet_has_two_header_rows_from_a1():
+    """6.10.3: the Reforming "Final Raw_Data" layout (family names, then C1…C15 / units) starts at A1."""
+    sheet = {"name": "Final Raw_Data", "columns": ["Date/Time", "Sampled_reactor", "DHA Date/Time", "Paraffins", "", "Carbon"],
+             "subheader": ["", "", "", "C1", "C2", "wt%"],
+             "rows": [["08.10.2026 16:06:39", 1, "08/10/2026 16:03", 0.0, 0.003, 85.1], [None, None, "08/10/2026 18:00", 0.1, 0.2, None]]}
+    ws = openpyxl.load_workbook(BytesIO(build_workbook([sheet]).read()))["Final Raw_Data"]
+    assert [c.value for c in ws[1]] == ["Date/Time", "Sampled_reactor", "DHA Date/Time", "Paraffins", None, "Carbon"]
+    assert [c.value for c in ws[2]] == [None, None, None, "C1", "C2", "wt%"]
+    assert ws["A3"].value == "08.10.2026 16:06:39" and ws["B3"].value == 1 and ws["E3"].value == 0.003
+    assert ws.auto_filter.ref == "A2:F4" and ws.freeze_panes == "B3"

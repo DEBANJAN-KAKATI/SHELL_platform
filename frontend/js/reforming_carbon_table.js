@@ -361,18 +361,7 @@ window.ILSReformingCarbon = (() => {
         button.disabled = true;
         button.textContent = 'Exporting...';
         try {
-            const response = await fetch('/api/reforming/operating-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path: online.path }),
-            });
-            let operating;
-            try {
-                operating = JSON.parse(await response.text());
-            } catch (error) {
-                throw new Error('The dashboard server is running older code. Close the dashboard window and start run_dashboard.bat again, then retry Export Complete.');
-            }
-            if (!response.ok) throw new Error(operating.error || 'Could not read the operating data file.');
+            const operating = await RR.fetchOperating();
             showCalcError();
             downloadComplete(operating);
         } catch (error) {
@@ -384,34 +373,15 @@ window.ILSReformingCarbon = (() => {
     }
 
     function downloadComplete(operating) {
-        const time = value => parseCalcDateTime(value)?.getTime() ?? null;
-        const opRows = operating.rows.map(row => ({ op: row, gc: time(row['GC Date/Time']), dha: null }));
-        const dhaRows = rows.map(row => ({ row, at: time(row.Date), used: false }));
-
-        // Closest pairs first; each record and each DHA sample is used once.
-        const pairs = [];
-        opRows.forEach((op, i) => dhaRows.forEach((dha, j) => {
-            if (op.gc === null || dha.at === null) return;
-            const diff = dha.at - op.gc;
-            if (diff >= -MATCH_BEFORE_MS && diff <= MATCH_AFTER_MS) pairs.push({ i, j, gap: Math.abs(diff) });
-        }));
-        pairs.sort((a, b) => a.gap - b.gap).forEach(({ i, j }) => {
-            if (opRows[i].dha || dhaRows[j].used) return;
-            opRows[i].dha = dhaRows[j].row;
-            dhaRows[j].used = true;
-        });
-        const output = [
-            ...opRows.map(entry => ({ op: entry.op, dha: entry.dha, key: entry.dha ? time(entry.dha.Date) : entry.gc })),
-            ...dhaRows.filter(dha => !dha.used).map(dha => ({ op: null, dha: dha.row, key: dha.at })),
-        ].sort((a, b) => (a.key ?? Infinity) - (b.key ?? Infinity));
+        const dataColumns = columns.slice(LEAD_COLUMNS.length);
+        const table = RR.completeTable(operating, rows, dataColumns);
+        const output = table.entries;
 
         const from = parseFilterTimestamp($('#reformingFrom')?.value);
         const to = parseFilterTimestamp($('#reformingTo')?.value);
         const visible = output.filter(entry => (from === null || (entry.key !== null && entry.key >= from)) &&
             (to === null || (entry.key !== null && entry.key <= to)));
 
-        const dataColumns = columns.slice(LEAD_COLUMNS.length);
-        const groups = groupsOf(dataColumns);
         const text = value => (value === null || value === undefined || value === '' ? '' : `="${String(value).replace(/"/g, '')}"`);
         const csvCell = value => {
             const str = String(value ?? '').replace(/"/g, '""');
@@ -419,12 +389,7 @@ window.ILSReformingCarbon = (() => {
         };
 
         // Operating data (valid columns only, chosen by the server), then DHA Date/Time and the carbon table.
-        const top = [...operating.columns, 'DHA Date/Time'];
-        const units = top.map(() => '');
-        groups.forEach(group => group.keys.forEach((key, index) => {
-            top.push(index === 0 ? (group.carbon ? group.label : key) : '');
-            units.push(group.carbon ? key.match(/ (C\d+)$/)[1] : (['Carbon', 'Hydrogen'].includes(key) ? 'wt%' : ''));
-        }));
+        const { top, units } = table;
         const textColumns = new Set(['Date/Time', 'GC Date/Time']);
 
         const body = visible.map(({ op, dha }) => [

@@ -120,6 +120,14 @@ def build_workbook(sheets):
             for cell in ws[header_row]:
                 cell.font = _HEADER_FONT
                 cell.fill = _HEADER_FILL
+            # Optional second header row (6.10.3), e.g. C1…C15 / units under the family names of the Reforming raw data
+            subheader = [str(c) if c is not None else "" for c in (sheet.get("subheader") or [])][: len(columns)]
+            if subheader:
+                ws.append(subheader)
+                header_row += 1
+                for cell in ws[header_row]:
+                    cell.font = _HEADER_FONT
+                    cell.fill = _HEADER_FILL
         widths = [len(c) for c in columns]
         for row in rows:
             values = [_cell_value(v) for v in list(row)[: len(columns)]]
