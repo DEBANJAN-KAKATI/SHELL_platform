@@ -13,6 +13,8 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   Yield (wof%) hidden. Reforming wof% (Reactor1 sheet) is a later update.
 - Reforming Base table temperature = **10i2TIC01** (10i1TIC02 reads a constant 350).
 - Reforming runs in **Reactor 1 only**; catalysts PS-210 and R-434 are tested one after the other in R1.
+  (2026-11-20, v6.10.1: runs with parallel reactors, e.g. R2 and R6, are supported: each DHA sample takes the reactor of
+  its GC line in the operating data and the DOE condition of that reactor; see CHANGELOG 6.10.1.)
 - Process selector (Isomerization / Reforming) goes right after the Run Number on the Run Plan page.
 - Export = CSV of the image-1 layout (Paraffins, Iso Paraffins, Naphthenes, Aromatics, Olefins, Unknowns ×
   C1..C15, then Total, Molecular Weight, RON, Carbon wt%, Hydrogen wt%, Specific Gravity).

@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.10.0
+# ILS Dashboard (DHA Data Dashboard) v6.10.1
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield

@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.10.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.10.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,8 +33,8 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (53 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
-  conditions, mass balance, synced folder + Export Complete workbook). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
+- Tests: `python -m pytest -q tests` (54 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+  conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
 
@@ -107,7 +107,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_plot_extra` (Plots → Additional graphs {open, graph, sample, scale}, 6.10.0), `ils_data_sync` (signatures loaded from the synced folder per page; localStorage `ils_data_autosync`), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
+`ils_reforming_sync`, `ils_reforming_reactor_lines` (6.10.1), `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_plot_extra` (Plots → Additional graphs {open, graph, sample, scale}, 6.10.0), `ils_data_sync` (signatures loaded from the synced folder per page; localStorage `ils_data_autosync`), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
 `summary` = reactor-table rows, `components` = component-table rows; v6.9.6/6.9.10), `ils_plot_mb` (Plots mass balance choices); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
@@ -187,6 +187,12 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   (Date, Condition, TOS from Feed Cut-In, Reactor, UID, 6 families × C1–C15, Total, physical properties) with
   CSV export (2 header rows, dates written as `="dd/mm/yyyy hh:mm"`) and **Export Complete** (operating data
   joined to DHA within −10..+60 min).
+- **Reactor per sample (6.10.1, parallel reactors e.g. R2 + R6):** each DHA sample takes the `Sampled_reactor` of its GC
+  line in the operating .txt (DHA time vs `GC Date/Time`, −10..+60 min, closest pairs first, each line once; lines read via
+  `/api/reforming/operating-data`, cached in sessionStorage `ils_reforming_reactor_lines` {path, lines}, saved with the
+  run); Condition = DOE row of that Reactor ID; bypass line → "Bypass"; no line → ERROR text; no operating data → the
+  single active reactor, else ERROR text. Do not use the online table's `Date/Time` for this: it is ~17–20 min before
+  `GC Date/Time` and the reactor changes every ~27 min.
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

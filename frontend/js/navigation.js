@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=11';
+        historianScript.src = '/frontend/js/historian_save.js?v=12';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
             runDataScript.src = '/frontend/js/run_data.js?v=8';
