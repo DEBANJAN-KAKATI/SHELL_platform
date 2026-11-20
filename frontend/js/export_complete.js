@@ -1,7 +1,7 @@
 // Export Complete (6.10.0): one Excel workbook with everything of the run, each table in its own sheet:
 // Run Plan (Feed, Plan, DOE, Pre-run, feed tables), Analysis (Offline tables, Reactor Map, Online, ZMB, Liquid),
 // Calculation (Base, Yield, Custom, Reforming, Mass Balance) and Plots (settings, the plot on screen and the Summary
-// Dashboard plots as images). Every sheet of the process is written even when nothing was imported for it: it then
+// Dashboard plots as images); Reforming ends with "Final Raw_Data" (the rows of Export Complete CSV). Every sheet of the process is written even when nothing was imported for it: it then
 // says what was not imported and where to import it, so the workbook always has the same tabs.
 // The button sits in the header of the Calculation pages, Plots and the Summary Dashboard.
 (() => {
@@ -130,6 +130,52 @@
         return sheets;
     }
 
+    // Reforming: "Final Raw_Data" (6.10.3) = the rows of "Export Complete CSV" (Calculation → Reforming tab): every
+    // operating record of the .txt with its DHA sample joined (GC Date/Time -10..+60 min), DHA samples without a record
+    // kept; two header rows (family / property name, then C1…C15 and units) from cell A1, all rows (no date filter).
+    // The join lives in reforming_reactors.js, loaded here on pages that do not have it (Plots, Summary Dashboard).
+    function reformingModule() {
+        if (window.ILSReformingReactors) return Promise.resolve(window.ILSReformingReactors);
+        return new Promise(resolve => {
+            const script = document.createElement('script');
+            script.src = '/frontend/js/reforming_reactors.js?v=2';
+            script.onload = () => resolve(window.ILSReformingReactors || null);
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+        });
+    }
+    async function reformingRawSheet() {
+        const name = 'Final Raw_Data';
+        const title = 'Final Raw_Data · operating data with the DHA sample of each GC line (as Export Complete CSV)';
+        const missing = why => ({ name, title, notes: [`Not imported: ${why}`], columns: ['Status'], rows: [['No data in this run']], _count: 0 });
+        const carbon = read('ils_reforming_carbon_state') || {};
+        if (!Array.isArray(carbon.rows) || !carbon.rows.length) {
+            return missing('process the DHA folder on Offline Analysis, then open Calculation → Reforming CARBON_TABULAR once.');
+        }
+        if (!(read('dhaOnlineState', true) || {}).path) return missing('load the operating data (.txt) on Analysis → Online Analysis.');
+        const RR = await reformingModule();
+        if (!RR?.completeTable) return missing('the Reforming module could not be loaded; reload the page and export again.');
+        let operating;
+        try { operating = await RR.fetchOperating(); } catch (error) { return missing(error.message); }
+        const lead = ['Date', 'Condition', 'TOS(h)', 'Reactor', 'UID'];
+        const dataColumns = (carbon.columns || []).filter(column => !lead.includes(column));
+        const table = RR.completeTable(operating, carbon.rows, dataColumns);
+        // Numbers stay numbers in Excel; dates and text stay as written in the file
+        const value = v => {
+            if (v === null || v === undefined || v === '') return null;
+            if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+            const text = String(v).trim();
+            return /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(text) ? Number(text) : text;
+        };
+        const textColumns = new Set(['Date/Time', 'GC Date/Time']);
+        const rows = table.entries.map(({ op, dha }) => [
+            ...table.opColumns.map(column => (op ? (textColumns.has(column) ? (op[column] || null) : value(op[column])) : null)),
+            dha ? (dha.Date || dha.DateTime || null) : null,
+            ...dataColumns.map(column => (dha ? value(dha[column]) : null)),
+        ]);
+        return { name, columns: table.top, subheader: table.units, rows, _count: rows.length, _title: title };
+    }
+
     function calculationSheets() {
         const need = 'open Calculation → Calculation table (it is built from the Offline and Online data).';
         const base = read('ils_base_table_state') || {};
@@ -212,11 +258,12 @@
         try { return (sessionStorage.getItem('ils_run_number') || localStorage.getItem('ils_run_number') || '').trim(); } catch (e) { return ''; }
     }
 
-    function buildSheets() {
+    async function buildSheets() {
         const groups = [['Run Plan', runPlanSheets()], ['Analysis', analysisSheets()], ['Calculation', calculationSheets()], ['Plots', plotSheets()]];
+        if (isRef()) groups.push(['Final raw data', [await reformingRawSheet()]]);   // Reforming: last tab of the workbook
         const index = [];
         groups.forEach(([section, sheets]) => sheets.forEach(sh => index.push({
-            Section: section, Sheet: sh.name, Content: sh.title || sh.name,
+            Section: section, Sheet: sh.name, Content: sh._title || sh.title || sh.name,
             Status: sh._count ? 'Included' : 'Not imported', 'Rows / plots': sh._count,
         })));
         const summary = {
@@ -229,7 +276,7 @@
             columns: ['Section', 'Sheet', 'Content', 'Status', 'Rows / plots'],
             rows: index.map(r => [r.Section, r.Sheet, r.Content, r.Status, r['Rows / plots']]),
         };
-        return [summary, ...groups.flatMap(([, sheets]) => sheets)].map(({ _count, ...sheet }) => sheet);
+        return [summary, ...groups.flatMap(([, sheets]) => sheets)].map(({ _count, _title, ...sheet }) => sheet);
     }
 
     async function exportComplete(button) {
@@ -241,7 +288,7 @@
             const name = `ILS_Run${run || ''}_${proc()}_Complete_${stamp}.xlsx`;
             const response = await fetch('/api/export-xlsx', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ file_name: name, sheets: buildSheets() }),
+                body: JSON.stringify({ file_name: name, sheets: await buildSheets() }),
             });
             if (!response.ok) {
                 let message = `Export failed (${response.status})`;

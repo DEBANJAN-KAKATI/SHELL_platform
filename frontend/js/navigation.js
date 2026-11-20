@@ -149,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Export Complete (6.10.0): one Excel workbook with every table of the run, on the Calculation pages and the plot pages
     if ((isCalculation || isCustom || isMassBalance || isPlots || isPlotDashboard) && !document.querySelector('script[src*="export_complete.js"]')) {
         const exportScript = document.createElement('script');
-        exportScript.src = '/frontend/js/export_complete.js?v=1';
+        exportScript.src = '/frontend/js/export_complete.js?v=2';
         document.head.appendChild(exportScript);
     }
 
