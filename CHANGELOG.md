@@ -1,3 +1,36 @@
+## 6.10.2 (2026-11-20) — Reforming with many reactors (catalyst and inert)
+Reforming was built for one reactor; experiments now run several reactors in parallel, inert ones included. Every
+reactor of the experiment is now shown. Isomerization and General_MB code is not changed (the Reforming scripts return
+at once in those processes; shared functions are wrapped from Reforming code only in Reforming mode).
+- New `frontend/js/reforming_reactors.js` (shared by the Offline and Calculation pages): reactor of each DHA sample from
+  its GC line in the operating data (6.10.1 rule), block of the reactor (DOE Block, else R1–R4 / R5–R8), Feed Cut-In of
+  every block from the saved Run Plan (pre-run "Feed cut-in", else the block's first DOE start; a typed Plan "Feed
+  Cut-In" applies to every block). Without operating data the reactors of the Run Plan (loading plan, else DOE).
+- **Offline Analysis**: the Active Reactor column of the Reforming tables uses that assignment (it used the nearest
+  online Date/Time, which is usually the next reactor's line); Feed / Bypass / ERROR text otherwise.
+- **Calculation table**: Reforming CARBON_TABULAR and Component Summary get a **Reactor filter** listing every active
+  reactor (also inert ones without samples yet), Feed / bypass and ERROR rows; TOS of each sample counts from the Feed
+  Cut-In of its reactor's block; the **Base table** Condition of a GC line is the DOE row of its own reactor.
+- **Plots**: every reactor is plotted (colour = reactor); feed / bypass samples and samples without a known reactor are no
+  longer drawn as R1; the Date text column is no longer offered (or defaulted) as the Y axis.
+- Still one Base-table temperature tag for every Reforming reactor (`10i2TIC01`, chosen for the R1 run): to be set per
+  reactor once the bed-temperature tags of the other reactors are known.
+
+## 6.10.1 (2026-11-20) — Reforming: each DHA sample gets its own reactor (parallel reactors, e.g. R2 and R6)
+- **Bug:** every Reforming DHA sample was labelled with the first active reactor of the Run Plan (e.g. R2), so the
+  samples of a second reactor (e.g. R6) showed as R2 in the Calculation table, the summary, Plots and Export Complete;
+  their Condition stayed blank when the two reactors ran different conditions at the same time.
+- **Fix** (`reforming_carbon_table.js`): each sample takes the reactor of its own GC line in the operating data (.txt of
+  Online Analysis): DHA file time = GC Date/Time, -10…+60 min, closest pairs first, each line used once (the rule of
+  Export Complete CSV). The lines (GC Date/Time + Sampled_reactor) are read once per file
+  (`/api/reforming/operating-data`, cached in `ils_reforming_reactor_lines`, saved with the run). Condition = the DOE
+  row of that reactor (Reactor ID) whose window contains the sample. Bypass lines → Condition "Bypass"; no GC line →
+  `ERROR: no GC line …`; without the operating data and several active reactors → `ERROR: reactor unknown …` (one
+  active reactor → that reactor, as before).
+- `backend/reforming/operating.py`: rows always carry `GC Date/Time` and `Sampled_reactor`; the file is also read off
+  Windows (cp1252 fallback; the `mbcs` code page only exists on Windows).
+- Test: `tests/test_reforming_reactors.py` (54 tests).
+
 ## 6.10.0 (2026-11-19) — Easier first use: floating guide and Next, OneDrive sync for every process, additional graphs, Export Complete
 - **Guide button moved** from the header to a round **?** at the bottom right of every page (`guide.js`, `guide.css`).
 - **Next →** next to it opens the next page of the workflow: Run Plan → Offline Analysis → Online Analysis → Calculation

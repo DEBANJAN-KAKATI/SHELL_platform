@@ -28,10 +28,16 @@ def read_operating_file(file_path):
         raise ValueError("Operating data file not found. Load it on the Online Analysis page first.")
     if path.suffix.lower() != ".txt":
         raise ValueError("Operating data must be the tab-delimited .txt file used on the Online Analysis page.")
-    try:
-        frame = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False, encoding="mbcs")
-    except (LookupError, UnicodeDecodeError):
-        frame = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    # mbcs = the Windows code page; elsewhere (Docker, Linux) UTF-8, else cp1252 (the GC writes "ÿ" as its empty marker)
+    frame = None
+    for encoding in ("mbcs", "utf-8-sig", "cp1252"):
+        try:
+            frame = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False, encoding=encoding)
+            break
+        except (LookupError, UnicodeDecodeError):
+            continue
+    if frame is None:
+        raise ValueError("Operating data file could not be read (unknown text encoding).")
     frame.columns = [str(column).strip() for column in frame.columns]
     for required in ("Date/Time", "GC Date/Time"):
         if required not in frame.columns:
@@ -49,8 +55,11 @@ def read_operating_file(file_path):
     others = [column for column in valid if column not in operating and column not in estd]
     columns = operating + estd + others
 
+    # GC Date/Time and Sampled_reactor always come along: the Calculation page uses them to give each DHA sample
+    # the reactor of its own GC line (6.10.1; parallel reactors, e.g. R2 and R6).
+    extra = [column for column in ("GC Date/Time", "Sampled_reactor") if column in frame.columns]
     rows = [
-        {column: str(record.get(column, "")).strip() for column in columns + ["GC Date/Time"]}
+        {column: str(record.get(column, "")).strip() for column in columns + extra}
         for record in frame.to_dict(orient="records")
     ]
     return {

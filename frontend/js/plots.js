@@ -799,14 +799,22 @@
             try {
                 const rawSummary = sessionStorage.getItem('ils_reforming_summary_state');
                 const summary = rawSummary ? JSON.parse(rawSummary) : null;
-                if (Array.isArray(summary?.rows) && summary.rows.length) {
-                    plotState.rows = summary.rows.map(row => ({
+                // 6.10.2: every reactor of the run is plotted (colour = reactor); feed / bypass samples and samples
+                // without a known reactor (ERROR text in the Calculation table) are not drawn as a reactor
+                const reactorRows = summary?.rows?.filter(row => /^R[1-9]\d*$/.test(String(row.Reactor || '')));
+                if (Array.isArray(reactorRows) && reactorRows.length) {
+                    // 'Date' (text) is kept as DateTime only, so it is never offered (or defaulted) as a Y axis
+                    plotState.rows = reactorRows.map(({ Date, ...row }) => ({
                         ...row,
-                        DateTime: row.DateTime || row.Date,
-                        Reactor: row.Reactor || 'R1'
+                        DateTime: row.DateTime || Date,
                     }));
-                    plotState.columns = summary.columns || Object.keys(plotState.rows[0]);
+                    plotState.columns = (summary.columns || Object.keys(plotState.rows[0])).filter(column => column !== 'Date');
                     onDataLoaded();
+                    return;
+                }
+                if (Array.isArray(summary?.rows) && summary.rows.length) {
+                    showError('The Reforming samples have no reactor yet: load the operating data (.txt) on Online Analysis, then open the Calculation table once.');
+                    showEmptyNotice(true); setStatus('No Data', true);
                     return;
                 }
             } catch (error) {
@@ -1174,8 +1182,8 @@
         if (window.ILSProcess?.isReforming()) {
             let state = null;
             try { state = JSON.parse(sessionStorage.getItem('ils_reforming_carbon_state') || 'null'); } catch (e) { }
-            return (state?.rows || []).map(row => ({
-                UID: row.UID || '', DateTime: row.DateTime || row.Date || '', Reactor: row.Reactor || 'R1', Condition: row.Condition || '',
+            return (state?.rows || []).filter(row => /^R[1-9]\d*$/.test(String(row.Reactor || ''))).map(row => ({
+                UID: row.UID || '', DateTime: row.DateTime || row.Date || '', Reactor: row.Reactor, Condition: row.Condition || '',
                 families: Object.fromEntries(DHA_FAMILIES.reforming.map(([key, label]) => [label,
                     Array.from({ length: 15 }, (_, i) => num(row[`${key} C${i + 1}`]))])),
             }));
