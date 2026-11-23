@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.11.0
+# ILS Dashboard (DHA Data Dashboard) v6.11.1
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -165,7 +165,8 @@ Final Raw_Data). **Calculation → Reactor calculations (wt% · wof%)** shows on
 performance (Date, duration, run length, pressure, temperature, LHSV, H2/Naphtha, N2 / H2 / naphtha vol%, MW, carbon of the
 naphtha, H2 / naphtha out, naphtha feed, Naphtha/H2, RON, SG), the 90 components in wt% (DHA) and wof% (with H2
 generation), group types, **H2 generation, Gas Yield (C1-C4), C5+ yield, Total**, group types in wof%, and the inlet
-ratios. Inputs: Run Plan Feed (Carbon wt%, MW, Density @ 15 °C), Plan (catalyst, catalyst volume), DOE of each line's
+ratios. Inputs: Run Plan Feed (Carbon and Hydrogen wt% — the carbon is normalised 100·C/(C+H) as the workbook's
+'Blend Feed Properties', e.g. CHN 85.33 / 14.89 → 85.1427 wt% — MW, Density @ 15 °C), Plan (catalyst, catalyst volume), DOE of each line's
 condition (N2 dilution flow NLPH, H2 Flow g/h), Feed Cut-In of the reactor's block; temperature / pressure 10i1TIC02 /
 10i1PIC01 (R1–R4) or 10i2TIC02 / 10i2PIC01 (R5–R8); H2 and N2 vol% from the GC areas with the GC calibration of the
 workbook. Yields start 12 h after the Feed Cut-In (setting "Yields from", as the workbook); before that wof% = wt%.
@@ -216,6 +217,6 @@ Open http://localhost:5001. `data/` is mounted at `/app/data`; RunData is kept i
 the sources with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY` or `DASHBOARD_RUN_PLAN_FILE`.
 
 ## Tests
-`python -m pytest -q tests` (59 tests: Run Plan reader and molecular weights, online units and the internal standard
+`python -m pytest -q tests` (60 tests: Run Plan reader and molecular weights, online units and the internal standard
 against the MassBal workbook, R08 conditions, mass balance, synced folder and Export Complete workbook, Reforming reactor
 per GC line and the Reforming reactor sheet).

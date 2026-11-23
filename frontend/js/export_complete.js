@@ -296,7 +296,7 @@
             return {
                 name, title: `${name} · catalyst performance (ILS reactor sheet)`,
                 notes: [
-                    `Carbon_Online DHA (feed) ${fmt(k.feed_carbon)} wt% · Hydrogen ${fmt(k.feed_hydrogen)} wt% · Molecular Weight ${fmt(k.feed_mw)} · Density ${fmt(k.feed_density)} g/ml (Run Plan Feed)`,
+                    `Carbon_Online DHA (feed) ${fmt(k.feed_carbon)} wt% · Hydrogen ${fmt(k.feed_hydrogen)} wt%${k.feed_carbon_normalised ? ` (normalised 100·C/(C+H) from C ${fmt(k.feed_carbon_measured)} / H ${fmt(k.feed_hydrogen_measured)})` : ''} · Molecular Weight ${fmt(k.feed_mw)} · Density ${fmt(k.feed_density)} g/ml (Run Plan Feed)`,
                     `Feed Cut-In ${reactor.feed_cut_in || '—'} · ${reactor.block} · catalyst volume ${fmt(reactor.catalyst_volume)} ml · H2 flow (inlet) ${fmt(reactor.h2_inlet_g_h)} g/h (Run Plan DOE)`,
                     `H2 / N2 vol% = (GC Area − intercept) / slope: H2 ${k.calibration?.H2?.intercept} / ${k.calibration?.H2?.slope}, N2 ${k.calibration?.N2?.intercept} / ${k.calibration?.N2?.slope} · yields from ${fmt(k.yield_start_h)} h after cut-in`,
                 ],

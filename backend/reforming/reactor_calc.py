@@ -19,6 +19,8 @@ Sheet row → key (all per GC line of the reactor; the sheet takes the Raw Data 
   35 H2 (Rx effluent, g/h) .......... h2_out              = N2/(N2%/100) × H2%/100 × 0.0416 × 2
   36 Naphtha (Rx effluent, g/h) ..... naphtha_out         = N2/(N2%/100) × Naphtha%/100 × 0.0416 × MW
   37 Naphtha (Feed Rate, g/h) ....... naphtha_feed        = naphtha_out × carbon_naphtha / feed Carbon wt%
+                                                          (feed Carbon = 100·C/(C+H) of the Run Plan Feed Carbon and Hydrogen,
+                                                          as the workbook's D2 = 'Blend Feed Properties' H9)
   38 Naphtha/H2 (Rx effluent, mass) . naphtha_h2          = (Naphtha% × MW) / (H2% × 2)
   39/40 Estimated RON, SG ........... ron, sg             (DHA)
   42-131 components wt% ............. wt[...]             (DHA families × C1-C15; 132 Total)
@@ -142,7 +144,13 @@ def plan_context(run_plan):
     for row in run_plan.get("feedRows") or []:   # older layout: flat rows
         props.setdefault(_key(row.get("component")), row.get("value"))
     density = next((v for k, v in props.items() if k.startswith("density")), None)
-    feed = {"carbon": number(props.get("carbon")), "hydrogen": number(props.get("hydrogen")),
+    carbon, hydrogen = number(props.get("carbon")), number(props.get("hydrogen"))
+    # Feed carbon as the workbook uses it (6.11.1): CHN Carbon normalised with Hydrogen, 100·C/(C+H)
+    # ('Blend Feed Properties' H9 = 100*D9/SUM(D9:D10): 85.33 / 14.89 → 85.1427 wt%, the reactor sheets' D2)
+    normalised = carbon is not None and hydrogen is not None and (carbon + hydrogen) > 0
+    feed = {"carbon": 100 * carbon / (carbon + hydrogen) if normalised else carbon,
+            "hydrogen": 100 * hydrogen / (carbon + hydrogen) if normalised else hydrogen,
+            "carbon_measured": carbon, "hydrogen_measured": hydrogen, "carbon_normalised": normalised,
             "mw": number(props.get("molecular weight")), "density": number(density)}
 
     plan_rows = (run_plan.get("planData") or {}).get("rows") or []
@@ -362,6 +370,8 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
         "lines": results, "reactors": reactors, "components": COMPONENTS, "families": FAMILIES,
         "carbon_fraction": {c: CARBON_FRACTION[f][n - 1] for f in FAMILIES for n in CARBON_NUMBERS for c in [component_key(f, n)]},
         "constants": {"feed_carbon": feed["carbon"], "feed_hydrogen": feed["hydrogen"], "feed_mw": feed["mw"],
+                      "feed_carbon_measured": feed["carbon_measured"], "feed_hydrogen_measured": feed["hydrogen_measured"],
+                      "feed_carbon_normalised": feed["carbon_normalised"],
                       "feed_density": feed["density"], "calibration": calibration, "molar_volume_factor": MOLAR_VOLUME_FACTOR,
                       "yield_start_h": yield_start_h},
         "missing": [label for label, value in (("feed Carbon wt%", feed["carbon"]), ("feed Molecular Weight", feed["mw"]),

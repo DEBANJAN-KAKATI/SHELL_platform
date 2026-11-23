@@ -1,3 +1,11 @@
+## 6.11.1 (2026-11-23) — Reforming: feed carbon normalised as the workbook
+- The reactor calculation uses the feed Carbon wt% as the workbook does: CHN Carbon normalised with Hydrogen,
+  100·C/(C+H) ('Blend Feed Properties' H9 → the reactor sheets' D2; 85.33 / 14.89 → 85.1427 wt%). Before, the Run Plan
+  Carbon was used as typed (a measured, not normalised value gave a naphtha feed ~0.2 % low). Shown on the Reactor
+  calculations tab and in the export notes. Per-component carbon factors (sheet column C) were already the workbook's.
+- Re-checked against Reactor 2 and Reactor 6 with the measured 85.33 / 14.89 in the Run Plan: same result as 6.11.0
+  (all yields equal). Test added (60 tests).
+
 ## 6.11.0 (2026-11-23) — Reforming as the mentor's workbook (ILS_Chemical Validation_Reforming, Method 2)
 Isomerization and General_MB are not changed (Reforming-only files; shared functions wrapped from Reforming code).
 - **Reactor calculation** `backend/reforming/reactor_calc.py` + `POST /api/reforming/reactor-calc`: the "Reactor n

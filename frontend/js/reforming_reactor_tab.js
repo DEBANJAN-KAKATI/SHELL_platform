@@ -92,7 +92,7 @@
         const n = v => (typeof v === 'number' ? Number(v.toPrecision(6)) : '—');
         $('#reformingReactorInfo').innerHTML = [
             `${reactor.block} · Feed Cut-In <b>${esc(reactor.feed_cut_in || '—')}</b> · catalyst volume <b>${n(reactor.catalyst_volume)}</b> ml`,
-            `Feed (Run Plan): Carbon <b>${n(k.feed_carbon)}</b> wt% · MW <b>${n(k.feed_mw)}</b> · density <b>${n(k.feed_density)}</b> g/ml`,
+            `Feed (Run Plan): Carbon <b>${n(k.feed_carbon)}</b> wt%${k.feed_carbon_normalised ? ` (normalised 100·C/(C+H) from C ${n(k.feed_carbon_measured)} / H ${n(k.feed_hydrogen_measured)})` : ''} · MW <b>${n(k.feed_mw)}</b> · density <b>${n(k.feed_density)}</b> g/ml`,
             `N2 effluent and H2 inlet flows from the Run Plan DOE of each line's condition`,
             `H2 / N2 vol% from the GC areas: (Area − ${k.calibration?.H2?.intercept}) / ${k.calibration?.H2?.slope} and (Area − ${k.calibration?.N2?.intercept}) / ${k.calibration?.N2?.slope}`,
             `Yields from ${n(k.yield_start_h)} h after cut-in (before: wof% = wt%)`,

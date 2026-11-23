@@ -109,3 +109,16 @@ def test_missing_run_plan_inputs_give_error_text():
     x = out["lines"][0]
     assert x["n2_nlph"].startswith("ERROR") and x["h2_out"].startswith("ERROR") and x["naphtha_h2_inlet"].startswith("ERROR")
     assert set(out["missing"]) == {"feed Carbon wt%", "feed Molecular Weight", "feed Density @ 15 °C"}
+
+
+def test_feed_carbon_is_normalised_with_hydrogen_as_the_workbook():
+    """'Blend Feed Properties' H9 = 100*D9/SUM(D9:D10): CHN 85.33 / 14.89 → 85.1427 wt% (the reactor sheets' D2)."""
+    plan = run_plan()
+    plan["feedTables"]["properties"]["rows"] = [{"label": "Carbon", "value": 85.33}, {"label": "Hydrogen", "value": 14.89},
+                                                {"label": "Molecular Weight", "value": FEED_MW}, {"label": "Density @ 15 °C", "value": DENSITY}]
+    ops = [line("19.11.2026 05:05:22", "19.11.2026 06:46:00", 2, 4380000, 323000000)]
+    out = calculate(ops, [sample("S1", "19/11/2026 06:46", **COMPOSITION)], plan)
+    assert out["constants"]["feed_carbon"] == pytest.approx(85.14268609060068, rel=1e-15)
+    assert out["constants"]["feed_hydrogen"] == pytest.approx(14.857313909399322, rel=1e-15)
+    x = out["lines"][0]
+    assert x["naphtha_feed"] == pytest.approx(x["naphtha_out"] * x["carbon_naphtha"] / 85.14268609060068, rel=1e-12)
