@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.11.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.11.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,7 +33,7 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (59 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+- Tests: `python -m pytest -q tests` (62 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
   conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line, Reforming reactor sheet). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
@@ -205,7 +205,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   (`calculate(operating_rows, samples, run_plan, yield_start_h)`; docstring maps every sheet row 19–252 to a key) +
   `POST /api/reforming/reactor-calc` {path, samples (= ils_reforming_offline rows), run_plan, yield_start_h};
   `POST /api/reforming/operating-table` = the whole .txt. One result per GC line of a reactor (Sampled_reactor 1–8), its
-  DHA sample paired by GC Date/Time (−10..+60 min). Constants: Run Plan Feed Carbon / MW / Density @ 15 °C, Plan
+  DHA sample paired by GC Date/Time (−10..+60 min). Constants: Run Plan Feed Carbon (6.11.1: normalised 100·C/(C+H) with
+  the Feed Hydrogen, as the workbook's 'Blend Feed Properties' H9 = reactor sheets' D2) / MW / Density @ 15 °C, Plan
   "Catalyst volume", DOE "N2 dilution flow (NLPH)" and "H2 Flow (gms/h)" of the line's condition (reactor + time), Feed
   Cut-In per block; T/P = 10i1TIC02/10i1PIC01 (R1–4), 10i2TIC02/10i2PIC01 (R5–8); H2/N2 vol% from Area_H2/Area_N2 with
   `GC_CALIBRATION`; 0.0416 mol/NL; carbon fractions `CARBON_FRACTION` (sheet column C); Gas = wof P C1-4 + iP C4 + O C2-4
@@ -216,6 +217,12 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   `reforming_carbon_table.js` (Plots read them). Export Complete (Reforming) tab list in `export_complete.js`
   `reformingWorkbook()`. Workbook exceptions not copied: typed 2 ml catalyst volume in LHSV from column O, typed N2 flows
   in single R6 columns, the pre-cut-in column's 273/293/22.4.
+  **6.11.2:** `assign_reactors` — a line exported with Sampled_reactor 0/blank but naphtha ≥ `NAPHTHA_MIN_VOL` (2 vol% from the
+  areas) takes the GC sampling-cycle reactor (smallest repeating period of the reactors before it); `/operating-data` adds
+  "Reactor (assigned)" / "Reactor source" (cache `ils_reforming_reactor_lines` v2, calc sig `CALC_VERSION` 2). Lines before
+  the cut-in without DHA are skipped; a line before the reactor's first DOE start uses condition 1's flows. Reforming-only
+  CSS: Offline `#dataTable thead th` sticky (from reforming_offline.js), reactor tab header z-index above the sticky column;
+  "—" + tooltip for yields before the yield start and for lines without DHA.
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

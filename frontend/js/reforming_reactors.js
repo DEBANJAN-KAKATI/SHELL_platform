@@ -8,6 +8,10 @@
 // Date/Time is usually the next reactor's line. The lines are read once per file and cached in sessionStorage.
 window.ILSReformingReactors = (() => {
     const LINES_KEY = 'ils_reforming_reactor_lines';
+    // 6.11.2: lines carry the server's assigned reactor (lines exported with Sampled_reactor 0 get the GC-cycle reactor);
+    // caches written before (no version) are read again
+    const LINES_VERSION = 2;
+    const CALC_VERSION = 2;
     const BEFORE_MS = 10 * 60000;
     const AFTER_MS = 60 * 60000;
     const readJson = (storage, key) => { try { return JSON.parse(storage.getItem(key) || 'null'); } catch (e) { return null; } };
@@ -39,7 +43,7 @@ window.ILSReformingReactors = (() => {
     // Cached GC lines [{gc, reactor}] of the loaded operating file, or null when they are not read (yet)
     function lines() {
         const cached = readJson(sessionStorage, LINES_KEY);
-        if (!cached || !Array.isArray(cached.lines)) return null;
+        if (!cached || !Array.isArray(cached.lines) || cached.v !== LINES_VERSION) return null;
         const online = onlineState();
         if (online?.path && cached.path && online.path !== cached.path) return null;
         return cached.lines;
@@ -50,7 +54,7 @@ window.ILSReformingReactors = (() => {
         const online = onlineState();
         if (!online?.path) return Promise.resolve(false);
         const cached = readJson(sessionStorage, LINES_KEY);
-        if (cached?.path === online.path && Array.isArray(cached.lines)) return Promise.resolve(false);
+        if (cached?.path === online.path && Array.isArray(cached.lines) && cached.v === LINES_VERSION) return Promise.resolve(false);
         if (loading) return loading;
         loading = (async () => {
             try {
@@ -59,9 +63,11 @@ window.ILSReformingReactors = (() => {
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || 'Could not read the operating data file.');
-                const gcLines = (data.rows || []).map(row => ({ gc: row['GC Date/Time'] || '', reactor: norm(row.Sampled_reactor) }))
+                const gcLines = (data.rows || []).map(row => ({ gc: row['GC Date/Time'] || '',
+                    reactor: norm(row['Reactor (assigned)'] !== undefined && row['Reactor (assigned)'] !== '' ? row['Reactor (assigned)'] : row.Sampled_reactor),
+                    source: row['Reactor source'] || '' }))
                     .filter(line => line.gc);
-                sessionStorage.setItem(LINES_KEY, JSON.stringify({ path: online.path, lines: gcLines }));
+                sessionStorage.setItem(LINES_KEY, JSON.stringify({ path: online.path, v: LINES_VERSION, lines: gcLines }));
                 return true;
             } catch (error) {
                 console.warn('Reforming: GC lines not read from the operating data:', error);
@@ -224,7 +230,7 @@ window.ILSReformingReactors = (() => {
         const runPlan = readJson(sessionStorage, 'runPlanDashboardState') || readJson(localStorage, 'runPlanDashboardState') || {};
         const plan = { feedRows: runPlan.feedRows, feedTables: runPlan.feedTables, planData: runPlan.planData, doeData: runPlan.doeData };
         const options = calcOptions();
-        const sig = JSON.stringify([online?.path || '', offline?.processed_at || '', (offline?.rows || []).length,
+        const sig = JSON.stringify([CALC_VERSION, online?.path || '', offline?.processed_at || '', (offline?.rows || []).length,
             JSON.stringify(plan).length, options.yield_start_h]);
         return { path: online?.path || '', samples: offline?.rows || [], plan, options, sig };
     }

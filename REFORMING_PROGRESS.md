@@ -24,6 +24,10 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   tags by block (10i1TIC02 / 10i2TIC02) as the workbook (resolves the open 10i2TIC01 item). Verified against Reactor 2 and
   Reactor 6 cell by cell. Workbook exceptions reported to the user, not copied (2 ml in LHSV from column O, typed N2 3.78
   / 4.7 in two R6 columns). Yields start 12 h after cut-in (workbook columns H / G) — adjustable on the tab.
+- **2026-11-23, v6.11.2 — full run Result_34.txt**: Sampled_reactor 0 on every line from 20.11 08:00 (GC still cycling
+  R2 / R6) → reactor from the GC cycle when the line holds naphtha (56/56 equal to the workbook); pre-run lines without DHA
+  left out; sticky headers (Offline Properties, Reactor calculations); "—" with tooltips instead of blank / ERROR cells.
+  Note for the user: the export itself has pressure typos (0.70, 699.797 barg) — shown as read.
 - Process selector (Isomerization / Reforming) goes right after the Run Number on the Run Plan page.
 - Export = CSV of the image-1 layout (Paraffins, Iso Paraffins, Naphthenes, Aromatics, Olefins, Unknowns ×
   C1..C15, then Total, Molecular Weight, RON, Carbon wt%, Hydrogen wt%, Specific Gravity).

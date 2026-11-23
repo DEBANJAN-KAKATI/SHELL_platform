@@ -19,6 +19,8 @@ Sheet row → key (all per GC line of the reactor; the sheet takes the Raw Data 
   35 H2 (Rx effluent, g/h) .......... h2_out              = N2/(N2%/100) × H2%/100 × 0.0416 × 2
   36 Naphtha (Rx effluent, g/h) ..... naphtha_out         = N2/(N2%/100) × Naphtha%/100 × 0.0416 × MW
   37 Naphtha (Feed Rate, g/h) ....... naphtha_feed        = naphtha_out × carbon_naphtha / feed Carbon wt%
+                                                          (feed Carbon = 100·C/(C+H) of the Run Plan Feed Carbon and Hydrogen,
+                                                          as the workbook's D2 = 'Blend Feed Properties' H9)
   38 Naphtha/H2 (Rx effluent, mass) . naphtha_h2          = (Naphtha% × MW) / (H2% × 2)
   39/40 Estimated RON, SG ........... ron, sg             (DHA)
   42-131 components wt% ............. wt[...]             (DHA families × C1-C15; 132 Total)
@@ -142,7 +144,13 @@ def plan_context(run_plan):
     for row in run_plan.get("feedRows") or []:   # older layout: flat rows
         props.setdefault(_key(row.get("component")), row.get("value"))
     density = next((v for k, v in props.items() if k.startswith("density")), None)
-    feed = {"carbon": number(props.get("carbon")), "hydrogen": number(props.get("hydrogen")),
+    carbon, hydrogen = number(props.get("carbon")), number(props.get("hydrogen"))
+    # Feed carbon as the workbook uses it (6.11.1): CHN Carbon normalised with Hydrogen, 100·C/(C+H)
+    # ('Blend Feed Properties' H9 = 100*D9/SUM(D9:D10): 85.33 / 14.89 → 85.1427 wt%, the reactor sheets' D2)
+    normalised = carbon is not None and hydrogen is not None and (carbon + hydrogen) > 0
+    feed = {"carbon": 100 * carbon / (carbon + hydrogen) if normalised else carbon,
+            "hydrogen": 100 * hydrogen / (carbon + hydrogen) if normalised else hydrogen,
+            "carbon_measured": carbon, "hydrogen_measured": hydrogen, "carbon_normalised": normalised,
             "mw": number(props.get("molecular weight")), "density": number(density)}
 
     plan_rows = (run_plan.get("planData") or {}).get("rows") or []
@@ -192,6 +200,51 @@ def condition_of(doe_rows, reactor, when):
     return rows[-1] if rows else None
 
 
+# ---------------------------------------------------------------- reactor of each GC line (6.11.2)
+# Some exports write Sampled_reactor 0 (the bypass code) for reactor lines, e.g. Result_34.txt from 20.11.2026 08:00 on;
+# the workbook's Raw Data has them relabelled by hand. A line marked 0 / blank that holds naphtha (>= NAPHTHA_MIN_VOL
+# vol% from the GC areas, i.e. reactor effluent, not the H2/N2 feed gas of a bypass) gets the reactor that continues the
+# GC's sampling cycle (the repeating sequence of the reactors before it, e.g. R2, R6, R2, R6 …). Real bypass lines keep 0.
+NAPHTHA_MIN_VOL = 2.0
+REACTOR_SOURCE_EXPORT, REACTOR_SOURCE_CYCLE = "export", "GC cycle (Sampled_reactor 0 in the export)"
+
+
+def naphtha_vol(raw, calibration=GC_CALIBRATION):
+    area_h2, area_n2 = number(raw.get("Area_H2")), number(raw.get("Area_N2"))
+    if area_h2 is None or area_n2 is None:
+        return None
+    h2 = (area_h2 - calibration["H2"]["intercept"]) / calibration["H2"]["slope"]
+    n2 = (area_n2 - calibration["N2"]["intercept"]) / calibration["N2"]["slope"]
+    return 100 - h2 - n2
+
+
+def assign_reactors(rows, calibration=GC_CALIBRATION):
+    """[(reactor 'R1'…'R8' / 'R0' / '', source)] for the rows of the operating file (same order)."""
+    order = sorted(range(len(rows)), key=lambda i: (parse_time(rows[i].get("Date/Time")) or datetime.max))
+    result = [("", "")] * len(rows)
+    history = []
+    for i in order:
+        raw = rows[i]
+        reactor = reactor_id(raw.get("Sampled_reactor"))
+        if reactor and reactor != "R0":
+            result[i] = (reactor, REACTOR_SOURCE_EXPORT)
+            history.append(reactor)
+            continue
+        nv = naphtha_vol(raw, calibration) if raw.get("GC Date/Time") else None
+        predicted = None
+        if nv is not None and nv >= NAPHTHA_MIN_VOL:
+            for period in range(1, 9):
+                if len(history) >= 2 * period and history[-period:] == history[-2 * period:-period]:
+                    predicted = history[-period]
+                    break
+        if predicted:
+            result[i] = (predicted, REACTOR_SOURCE_CYCLE)
+            history.append(predicted)
+        else:
+            result[i] = (reactor, REACTOR_SOURCE_EXPORT if reactor else "")
+    return result
+
+
 # ---------------------------------------------------------------- pairing
 def pair_samples(sample_times, line_times):
     """DHA sample → GC line: DHA time within −10..+60 min of the GC Date/Time, closest pairs first, each used once."""
@@ -228,6 +281,12 @@ def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION,
     when = line["time"]
     feed = ctx["feed"]
     doe = condition_of(ctx["doe"], reactor, when)
+    flows = doe
+    if flows is None and when is not None:
+        # A line before the reactor's first condition (e.g. just before the Feed Cut-In) takes condition 1's flows,
+        # as the workbook's first column (N2 and H2 inlet of the run)
+        firsts = sorted((r for r in ctx["doe"] if r["reactor"] == reactor and r["start"]), key=lambda r: r["start"])
+        flows = firsts[0] if firsts and when < firsts[0]["start"] else None
     first = 1 if int(reactor[1:]) <= 4 else 2
     out = {
         "reactor": reactor, "block": block, "catalyst": ctx["catalyst"].get(reactor, ""),
@@ -245,9 +304,9 @@ def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION,
         out["duration_h"] = hours(when, previous_time) if previous_time else hours(when, cut_in)
     out["pressure"] = number(line["raw"].get(f"10i{first}PIC01"))
     out["temperature"] = number(line["raw"].get(f"10i{first}TIC02"))
-    out["n2_nlph"] = (doe["n2_nlph"] if doe and doe["n2_nlph"] is not None
+    out["n2_nlph"] = (flows["n2_nlph"] if flows and flows["n2_nlph"] is not None
                       else _err("no DOE 'N2 dilution flow (NLPH)' for this reactor and time"))
-    h2_inlet = doe["h2_g_h"] if doe and doe["h2_g_h"] is not None else None
+    h2_inlet = flows["h2_g_h"] if flows and flows["h2_g_h"] is not None else None
 
     area_h2, area_n2 = number(line["raw"].get("Area_H2")), number(line["raw"].get("Area_N2"))
     out["h2_vol"] = (area_h2 - calibration["H2"]["intercept"]) / calibration["H2"]["slope"] if area_h2 is not None else _err("no Area_H2")
@@ -326,13 +385,14 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
     calibration = calibration or GC_CALIBRATION
     ctx = plan_context(run_plan)
     lines = []
-    for raw in operating_rows:
+    assigned = assign_reactors(operating_rows, calibration)
+    for raw, (reactor, source) in zip(operating_rows, assigned):
         gc = parse_time(raw.get("GC Date/Time"))
         if gc is None:
             continue
         lines.append({"raw": raw, "gc": gc, "time": parse_time(raw.get("Date/Time")),
                       "date_time": str(raw.get("Date/Time") or ""), "gc_date_time": str(raw.get("GC Date/Time") or ""),
-                      "reactor": reactor_id(raw.get("Sampled_reactor"))})
+                      "reactor": reactor, "reactor_source": source})
     feed_id = ctx["feed_id"]
     dha = [s for s in samples if not (feed_id and feed_id in str(s.get("UID", "")).upper())]
     line_to_sample = pair_samples([parse_time(s.get("DateTime")) for s in dha], [l["gc"] for l in lines])
@@ -344,7 +404,12 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
         if not reactor or reactor == "R0":
             continue    # bypass lines and lines without a reactor are not part of a reactor sheet
         sample = dha[line_to_sample[line]] if line in line_to_sample else None
+        block = block_of(reactor, ctx["doe"])
+        cut_in = ctx["cut_ins"].get(block) or ctx["cut_in"]
+        if sample is None and cut_in is not None and line_obj["time"] is not None and line_obj["time"] < cut_in:
+            continue    # pre-run line (activation) without a DHA sample: not part of the reactor sheet (as the workbook)
         result = calculate_line(line_obj, sample, ctx, previous.get(reactor), calibration, yield_start_h)
+        result["reactor_source"] = line_obj["reactor_source"]
         previous[reactor] = line_obj["time"]
         results.append(result)
 
@@ -356,12 +421,15 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
                          "catalyst_volume": ctx["catalyst_volume"].get(reactor),
                          "feed_cut_in": cut_in.strftime("%d.%m.%Y %H:%M") if cut_in else "",
                          "h2_inlet_g_h": next((r["h2_g_h"] for r in ctx["doe"] if r["reactor"] == reactor and r["h2_g_h"] is not None), None),
-                         "lines": sum(1 for r in results if r["reactor"] == reactor)})
+                         "lines": sum(1 for r in results if r["reactor"] == reactor),
+                         "lines_from_cycle": sum(1 for r in results if r["reactor"] == reactor and r["reactor_source"] == REACTOR_SOURCE_CYCLE)})
     feed = ctx["feed"]
     return {
         "lines": results, "reactors": reactors, "components": COMPONENTS, "families": FAMILIES,
         "carbon_fraction": {c: CARBON_FRACTION[f][n - 1] for f in FAMILIES for n in CARBON_NUMBERS for c in [component_key(f, n)]},
         "constants": {"feed_carbon": feed["carbon"], "feed_hydrogen": feed["hydrogen"], "feed_mw": feed["mw"],
+                      "feed_carbon_measured": feed["carbon_measured"], "feed_hydrogen_measured": feed["hydrogen_measured"],
+                      "feed_carbon_normalised": feed["carbon_normalised"],
                       "feed_density": feed["density"], "calibration": calibration, "molar_volume_factor": MOLAR_VOLUME_FACTOR,
                       "yield_start_h": yield_start_h},
         "missing": [label for label, value in (("feed Carbon wt%", feed["carbon"]), ("feed Molecular Weight", feed["mw"]),

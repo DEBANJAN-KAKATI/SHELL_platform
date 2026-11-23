@@ -25,6 +25,11 @@ window.ILSReformingOffline = (() => {
     }
 
     if (active) {
+        // Column titles stay visible while scrolling down the DHA tables (Table-1/2/3). dashboard.css makes only the
+        // first header cell of the Properties table sticky (`.table3-table th:nth-child(n) {position: static}`, shared
+        // with Isomerization, not changed); this id rule wins over it in Reforming mode only.
+        document.head.insertAdjacentHTML('beforeend', '<style>#dataTable thead th{position:sticky!important;top:0;z-index:3}'
+            + '#dataTable thead th:first-child{left:0;z-index:5}</style>');
         const tab2 = document.querySelector('.table-tab[data-table="table2"]');
         const tab3 = document.querySelector('.table-tab[data-table="table3"]');
         if (tab2) tab2.textContent = 'Table-2 · Unknown Peaks';
