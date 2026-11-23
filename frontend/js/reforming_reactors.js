@@ -202,5 +202,127 @@ window.ILSReformingReactors = (() => {
         return { top, units, opColumns: operating.columns, dataColumns, entries };
     }
 
-    return { LINES_KEY, norm, isReactor, time, lines, load, pair, plan, blockOf, assign, cutInOf, doeValue, fetchOperating, completeTable };
+    // ---------------------------------------------------------------- reactor calculation (6.11.0)
+    // The "Reactor n (catalyst)" sheets of ILS_Chemical Validation_Reforming (Method 2), computed on the server
+    // (backend/reforming/reactor_calc.py) for every reactor, one result per GC line. Cached per operating file, DHA set,
+    // Run Plan and "yields from" setting; the Calculation page, Summary, Plots and Export Complete read the cache.
+    const CALC_KEY = 'ils_reforming_calc';
+    const CALC_OPTIONS_KEY = 'ils_reforming_calc_options';
+    let calcMemo = null;
+    let calcLoading = null;
+    function calcOptions() {
+        const saved = readJson(sessionStorage, CALC_OPTIONS_KEY) || {};
+        const start = Number(saved.yield_start_h);
+        return { yield_start_h: Number.isFinite(start) && start >= 0 ? start : 12 };
+    }
+    function setCalcOptions(options) {
+        try { sessionStorage.setItem(CALC_OPTIONS_KEY, JSON.stringify({ ...calcOptions(), ...options })); } catch (e) { }
+    }
+    function calcInputs() {
+        const online = onlineState();
+        const offline = readJson(sessionStorage, 'ils_reforming_offline');
+        const runPlan = readJson(sessionStorage, 'runPlanDashboardState') || readJson(localStorage, 'runPlanDashboardState') || {};
+        const plan = { feedRows: runPlan.feedRows, feedTables: runPlan.feedTables, planData: runPlan.planData, doeData: runPlan.doeData };
+        const options = calcOptions();
+        const sig = JSON.stringify([online?.path || '', offline?.processed_at || '', (offline?.rows || []).length,
+            JSON.stringify(plan).length, options.yield_start_h]);
+        return { path: online?.path || '', samples: offline?.rows || [], plan, options, sig };
+    }
+    // Cached result for the current inputs, or null
+    function calcCached() {
+        const { sig } = calcInputs();
+        if (calcMemo?.sig === sig) return calcMemo.result;
+        const saved = readJson(sessionStorage, CALC_KEY);
+        if (saved?.sig === sig) { calcMemo = saved; return saved.result; }
+        return null;
+    }
+    // Runs the calculation when the inputs changed; resolves {result, changed} or {error}
+    async function calc(force = false) {
+        const inputs = calcInputs();
+        if (!inputs.path) return { error: 'Load the operating data (.txt) on Analysis → Online Analysis.' };
+        if (!inputs.samples.length) return { error: 'Process the Reforming DHA folder on Analysis → Offline Analysis.' };
+        if (!force && calcCached()) return { result: calcCached(), changed: false };
+        if (calcLoading) return calcLoading;
+        calcLoading = (async () => {
+            try {
+                const response = await fetch('/api/reforming/reactor-calc', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: inputs.path, samples: inputs.samples, run_plan: inputs.plan, yield_start_h: inputs.options.yield_start_h }),
+                });
+                const data = await response.json();
+                if (!response.ok) return { error: data.error || 'Reactor calculation failed.' };
+                calcMemo = { sig: inputs.sig, result: data };
+                try { sessionStorage.setItem(CALC_KEY, JSON.stringify(calcMemo)); } catch (e) { /* large runs: memory only */ }
+                return { result: data, changed: true };
+            } catch (error) {
+                return { error: `Reactor calculation failed: ${error.message}` };
+            } finally {
+                calcLoading = null;
+            }
+        })();
+        return calcLoading;
+    }
+    // Result line of a DHA sample (same pairing as the server), or null
+    function lineOfSample(result, uid, dateTime) {
+        return (result?.lines || []).find(line => line.dha_uid === uid && String(line.dha_date_time) === String(dateTime)) || null;
+    }
+    async function fetchOperatingTable() {
+        const online = onlineState();
+        if (!online?.path) throw new Error('Load the operating data (.txt) on the Online Analysis page first.');
+        const response = await fetch('/api/reforming/operating-table', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: online.path }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not read the operating data file.');
+        return data;
+    }
+
+    // Layout of the reactor sheet: [label, unit, key | {wt|wof|family_wt|family_wof: name}, section]
+    const FAMILY_ORDER = ['Paraffins', 'Iso Paraffins', 'Naphthenes', 'Aromatics', 'Olefins', 'Unknowns'];
+    const FAMILY_SHORT = { Paraffins: 'P', 'Iso Paraffins': 'iP', Naphthenes: 'N', Aromatics: 'A', Olefins: 'O', Unknowns: 'U' };
+    const componentRows = (kind, unit) => FAMILY_ORDER.flatMap(f => Array.from({ length: 15 }, (_, i) =>
+        [`C${i + 1} (${FAMILY_SHORT[f]})`, unit, { [kind]: `${f} C${i + 1}` }, kind]));
+    const SHEET_ROWS = [
+        ['Date', '--', 'date', 'performance'], ['Injection Time', '--', 'time', 'performance'],
+        ['GC Date/Time', '--', 'gc_date_time', 'performance'], ['Condition', '--', 'condition', 'performance'],
+        ['DHA sample', '--', 'dha_uid', 'performance'],
+        ['Duration', 'hrs', 'duration_h', 'performance'], ['Run length', 'hr', 'run_length_h', 'performance'],
+        ['Pressure', 'barg', 'pressure', 'performance'], ['Temperature', 'oC', 'temperature', 'performance'],
+        ['LHSV', 'h-1', 'lhsv', 'performance'], ['H2/Naphtha', 'mol. Basis', 'h2_naphtha_mol', 'performance'],
+        ['N2 (Rx effluent)', 'NLPH', 'n2_nlph', 'performance'], ['H2 (Rx effluent)', '% vol', 'h2_vol', 'performance'],
+        ['N2 (Rx effluent)', '% vol', 'n2_vol', 'performance'], ['Naphtha (Rx effluent)', '% vol', 'naphtha_vol', 'performance'],
+        ['Total', '% vol', 'total_vol', 'performance'], ['Mol. Weight', '--', 'mw', 'performance'],
+        ['Carbon_Naphtha (Rx effluent)', 'wt%', 'carbon_naphtha', 'performance'],
+        ['Hydrogen_Naphtha (Rx effluent)', 'wt%', 'hydrogen_naphtha', 'performance'],
+        ['H2 (Rx effluent)', 'gms/hr', 'h2_out', 'performance'], ['Naphtha (Rx effluent)', 'gms/hr', 'naphtha_out', 'performance'],
+        ['Naphtha (Feed Rate)', 'gms/hr', 'naphtha_feed', 'performance'],
+        ['Naphtha/H2 (Rx effluent)', 'mass basis', 'naphtha_h2', 'performance'],
+        ['Estimated RON', '--', 'ron', 'performance'], ['Specific Gravity (Online DHA)', '--', 'sg', 'performance'],
+        ...componentRows('wt', 'wt%'), ['Total', 'wt%', 'total_wt', 'wt'],
+        ...componentRows('wof', 'wof%'), ['Total', 'wof%', 'total_wof', 'wof'],
+        ...FAMILY_ORDER.map(f => [f, 'wt%', { family_wt: f }, 'yields']), ['Total', 'wt%', 'family_wt_total', 'yields'],
+        ['H2 generation', 'wof%', 'h2_generation', 'yields'], ['Gas Yield (C1-C4)', 'wof%', 'gas_yield', 'yields'],
+        ['C5+ yield', 'wof%', 'c5_yield', 'yields'], ['Total', 'wof%', 'yield_total', 'yields'],
+        ...FAMILY_ORDER.map(f => [f, 'wof%', { family_wof: f }, 'yields']), ['Total', 'wof%', 'family_wof_total', 'yields'],
+        ['Total including H2 generation', 'wof%', 'total_incl_h2', 'yields'],
+        ['Naphtha/H2 (Rx inlet)', 'mass  basis', 'naphtha_h2_inlet', 'yields'], ['H2/Naphtha (Rx inlet)', 'mole basis', 'h2_naphtha_inlet', 'yields'],
+    ];
+    function sheetValue(line, key) {
+        if (typeof key === 'string') return line[key];
+        const [kind, name] = Object.entries(key)[0];
+        return line[kind]?.[name];
+    }
+    // Per-sample values added to the Reforming Component Summary (and so to Plots): [column, key]
+    const SUMMARY_EXTRA = [
+        ['Run length (h)', 'run_length_h'], ['Temperature (°C)', 'temperature'], ['Pressure (barg)', 'pressure'],
+        ['LHSV (1/h)', 'lhsv'], ['H2/Naphtha (mol)', 'h2_naphtha_mol'], ['Naphtha/H2 (Rx effluent, mass)', 'naphtha_h2'],
+        ['Naphtha/H2 (Rx inlet, mass)', 'naphtha_h2_inlet'], ['H2/Naphtha (Rx inlet, mol)', 'h2_naphtha_inlet'],
+        ['Naphtha feed (g/h)', 'naphtha_feed'], ['H2 generation (wof%)', 'h2_generation'], ['Gas Yield C1-C4 (wof%)', 'gas_yield'],
+        ['C5+ yield (wof%)', 'c5_yield'], ['Total yield (wof%)', 'yield_total'],
+        ...FAMILY_ORDER.map(f => [`${f} (wof%)`, { family_wof: f }]),
+        ['Total families (wof%)', 'family_wof_total'], ['Total incl. H2 generation (wof%)', 'total_incl_h2'],
+    ];
+
+    return { LINES_KEY, norm, isReactor, time, lines, load, pair, plan, blockOf, assign, cutInOf, doeValue, fetchOperating, completeTable,
+             calc, calcCached, calcOptions, setCalcOptions, lineOfSample, fetchOperatingTable, SHEET_ROWS, SUMMARY_EXTRA, sheetValue, FAMILY_ORDER };
 })();

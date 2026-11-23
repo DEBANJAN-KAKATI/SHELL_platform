@@ -7,10 +7,11 @@
     <title>Calculation Table | DHA Data Dashboard</title>
     <link href="/frontend/css/dashboard.css?v=64" rel="stylesheet">
     <link href="/frontend/css/claude-theme.css" rel="stylesheet">
-    <script src="/frontend/js/navigation.js?v=18" defer></script>
+    <script src="/frontend/js/navigation.js?v=19" defer></script>
     <script src="/frontend/js/calculation_table.js?v=10" defer></script>
-    <script src="/frontend/js/reforming_reactors.js?v=2" defer></script>
-    <script src="/frontend/js/reforming_carbon_table.js?v=13" defer></script>
+    <script src="/frontend/js/reforming_reactors.js?v=3" defer></script>
+    <script src="/frontend/js/reforming_carbon_table.js?v=14" defer></script>
+    <script src="/frontend/js/reforming_reactor_tab.js?v=1" defer></script>
 </head>
 
 <body>
@@ -61,6 +62,7 @@
                     <button aria-controls="yieldTablePanel" aria-selected="false" class="table-tab" data-subtab="yield_table" id="tabYieldTable" role="tab" type="button">Yield Table (wof%)</button>
                     <button aria-controls="reformingCarbonPanel" aria-selected="false" class="table-tab" data-subtab="reforming_carbon" id="tabReformingCarbon" role="tab" type="button" hidden>Reforming CARBON_TABULAR(%WGT)</button>
                     <button aria-controls="reformingSummaryPanel" aria-selected="false" class="table-tab" data-subtab="reforming_summary" id="tabReformingSummary" role="tab" type="button" hidden>Reforming Component Summary</button>
+                    <button aria-controls="reformingReactorPanel" aria-selected="false" class="table-tab" data-subtab="reforming_reactors" id="tabReformingReactors" role="tab" type="button" hidden>Reactor calculations (wt% · wof%)</button>
                 </div>
 
                 <!-- Base Table Panel -->
@@ -230,6 +232,42 @@
                     </div>
                     <div class="filter-summary" style="margin-top: 12px; font-size: 13px; color: var(--slate);">
                         <span id="reformingSummaryNote">Each component is the date-wise sum of its C1-C15 carbon columns. This table is also used by Reforming plots.</span>
+                    </div>
+                </div>
+                <!-- Reforming (6.11.0): reactor sheets of ILS_Chemical Validation_Reforming (Method 2), one per reactor -->
+                <div class="card run-plan-panel" id="reformingReactorPanel" hidden>
+                    <div class="card-head">
+                        <div>
+                            <div class="eyebrow">CALCULATION · REFORMING REACTORS</div>
+                            <h3 id="reformingReactorTitle">Reactor calculations</h3>
+                        </div>
+                        <div class="table-actions online-table-actions">
+                            <select class="input online-filter" id="reformingReactorSelect" aria-label="Reactor" title="Reactor sheet to show"></select>
+                            <select class="input online-filter" id="reformingReactorSection" aria-label="Rows" title="Rows to show">
+                                <option value="">All rows</option>
+                                <option value="performance">Performance (T, P, flows, H2 / N2 / naphtha)</option>
+                                <option value="wt">Components wt% (DHA)</option>
+                                <option value="wof">Components wof% (with H2 generation)</option>
+                                <option value="yields">Yields: H2 generation, Gas, C5+, families</option>
+                            </select>
+                            <label class="reforming-yield-start" title="Yields (H2 generation, Gas, C5+, wof%) start this many hours after the Feed Cut-In; before that wof% = wt% (the workbook starts at 12 h)">Yields from
+                                <input class="input" id="reformingYieldStart" type="number" min="0" step="0.5" style="width:72px"> h</label>
+                            <div class="decimal-control" role="group" aria-label="Reactor table decimal places">
+                                <button type="button" class="btn secondary decimal-btn" id="reformingReactorDecDecrease" title="Decrease decimal places">.0&larr;</button>
+                                <span class="decimal-count" id="reformingReactorDecCount">4 dp</span>
+                                <button type="button" class="btn secondary decimal-btn" id="reformingReactorDecIncrease" title="Increase decimal places">.00&rarr;</button>
+                            </div>
+                            <button type="button" class="btn secondary" id="reformingReactorExportCsv" title="Export this reactor sheet as CSV">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="filter-summary" id="reformingReactorInfo" style="margin: 0 0 10px; font-size: 13px; color: var(--slate);"></div>
+                    <div class="error" id="reformingReactorError"></div>
+                    <div class="table-wrap online-table-wrap">
+                        <table class="online-table calculation-table reforming-carbon-table reforming-reactor-table" id="reformingReactorTable">
+                            <thead id="reformingReactorThead"></thead>
+                            <tbody id="reformingReactorTbody"></tbody>
+                        </table>
+                        <div class="empty" id="reformingReactorEmpty">No reactor calculation yet: load the Run Plan, process the Reforming DHA folder (Offline Analysis) and import the operating data (Online Analysis).</div>
                     </div>
                 </div>
             </section>

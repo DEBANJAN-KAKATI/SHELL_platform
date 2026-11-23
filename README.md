@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.10.3
+# ILS Dashboard (DHA Data Dashboard) v6.11.0
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -158,6 +158,23 @@ with repeated headers. Snapshots persist in the browser tab.
 **Data Integrity** (optional plug-in): statistics and MAD-based potential outliers per Run / Condition / Reactor / Parameter;
 hide it with `DASHBOARD_DATA_INTEGRITY=0`; see [features/data_integrity/README.md](features/data_integrity/README.md).
 
+## Reforming reactor calculations (6.11.0)
+Reforming runs are calculated as the "Reactor n (catalyst)" sheets of the mentor's workbook *ILS_Chemical Validation_
+Reforming (Method 2)*, for every reactor, one column per GC line of the operating .txt (the line's DHA sample joined as in
+Final Raw_Data). **Calculation → Reactor calculations (wt% · wof%)** shows one reactor at a time with the sheet's rows:
+performance (Date, duration, run length, pressure, temperature, LHSV, H2/Naphtha, N2 / H2 / naphtha vol%, MW, carbon of the
+naphtha, H2 / naphtha out, naphtha feed, Naphtha/H2, RON, SG), the 90 components in wt% (DHA) and wof% (with H2
+generation), group types, **H2 generation, Gas Yield (C1-C4), C5+ yield, Total**, group types in wof%, and the inlet
+ratios. Inputs: Run Plan Feed (Carbon wt%, MW, Density @ 15 °C), Plan (catalyst, catalyst volume), DOE of each line's
+condition (N2 dilution flow NLPH, H2 Flow g/h), Feed Cut-In of the reactor's block; temperature / pressure 10i1TIC02 /
+10i1PIC01 (R1–R4) or 10i2TIC02 / 10i2PIC01 (R5–R8); H2 and N2 vol% from the GC areas with the GC calibration of the
+workbook. Yields start 12 h after the Feed Cut-In (setting "Yields from", as the workbook); before that wof% = wt%.
+The **Base table** shows the same per-line values (it used ESTD_H2 / N2 and the feed MW before), the **Component Summary**
+adds H2 generation, Gas, C5+, totals, group types in wof%, temperature, pressure, LHSV and the ratios, so **Plots** can use
+them (e.g. C5+ yield or H2 generation vs temperature, Naphtha/H2 vs run length). Checked against Reactor 2 and Reactor 6 of
+the workbook: every cell equal except where the workbook deviates from its own formulas (a typed 2 ml catalyst volume in
+LHSV from column O, typed N2 flows 3.78 / 4.7 in two R6 columns, the line before cut-in).
+
 ## Export Complete (6.10.0)
 **Export Complete** in the header of the Calculation pages, Plots and the Summary Dashboard downloads one Excel workbook
 (`ILS_Run<n>_<process>_Complete_<date>.xlsx`) with a **Summary** sheet (which tables are included and which are not
@@ -165,7 +182,9 @@ imported) and one sheet per table: Run Plan (information, feed, liquid and gas c
 pre-run), Analysis (Offline Table-1/2/3 and Reactor Map, Online export; General_MB: feed gas IS, average IS flow, Liquid
 samples, ZMB lines, pump check, verified flow), Calculation (Base table, Yield wof% or the Reforming tables, Custom table
 and its formulas; General_MB: Mass Balance reactor and component tables) and Plots (settings, the plot on screen and the
-Summary Dashboard plots as images). For Reforming the last tab is **Final Raw_Data**: the same rows as Export Complete CSV
+Summary Dashboard plots as images). **Reforming (6.11.0)** exports only: Run Plan (Feed, Plan, DOE, Pre-run), Offline
+Table-1/2/3, Online Analysis (the whole .txt), Final Raw_Data, one sheet per reactor laid out as the workbook's reactor
+sheets, and Plots. For Reforming the **Final Raw_Data** tab is: the same rows as Export Complete CSV
 (every operating record with the DHA sample of its GC line, two header rows from A1, all rows). Every sheet of the process
 is written even when its data was not imported: it then says where to import it. The Reforming CSV export of the operating data joined to the DHA is now labelled **Export
 Complete CSV**.
@@ -197,5 +216,6 @@ Open http://localhost:5001. `data/` is mounted at `/app/data`; RunData is kept i
 the sources with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY` or `DASHBOARD_RUN_PLAN_FILE`.
 
 ## Tests
-`python -m pytest -q tests` (53 tests: Run Plan reader and molecular weights, online units and the internal standard
-against the MassBal workbook, R08 conditions, mass balance, synced folder and Export Complete workbook).
+`python -m pytest -q tests` (59 tests: Run Plan reader and molecular weights, online units and the internal standard
+against the MassBal workbook, R08 conditions, mass balance, synced folder and Export Complete workbook, Reforming reactor
+per GC line and the Reforming reactor sheet).

@@ -4,7 +4,8 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request
 
-from backend.reforming.operating import read_operating_file
+from backend.reforming.operating import read_operating_file, read_operating_table
+from backend.reforming.reactor_calc import YIELD_START_H, calculate
 from backend.services.run_plan_service import process_run_plan_file
 from backend.reforming.service import process_reforming_directory
 from backend.reforming.sync_source import save_folder, sync_status
@@ -83,5 +84,33 @@ def operating_data():
         return jsonify({"error": "Load the operating data (.txt) on the Online Analysis page first."}), 400
     try:
         return jsonify(read_operating_file(file_path))
+    except Exception as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@reforming_api.post("/operating-table")
+def operating_table():
+    """The whole operating .txt (every column as written): Online Analysis sheet of Export Complete."""
+    file_path = (request.get_json(silent=True) or {}).get("path")
+    if not file_path:
+        return jsonify({"error": "Load the operating data (.txt) on the Online Analysis page first."}), 400
+    try:
+        return jsonify(read_operating_table(file_path))
+    except Exception as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@reforming_api.post("/reactor-calc")
+def reactor_calc():
+    """Reactor sheets of ILS_Chemical Validation_Reforming (Method 2) for every reactor: see reactor_calc.py.
+    Body: {path: operating .txt, samples: Reforming DHA rows, run_plan: saved Run Plan, yield_start_h}."""
+    body = request.get_json(silent=True) or {}
+    if not body.get("path"):
+        return jsonify({"error": "Load the operating data (.txt) on the Online Analysis page first."}), 400
+    try:
+        start = body.get("yield_start_h")
+        start = float(start) if start not in (None, "") else YIELD_START_H
+        table = read_operating_table(body["path"])
+        return jsonify(calculate(table["rows"], body.get("samples") or [], body.get("run_plan") or {}, yield_start_h=start))
     except Exception as error:
         return jsonify({"error": str(error)}), 400

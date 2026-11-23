@@ -22,7 +22,7 @@ def _is_error(text):
     return "ÿ" in text or "error" in text.lower() or bool(EXCEL_ERROR.match(text)) or text.lower() == "nan"
 
 
-def read_operating_file(file_path):
+def _read_frame(file_path):
     path = Path(str(file_path or ""))
     if not path.is_file():
         raise ValueError("Operating data file not found. Load it on the Online Analysis page first.")
@@ -39,6 +39,20 @@ def read_operating_file(file_path):
     if frame is None:
         raise ValueError("Operating data file could not be read (unknown text encoding).")
     frame.columns = [str(column).strip() for column in frame.columns]
+    return path, frame
+
+
+def read_operating_table(file_path):
+    """The whole .txt as written (every column, values as text): Online Analysis sheet of Export Complete and the
+    input of the reactor calculation (6.11.0)."""
+    path, frame = _read_frame(file_path)
+    columns = list(frame.columns)
+    rows = [{column: str(record.get(column, "")).strip() for column in columns} for record in frame.to_dict(orient="records")]
+    return {"columns": columns, "rows": rows, "source_file": str(path)}
+
+
+def read_operating_file(file_path):
+    path, frame = _read_frame(file_path)
     for required in ("Date/Time", "GC Date/Time"):
         if required not in frame.columns:
             raise ValueError(f"Operating data file is missing column: {required}")

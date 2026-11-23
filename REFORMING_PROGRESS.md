@@ -18,6 +18,12 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   Active Reactor, Calculation Reactor filter, TOS per block cut-in, Base-table condition per reactor, Plots). Open: the
   Base-table temperature tag per reactor (now `10i2TIC01` for all). See CHANGELOG 6.10.1 / 6.10.2.
   6.10.3: the Export Complete workbook ends with "Final Raw_Data" = the Export Complete CSV rows (same join, two headers).
+- **2026-11-23, v6.11.0 — mentor's workbook "ILS_Chemical Validation_Reforming (Method 2)" implemented**: Reactor sheets
+  (backend/reforming/reactor_calc.py) for every reactor, Reactor calculations tab, Base table and Summary from them,
+  Plots with temperature / pressure / run length …, Export Complete with the workbook's tab set. Temperature / pressure
+  tags by block (10i1TIC02 / 10i2TIC02) as the workbook (resolves the open 10i2TIC01 item). Verified against Reactor 2 and
+  Reactor 6 cell by cell. Workbook exceptions reported to the user, not copied (2 ml in LHSV from column O, typed N2 3.78
+  / 4.7 in two R6 columns). Yields start 12 h after cut-in (workbook columns H / G) — adjustable on the tab.
 - Process selector (Isomerization / Reforming) goes right after the Run Number on the Run Plan page.
 - Export = CSV of the image-1 layout (Paraffins, Iso Paraffins, Naphthenes, Aromatics, Olefins, Unknowns ×
   C1..C15, then Total, Molecular Weight, RON, Carbon wt%, Hydrogen wt%, Specific Gravity).
