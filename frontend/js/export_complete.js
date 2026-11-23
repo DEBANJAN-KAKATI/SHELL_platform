@@ -1,7 +1,8 @@
 // Export Complete (6.10.0): one Excel workbook with everything of the run, each table in its own sheet:
 // Run Plan (Feed, Plan, DOE, Pre-run, feed tables), Analysis (Offline tables, Reactor Map, Online, ZMB, Liquid),
 // Calculation (Base, Yield, Custom, Reforming, Mass Balance) and Plots (settings, the plot on screen and the Summary
-// Dashboard plots as images); Reforming ends with "Final Raw_Data" (the rows of Export Complete CSV). Every sheet of the process is written even when nothing was imported for it: it then
+// Dashboard plots as images). Reforming (6.11.0) has its own tab list: Run Plan (Feed, Plan, DOE, Pre-run), Offline
+// Table-1/2/3, Online Analysis (whole .txt), Final Raw_Data, one "Reactor n (catalyst)" sheet per reactor, Plots. Every sheet of the process is written even when nothing was imported for it: it then
 // says what was not imported and where to import it, so the workbook always has the same tabs.
 // The button sits in the header of the Calculation pages, Plots and the Summary Dashboard.
 (() => {
@@ -138,7 +139,7 @@
         if (window.ILSReformingReactors) return Promise.resolve(window.ILSReformingReactors);
         return new Promise(resolve => {
             const script = document.createElement('script');
-            script.src = '/frontend/js/reforming_reactors.js?v=2';
+            script.src = '/frontend/js/reforming_reactors.js?v=3';
             script.onload = () => resolve(window.ILSReformingReactors || null);
             script.onerror = () => resolve(null);
             document.head.appendChild(script);
@@ -258,9 +259,76 @@
         try { return (sessionStorage.getItem('ils_run_number') || localStorage.getItem('ils_run_number') || '').trim(); } catch (e) { return ''; }
     }
 
+    // ---------------------------------------------------------------- Reforming workbook (6.11.0)
+    // Only these tabs, in this order: Run Plan (Feed, Plan, DOE, Pre-run) · Offline Analysis (Table-1, -2, -3) ·
+    // Online Analysis (the whole .txt) · Final Raw_Data · one sheet per reactor laid out as the "Reactor n (catalyst)"
+    // sheets of ILS_Chemical Validation_Reforming · Plots. Isomerization / General_MB keep the layout above.
+    const numeric = v => {
+        if (v === null || v === undefined || v === '') return null;
+        if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+        const text = String(v).trim();
+        return /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(text) ? Number(text) : text;
+    };
+    async function reformingOnlineSheet(RR) {
+        const name = 'Online Analysis', title = 'Online Analysis · the operating data file (.txt) as written, every column';
+        try {
+            const data = await RR.fetchOperatingTable();
+            return { name, title, columns: data.columns, rows: data.rows.map(row => data.columns.map(c => numeric(row[c]))), _count: data.rows.length };
+        } catch (error) {
+            return table(name, title, [], [], error.message);
+        }
+    }
+    function reactorSheets(RR, calc) {
+        if (!calc?.reactors?.length) {
+            return [table('Reactor calculations', 'Reactor calculations', [], [],
+                'load the Run Plan, the Reforming DHA folder (Offline) and the operating data (Online), then open the Calculation table.')];
+        }
+        const k = calc.constants || {};
+        const fmt = v => (typeof v === 'number' ? Number(v.toPrecision(10)) : '—');
+        return calc.reactors.map(reactor => {
+            const lines = calc.lines.filter(line => line.reactor === reactor.reactor);
+            const name = `Reactor ${reactor.reactor.slice(1)}${reactor.catalyst ? ` (${reactor.catalyst})` : ''}`.slice(0, 31);
+            const rows = RR.SHEET_ROWS.map(([label, unit, key]) => {
+                const component = typeof key === 'object' && (key.wt || key.wof);
+                return [label, unit, component ? calc.carbon_fraction?.[component] ?? null : null,
+                    ...lines.map(line => { const v = RR.sheetValue(line, key); return typeof v === 'number' ? (Number.isFinite(v) ? v : null) : (v === '' ? null : v ?? null); })];
+            });
+            return {
+                name, title: `${name} · catalyst performance (ILS reactor sheet)`,
+                notes: [
+                    `Carbon_Online DHA (feed) ${fmt(k.feed_carbon)} wt% · Hydrogen ${fmt(k.feed_hydrogen)} wt% · Molecular Weight ${fmt(k.feed_mw)} · Density ${fmt(k.feed_density)} g/ml (Run Plan Feed)`,
+                    `Feed Cut-In ${reactor.feed_cut_in || '—'} · ${reactor.block} · catalyst volume ${fmt(reactor.catalyst_volume)} ml · H2 flow (inlet) ${fmt(reactor.h2_inlet_g_h)} g/h (Run Plan DOE)`,
+                    `H2 / N2 vol% = (GC Area − intercept) / slope: H2 ${k.calibration?.H2?.intercept} / ${k.calibration?.H2?.slope}, N2 ${k.calibration?.N2?.intercept} / ${k.calibration?.N2?.slope} · yields from ${fmt(k.yield_start_h)} h after cut-in`,
+                ],
+                columns: ['Parameter', 'Unit', 'Carbon, wt%', ...lines.map((_, i) => `#${i + 1}`)],
+                rows, _count: lines.length,
+            };
+        });
+    }
+    async function reformingWorkbook() {
+        const RR = await reformingModule();
+        const runPlan = runPlanSheets().filter(sheet => ['RunPlan Feed', 'RunPlan Plan', 'RunPlan DOE', 'RunPlan Pre-run'].includes(sheet.name));
+        const off = read('dhaDashboardState', true) || {};
+        const offNeed = 'process the DHA folder on Analysis → Offline Analysis.';
+        const offline = [
+            table('Offline Table-1', 'Offline Analysis · Table-1 carbon-number table (Unknowns by Carbon#)', off.r1, null, offNeed),
+            table('Offline Table-2', 'Offline Analysis · Table-2 unknown peaks (Carbon# assignment)', off.r2, off.c2, offNeed),
+            table('Offline Table-3', 'Offline Analysis · Table-3 properties', off.r3, null, offNeed),
+        ];
+        let calc = null;
+        if (RR?.calc) {
+            const outcome = await RR.calc();
+            calc = outcome.result || null;
+        }
+        const plots = plotSheets().filter(sheet => sheet.name === 'Plots');
+        return [...runPlan, ...offline, RR ? await reformingOnlineSheet(RR) : table('Online Analysis', 'Online Analysis', [], [], 'reload the page and export again.'),
+                await reformingRawSheet(), ...(RR ? reactorSheets(RR, calc) : []), ...plots]
+            .map(({ _count, _title, ...sheet }) => sheet);
+    }
+
     async function buildSheets() {
+        if (isRef()) return reformingWorkbook();
         const groups = [['Run Plan', runPlanSheets()], ['Analysis', analysisSheets()], ['Calculation', calculationSheets()], ['Plots', plotSheets()]];
-        if (isRef()) groups.push(['Final raw data', [await reformingRawSheet()]]);   // Reforming: last tab of the workbook
         const index = [];
         groups.forEach(([section, sheets]) => sheets.forEach(sh => index.push({
             Section: section, Sheet: sh.name, Content: sh._title || sh.title || sh.name,

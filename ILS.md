@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.10.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.11.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,8 +33,8 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (55 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
-  conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
+- Tests: `python -m pytest -q tests` (59 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+  conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line, Reforming reactor sheet). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
 
@@ -108,7 +108,7 @@ All working data lives in the browser tab's **sessionStorage** (use one tab acro
 `ils_run_number`, `ils_process`, `runPlanDashboardState`, `ils_feed_properties`, `dhaDashboardState` (offline),
 `dhaOnlineState`, `dhaDateTimeFilter`, `ils_base_table_state`, `ils_yield_table_state`, `ils_custom_table_state`,
 `ils_custom_columns`, `ils_plot_preferences`, `ils_reforming_offline`, `ils_reforming_carbon_state`,
-`ils_reforming_sync`, `ils_reforming_reactor_lines` (6.10.1), `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_plot_extra` (Plots → Additional graphs {open, graph, sample, scale}, 6.10.0), `ils_data_sync` (signatures loaded from the synced folder per page; localStorage `ils_data_autosync`), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
+`ils_reforming_sync`, `ils_reforming_reactor_lines` (6.10.1), `ils_reforming_calc` / `ils_reforming_calc_options` (6.11.0), `ils_zmb_state` (ZMB rows/columns, v6.9.2), `ils_zmb_pump` (pump-check reps {rows: {R1: {start, end, mass}}} + results, v6.9.3), `ils_liquid_state` (Online → Liquid: feedCarbon, samples [{name, twoPhase, rows: {R1: {start, end, tlp, hc, aq, c, h, o, n, s, density, mono, di, tri}}}], results, tab; v6.9.5), `ils_plot_extra` (Plots → Additional graphs {open, graph, sample, scale}, 6.10.0), `ils_data_sync` (signatures loaded from the synced folder per page; localStorage `ils_data_autosync`), `ils_mass_balance_state` (Mass Balance: options {is, basis, window_h}, comp {selected, refs, metrics, basis}, reactor filter,
 `summary` = reactor-table rows, `components` = component-table rows; v6.9.6/6.9.10), `ils_plot_mb` (Plots mass balance choices); localStorage `ils_reforming_autosync`. `historian_save.js` (`STATE_KEYS`) and
 `run_data.js` (`sourceKeys`) list what gets saved — add new keys there. **Save Run Details** writes a gzip JSON
 snapshot to `RunData/` (max 25 MB, id = 32-hex); re-saving the same Run Number offers cancel / replace latest /
@@ -200,8 +200,22 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   Reactor filter on both Reforming tabs incl. active reactors without samples; TOS from the Feed Cut-In of the reactor's
   block, per-block cut-ins derived from `doeData.pretreatment.settings` / DOE Block starts; Base-table conditions per
   reactor by wrapping `assignBaseConditions` in Reforming mode). Plots: only R1–R8 rows, no Date axis. Rule: Isomerization /
-  General_MB code is not touched for Reforming work — gate or wrap from the Reforming files. Open: Base-table temperature
-  is still `10i2TIC01` for every Reforming reactor.
+  General_MB code is not touched for Reforming work — gate or wrap from the Reforming files.
+- **Reactor sheets (6.11.0, mentor's ILS_Chemical Validation_Reforming Method 2)** — `backend/reforming/reactor_calc.py`
+  (`calculate(operating_rows, samples, run_plan, yield_start_h)`; docstring maps every sheet row 19–252 to a key) +
+  `POST /api/reforming/reactor-calc` {path, samples (= ils_reforming_offline rows), run_plan, yield_start_h};
+  `POST /api/reforming/operating-table` = the whole .txt. One result per GC line of a reactor (Sampled_reactor 1–8), its
+  DHA sample paired by GC Date/Time (−10..+60 min). Constants: Run Plan Feed Carbon / MW / Density @ 15 °C, Plan
+  "Catalyst volume", DOE "N2 dilution flow (NLPH)" and "H2 Flow (gms/h)" of the line's condition (reactor + time), Feed
+  Cut-In per block; T/P = 10i1TIC02/10i1PIC01 (R1–4), 10i2TIC02/10i2PIC01 (R5–8); H2/N2 vol% from Area_H2/Area_N2 with
+  `GC_CALIBRATION`; 0.0416 mol/NL; carbon fractions `CARBON_FRACTION` (sheet column C); Gas = wof P C1-4 + iP C4 + O C2-4
+  + U C1-4 (the sheet's cells); yields from `YIELD_START_H` = 12 h after cut-in, before that wof = wt. Frontend:
+  `reforming_reactors.js` (`calc`, `calcCached`, `SHEET_ROWS`, `SUMMARY_EXTRA`; cache `ils_reforming_calc`, option
+  `ils_reforming_calc_options`), `reforming_reactor_tab.js` (tab "Reactor calculations"; wraps `switchSubtab` and
+  `reconstructBaseRows` in Reforming mode → Base table = sheet rows 21–38 per line), summary columns in
+  `reforming_carbon_table.js` (Plots read them). Export Complete (Reforming) tab list in `export_complete.js`
+  `reformingWorkbook()`. Workbook exceptions not copied: typed 2 ml catalyst volume in LHSV from column O, typed N2 flows
+  in single R6 columns, the pre-cut-in column's 273/293/22.4.
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

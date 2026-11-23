@@ -19,7 +19,9 @@ window.ILSReformingCarbon = (() => {
     let summaryRows = [];
     const PHYSICAL = ['Molecular Weight', 'RON', 'Carbon', 'Hydrogen', 'Specific Gravity'];
     const SUMMARY_FAMILIES = ['Paraffins', 'Iso Paraffins', 'Naphthenes', 'Aromatics', 'Olefins', 'Unknowns'];
-    const SUMMARY_COLUMNS = ['Date', 'Condition', 'TOS(h)', 'Reactor', 'UID', ...SUMMARY_FAMILIES, 'Total', ...PHYSICAL];
+    const BASE_SUMMARY_COLUMNS = ['Date', 'Condition', 'TOS(h)', 'Reactor', 'UID', ...SUMMARY_FAMILIES, 'Total', ...PHYSICAL];
+    // 6.11.0: plus the reactor calculation of the sample's GC line (H2 generation, Gas, C5+, wof%, T, P, LHSV, ratios)
+    const SUMMARY_COLUMNS = [...BASE_SUMMARY_COLUMNS, ...(window.ILSReformingReactors?.SUMMARY_EXTRA || []).map(([column]) => column)];
     let decimals = 4;
     try {
         const saved = Number(localStorage.getItem(DECIMALS_KEY));
@@ -160,6 +162,7 @@ window.ILSReformingCarbon = (() => {
             return out;
         });
         columns = [...LEAD_COLUMNS, ...dataColumns];
+        const calc = RR.calcCached();
         summaryRows = rows.map(row => {
             const summary = Object.fromEntries(SUMMARY_COLUMNS.map(column => [column, row[column] ?? '']));
             SUMMARY_FAMILIES.forEach(family => {
@@ -170,6 +173,12 @@ window.ILSReformingCarbon = (() => {
             });
             summary.Total = SUMMARY_FAMILIES
                 .reduce((total, family) => total + summary[family], 0);
+            // Reactor calculation of this sample's GC line (blank until it is calculated; ERROR text when inputs are missing)
+            const line = calc ? RR.lineOfSample(calc, row.UID, row.DateTime) : null;
+            RR.SUMMARY_EXTRA.forEach(([column, key]) => {
+                const value = line ? RR.sheetValue(line, key) : '';
+                summary[column] = value === undefined || value === null ? '' : value;
+            });
             return summary;
         });
         try {

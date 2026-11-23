@@ -1,3 +1,26 @@
+## 6.11.0 (2026-11-23) — Reforming as the mentor's workbook (ILS_Chemical Validation_Reforming, Method 2)
+Isomerization and General_MB are not changed (Reforming-only files; shared functions wrapped from Reforming code).
+- **Reactor calculation** `backend/reforming/reactor_calc.py` + `POST /api/reforming/reactor-calc`: the "Reactor n
+  (catalyst)" sheets for every reactor, one result per GC line (rows 19–252: duration, run length, P, T, LHSV, H2/Naphtha,
+  N2 / H2 / naphtha vol% from the GC areas, MW, carbon of the naphtha, H2 / naphtha out, naphtha feed, Naphtha/H2, RON, SG,
+  90 components wt% and wof%, group types, H2 generation, Gas Yield C1-C4, C5+, totals, group types wof%, inlet ratios).
+  Constants from the Run Plan (Feed Carbon / MW / density, Plan catalyst volume, DOE N2 dilution and H2 flow of the
+  line's condition, Feed Cut-In of the block); temperature / pressure by block (10i1TIC02 / 10i1PIC01, 10i2TIC02 /
+  10i2PIC01); GC calibration H2 (Area − 180057)/179209, N2 (Area − 5710532)/4716081; yields from 12 h after cut-in
+  (adjustable). Verified cell by cell against Reactor 2 and Reactor 6 of the workbook (≈12 000 cells equal; the only
+  differences are the workbook's own exceptions: 2 ml catalyst volume typed in LHSV from column O, N2 3.78 / 4.7 typed in
+  two R6 columns, a different gas constant in the pre-cut-in column).
+- **Calculation**: new tab **Reactor calculations (wt% · wof%)** (reactor select, row sections, "Yields from" h, decimals,
+  CSV); the **Base table** shows the sheet's per-line values (corrected H2 / N2, Naphtha/H2 = Naphtha%·MW(DHA)/(H2%·2),
+  naphtha feed, LHSV, ratios) — it used the GC ESTD values (text in these exports) and the feed MW;
+  the **Component Summary** adds Run length, Temperature, Pressure, LHSV, ratios, naphtha feed, H2 generation, Gas Yield,
+  C5+, Total, group types wof%, totals.
+- **Plots**: those summary columns are X / Y choices (temperature, pressure, run length, LHSV, H2/Naphtha …).
+- **Export Complete (Reforming)**: only Run Plan Feed / Plan / DOE / Pre-run, Offline Table-1/2/3, Online Analysis (the
+  whole .txt, `POST /api/reforming/operating-table`), Final Raw_Data, one sheet per reactor (workbook layout: Parameter,
+  Unit, Carbon wt%, one column per GC line, constants on top), Plots.
+- Tests: `tests/test_reforming_reactor_calc.py` (synthetic data, formulas written out; 59 tests).
+
 ## 6.10.3 (2026-11-20) — Export Complete: "Final Raw_Data" tab for Reforming
 - The Export Complete workbook of a Reforming run ends with a **Final Raw_Data** tab holding the same data as the
   Reforming **Export Complete CSV**: every operating record of the online .txt (all valid columns) with the DHA sample of
