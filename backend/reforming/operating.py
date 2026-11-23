@@ -71,11 +71,20 @@ def read_operating_file(file_path):
 
     # GC Date/Time and Sampled_reactor always come along: the Calculation page uses them to give each DHA sample
     # the reactor of its own GC line (6.10.1; parallel reactors, e.g. R2 and R6).
-    extra = [column for column in ("GC Date/Time", "Sampled_reactor") if column in frame.columns]
+    extra = [column for column in ("GC Date/Time", "Sampled_reactor", "Area_H2", "Area_N2") if column in frame.columns]
     rows = [
         {column: str(record.get(column, "")).strip() for column in columns + extra}
         for record in frame.to_dict(orient="records")
     ]
+    # 6.11.2: the reactor of each line, also for lines exported with Sampled_reactor 0 (see reactor_calc.assign_reactors);
+    # shown next to Sampled_reactor in Export Complete CSV / Final Raw_Data
+    from backend.reforming.reactor_calc import assign_reactors
+    for row, (reactor, source) in zip(rows, assign_reactors(rows)):
+        row["Reactor (assigned)"] = reactor[1:] if reactor else ""
+        row["Reactor source"] = source
+    if "Sampled_reactor" in columns:
+        position = columns.index("Sampled_reactor") + 1
+        columns = columns[:position] + ["Reactor (assigned)"] + columns[position:]
     return {
         "columns": columns,
         "rows": rows,

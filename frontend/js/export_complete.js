@@ -139,7 +139,7 @@
         if (window.ILSReformingReactors) return Promise.resolve(window.ILSReformingReactors);
         return new Promise(resolve => {
             const script = document.createElement('script');
-            script.src = '/frontend/js/reforming_reactors.js?v=3';
+            script.src = '/frontend/js/reforming_reactors.js?v=4';
             script.onload = () => resolve(window.ILSReformingReactors || null);
             script.onerror = () => resolve(null);
             document.head.appendChild(script);

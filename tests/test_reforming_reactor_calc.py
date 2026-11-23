@@ -122,3 +122,33 @@ def test_feed_carbon_is_normalised_with_hydrogen_as_the_workbook():
     assert out["constants"]["feed_hydrogen"] == pytest.approx(14.857313909399322, rel=1e-15)
     x = out["lines"][0]
     assert x["naphtha_feed"] == pytest.approx(x["naphtha_out"] * x["carbon_naphtha"] / 85.14268609060068, rel=1e-12)
+
+
+# 6.11.2: Result_34 exports every line from 20.11.2026 08:00 with Sampled_reactor 0 although the GC kept sampling R2 / R6.
+REACTOR_AREAS = (4380000, 323000000)                    # ~9 vol% naphtha: a reactor effluent
+BYPASS_AREAS = (int(20 * 179209 + 180057), int(79.9 * 4716081 + 5710532))     # 20 % H2 + 79.9 % N2: 0.1 vol% naphtha
+
+
+def test_lines_exported_as_reactor_0_with_naphtha_take_the_gc_cycle():
+    from backend.reforming.reactor_calc import REACTOR_SOURCE_CYCLE, REACTOR_SOURCE_EXPORT, assign_reactors
+    times = [f"20.11.2026 {h:02d}:00:00" for h in range(9)]
+    labels = [2, 6, 2, 6, 0, 0, 0, 0, 0]
+    areas = [REACTOR_AREAS] * 7 + [BYPASS_AREAS, REACTOR_AREAS]
+    ops = [line(t, t, r, *a) for t, r, a in zip(times, labels, areas)]
+    out = assign_reactors(list(reversed(ops)))[::-1]          # the order of the rows does not matter, time does
+    assert [r for r, _ in out] == ["R2", "R6", "R2", "R6", "R2", "R6", "R2", "R0", "R6"]
+    assert [s for _, s in out][:4] == [REACTOR_SOURCE_EXPORT] * 4 and out[4][1] == REACTOR_SOURCE_CYCLE
+    assert out[7][1] == REACTOR_SOURCE_EXPORT                    # a real bypass line (H2 + N2 only) stays the bypass
+
+
+def test_pre_run_lines_without_dha_are_left_out_and_early_lines_take_condition_1():
+    ops = [
+        line("17.11.2026 11:23:44", "17.11.2026 13:00:00", 2, *REACTOR_AREAS),      # drying / reduction: no DHA, no DOE
+        line("17.11.2026 20:00:00", "17.11.2026 21:40:00", 2, *REACTOR_AREAS),      # before the DOE start, with a DHA sample
+        line("19.11.2026 05:05:22", "19.11.2026 06:46:00", 2, *REACTOR_AREAS),
+    ]
+    samples = [sample("S0", "17/11/2026 21:40", **COMPOSITION), sample("S1", "19/11/2026 06:46", **COMPOSITION)]
+    out = calculate(ops, samples, run_plan())
+    r2 = [l for l in out["lines"] if l["reactor"] == "R2"]
+    assert [l["dha_uid"] for l in r2] == ["S0", "S1"]
+    assert r2[0]["n2_nlph"] == N2 and isinstance(r2[0]["h2_out"], float)

@@ -21,6 +21,7 @@ window.ILSReformingCarbon = (() => {
     const SUMMARY_FAMILIES = ['Paraffins', 'Iso Paraffins', 'Naphthenes', 'Aromatics', 'Olefins', 'Unknowns'];
     const BASE_SUMMARY_COLUMNS = ['Date', 'Condition', 'TOS(h)', 'Reactor', 'UID', ...SUMMARY_FAMILIES, 'Total', ...PHYSICAL];
     // 6.11.0: plus the reactor calculation of the sample's GC line (H2 generation, Gas, C5+, wof%, T, P, LHSV, ratios)
+    const EXTRA_COLUMNS = new Set((window.ILSReformingReactors?.SUMMARY_EXTRA || []).map(([column]) => column));
     const SUMMARY_COLUMNS = [...BASE_SUMMARY_COLUMNS, ...(window.ILSReformingReactors?.SUMMARY_EXTRA || []).map(([column]) => column)];
     let decimals = 4;
     try {
@@ -179,6 +180,11 @@ window.ILSReformingCarbon = (() => {
                 const value = line ? RR.sheetValue(line, key) : '';
                 summary[column] = value === undefined || value === null ? '' : value;
             });
+            // Why the calculated columns are blank (shown as "—" with a tooltip; the stored values stay blank for Plots)
+            const startH = calc?.constants?.yield_start_h;
+            Object.defineProperty(summary, '__calcNote', { enumerable: false, value: !calc ? 'Not calculated yet (Reactor calculations)'
+                : !line ? 'No GC line of a reactor for this DHA sample (feed, bypass or outside −10..+60 min)'
+                : typeof line.run_length_h === 'number' && line.run_length_h < startH ? `Yields start ${startH} h after the Feed Cut-In (as the sheet): run length ${line.run_length_h.toFixed(2)} h` : '' });
             return summary;
         });
         try {
@@ -287,7 +293,11 @@ window.ILSReformingCarbon = (() => {
         const tbody = $('#reformingSummaryTbody');
         if (thead) thead.innerHTML = `<tr>${SUMMARY_COLUMNS.map(column => `<th>${esc(column)}</th>`).join('')}</tr>`;
         if (tbody) tbody.innerHTML = visible.map(row =>
-            `<tr>${SUMMARY_COLUMNS.map(column => `<td>${esc(cellText(column, row[column]))}</td>`).join('')}</tr>`).join('');
+            `<tr>${SUMMARY_COLUMNS.map(column => {
+                const text = cellText(column, row[column]);
+                if (text === '' && row.__calcNote && EXTRA_COLUMNS.has(column)) return `<td class="rf-not-calc" title="${esc(row.__calcNote)}">—</td>`;
+                return `<td>${esc(text)}</td>`;
+            }).join('')}</tr>`).join('');
         if ($('#reformingSummaryEmpty')) $('#reformingSummaryEmpty').style.display = visible.length ? 'none' : 'block';
         if ($('#reformingSummaryDateBadge')) $('#reformingSummaryDateBadge').textContent = summaryRows.length ? `${visible.length} of ${summaryRows.length} samples` : '';
         if ($('#reformingSummaryDecCount')) $('#reformingSummaryDecCount').textContent = `${decimals} dp`;

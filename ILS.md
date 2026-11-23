@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.11.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.11.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,7 +33,7 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (60 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+- Tests: `python -m pytest -q tests` (62 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
   conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line, Reforming reactor sheet). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
@@ -217,6 +217,12 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   `reforming_carbon_table.js` (Plots read them). Export Complete (Reforming) tab list in `export_complete.js`
   `reformingWorkbook()`. Workbook exceptions not copied: typed 2 ml catalyst volume in LHSV from column O, typed N2 flows
   in single R6 columns, the pre-cut-in column's 273/293/22.4.
+  **6.11.2:** `assign_reactors` — a line exported with Sampled_reactor 0/blank but naphtha ≥ `NAPHTHA_MIN_VOL` (2 vol% from the
+  areas) takes the GC sampling-cycle reactor (smallest repeating period of the reactors before it); `/operating-data` adds
+  "Reactor (assigned)" / "Reactor source" (cache `ils_reforming_reactor_lines` v2, calc sig `CALC_VERSION` 2). Lines before
+  the cut-in without DHA are skipped; a line before the reactor's first DOE start uses condition 1's flows. Reforming-only
+  CSS: Offline `#dataTable thead th` sticky (from reforming_offline.js), reactor tab header z-index above the sticky column;
+  "—" + tooltip for yields before the yield start and for lines without DHA.
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

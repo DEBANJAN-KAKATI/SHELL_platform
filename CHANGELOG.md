@@ -1,3 +1,21 @@
+## 6.11.2 (2026-11-23) — Reforming: fixes from a full run (Result_34.txt)
+Isomerization and General_MB are not changed (Reforming files only; shared files only get cache-buster bumps).
+- **Lines exported with Sampled_reactor 0**: from 20.11.2026 08:00 the operating export labels every line 0 although the GC
+  kept sampling R2 / R6, so only 17 lines per reactor were calculated and the later DHA samples had no reactor. A line
+  labelled 0 (or blank) whose GC shows naphtha (≥ 2 vol% from the H2 / N2 areas) now takes the reactor of the GC's sampling
+  cycle (the repeating R2, R6, R2 … before it); real bypass lines (H2 + N2 only) stay the bypass
+  (`reactor_calc.assign_reactors`, also used for the Offline Active Reactor through `/api/reforming/operating-data`
+  column "Reactor (assigned)"). Checked: 56 of 56 lines get the reactor the mentor's workbook gives them; 28 lines per
+  reactor; the Offline page now shows R2 28 / R6 27 samples instead of ERROR.
+- **Pre-run lines**: GC lines before the Feed Cut-In that have no DHA sample (drying / reduction, no DOE condition) are
+  left out of the reactor sheets and the Base table (they gave a page of ERROR cells). A line just before the reactor's
+  first DOE condition uses that condition's N2 / H2 flows (the workbook's first column).
+- **Tables**: Offline Table-1/2/3 header row stays visible when scrolling (the Properties table kept only "File Name");
+  Reactor calculations header stays above the sticky Parameter column (the body was painted over it); blank cells explain
+  themselves — "—" with a tooltip for yields before the yield start (12 h after cut-in, blank in the workbook too) and for
+  a GC line without its DHA sample (instead of ERROR); `*` marks lines whose reactor came from the GC cycle.
+- Tests for the reactor inference and the pre-run rule (62 tests).
+
 ## 6.11.1 (2026-11-23) — Reforming: feed carbon normalised as the workbook
 - The reactor calculation uses the feed Carbon wt% as the workbook does: CHN Carbon normalised with Hydrogen,
   100·C/(C+H) ('Blend Feed Properties' H9 → the reactor sheets' D2; 85.33 / 14.89 → 85.1427 wt%). Before, the Run Plan

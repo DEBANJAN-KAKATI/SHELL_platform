@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.11.1
+# ILS Dashboard (DHA Data Dashboard) v6.11.2
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -175,6 +175,9 @@ adds H2 generation, Gas, C5+, totals, group types in wof%, temperature, pressure
 them (e.g. C5+ yield or H2 generation vs temperature, Naphtha/H2 vs run length). Checked against Reactor 2 and Reactor 6 of
 the workbook: every cell equal except where the workbook deviates from its own formulas (a typed 2 ml catalyst volume in
 LHSV from column O, typed N2 flows 3.78 / 4.7 in two R6 columns, the line before cut-in).
+**6.11.2:** lines the operating export labels Sampled_reactor 0 while the GC shows naphtha (≥ 2 vol%) take the reactor of the
+GC sampling cycle (marked `*`; real bypass lines stay the bypass); pre-run lines before the Feed Cut-In without a DHA sample
+are left out; "—" (with a tooltip) marks yields before the yield start and lines without a DHA sample.
 
 ## Export Complete (6.10.0)
 **Export Complete** in the header of the Calculation pages, Plots and the Summary Dashboard downloads one Excel workbook
@@ -217,6 +220,6 @@ Open http://localhost:5001. `data/` is mounted at `/app/data`; RunData is kept i
 the sources with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY` or `DASHBOARD_RUN_PLAN_FILE`.
 
 ## Tests
-`python -m pytest -q tests` (60 tests: Run Plan reader and molecular weights, online units and the internal standard
+`python -m pytest -q tests` (62 tests: Run Plan reader and molecular weights, online units and the internal standard
 against the MassBal workbook, R08 conditions, mass balance, synced folder and Export Complete workbook, Reforming reactor
 per GC line and the Reforming reactor sheet).

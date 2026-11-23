@@ -36,6 +36,8 @@
                 if (column === 'DateTime') return [column, isoDate(line.date_time)];
                 if (column === 'Reactor') return [column, Number(String(line.reactor).slice(1))];
                 const value = line[key];
+                // A GC line without its DHA sample (e.g. the last line of a run): the DHA-based values are "—", not ERROR
+                if (!line.dha_uid && String(value ?? '').startsWith('ERROR')) return [column, '—'];
                 return [column, value === undefined ? '' : value];
             })));
             return { rows, columns: BASE_COLUMNS.map(([column]) => column) };
@@ -69,6 +71,14 @@
         }
         return reactors.find(r => r.reactor === select?.value) || reactors[0] || null;
     }
+    // Why a cell of the sheet is empty: no DHA sample for the line, or a yield row before the yield start (12 h after cut-in)
+    function blankNote(line, sec, k) {
+        if (!line.dha_uid && sec !== 'performance') return 'No DHA sample for this GC line';
+        if ((sec === 'yields' || sec === 'wof') && typeof line.run_length_h === 'number' && line.run_length_h < k.yield_start_h) {
+            return `Yields start ${k.yield_start_h} h after the Feed Cut-In (as the sheet): run length ${line.run_length_h.toFixed(2)} h`;
+        }
+        return '';
+    }
     function renderTab() {
         const calc = RR.calcCached();
         const thead = $('#reformingReactorThead');
@@ -95,14 +105,15 @@
             `Feed (Run Plan): Carbon <b>${n(k.feed_carbon)}</b> wt%${k.feed_carbon_normalised ? ` (normalised 100·C/(C+H) from C ${n(k.feed_carbon_measured)} / H ${n(k.feed_hydrogen_measured)})` : ''} · MW <b>${n(k.feed_mw)}</b> · density <b>${n(k.feed_density)}</b> g/ml`,
             `N2 effluent and H2 inlet flows from the Run Plan DOE of each line's condition`,
             `H2 / N2 vol% from the GC areas: (Area − ${k.calibration?.H2?.intercept}) / ${k.calibration?.H2?.slope} and (Area − ${k.calibration?.N2?.intercept}) / ${k.calibration?.N2?.slope}`,
-            `Yields from ${n(k.yield_start_h)} h after cut-in (before: wof% = wt%)`,
+            `Yields from ${n(k.yield_start_h)} h after cut-in (before: wof% = wt%, yields "—")`,
+            ...(lines.some(l => l.reactor_source && l.reactor_source !== 'export') ? [`<b>*</b> ${lines.filter(l => l.reactor_source && l.reactor_source !== 'export').length} lines exported with Sampled_reactor 0 but holding naphtha: reactor taken from the GC sampling cycle`] : []),
             ...(calc.missing?.length ? [`<span style="color:#8b2d22"><b>Missing in the Run Plan:</b> ${esc(calc.missing.join(', '))}</span>`] : []),
         ].join(' · ');
         const section = $('#reformingReactorSection')?.value || '';
         const rows = RR.SHEET_ROWS.filter(([, , , sec]) => !section || sec === section);
         if (thead) {
             thead.innerHTML = `<tr><th class="sticky-col">Parameter</th><th>Unit</th><th>Carbon, wt%</th>${lines.map((line, i) =>
-                `<th title="${esc(line.date_time)} · GC ${esc(line.gc_date_time)}">#${i + 1}<br><small>${esc(line.date)} ${esc(line.time.slice(0, 5))}</small></th>`).join('')}</tr>`;
+                `<th title="${esc(line.date_time)} · GC ${esc(line.gc_date_time)}${line.reactor_source && line.reactor_source !== 'export' ? ` · reactor from the ${esc(line.reactor_source)}` : ''}">#${i + 1}${line.reactor_source && line.reactor_source !== 'export' ? '<sup>*</sup>' : ''}<br><small>${esc(line.date)} ${esc(line.time.slice(0, 5))}</small></th>`).join('')}</tr>`;
         }
         if (tbody) {
             let lastSection = null;
@@ -115,7 +126,13 @@
                 return header + `<tr><td class="sticky-col">${esc(label)}</td><td>${esc(unit)}</td><td>${factor === '' || factor === undefined ? '' : factor}</td>${lines.map(line => {
                     const value = RR.sheetValue(line, key);
                     const text = fmt(value, key);
-                    return `<td${String(text).startsWith('ERROR') ? ' class="error-cell" title="' + esc(text) + '"' : ''}>${esc(String(text).startsWith('ERROR') ? 'ERROR' : text)}</td>`;
+                    const note = blankNote(line, sec, k);
+                    if (String(text).startsWith('ERROR')) {
+                        return !line.dha_uid ? `<td class="rf-not-calc" title="No DHA sample for this GC line">—</td>`
+                            : `<td class="error-cell" title="${esc(text)}">ERROR</td>`;
+                    }
+                    if (text === '' && note) return `<td class="rf-not-calc" title="${esc(note)}">—</td>`;
+                    return `<td>${esc(text)}</td>`;
                 }).join('')}</tr>`;
             }).join('');
         }
@@ -169,8 +186,13 @@
         const step = delta => { decimals = Math.min(8, Math.max(0, decimals + delta)); try { localStorage.setItem(DECIMALS_KEY, String(decimals)); } catch (e) { } renderTab(); };
         $('#reformingReactorDecDecrease')?.addEventListener('click', () => step(-1));
         $('#reformingReactorDecIncrease')?.addEventListener('click', () => step(1));
-        document.head.insertAdjacentHTML('beforeend', '<style>.reforming-reactor-table .sticky-col{position:sticky;left:0;background:var(--paper,#fbf5e9);z-index:1;white-space:nowrap}'
-            + '.reforming-reactor-table th.sticky-col{background:var(--navy,#071a2d);color:#fbf5e9;z-index:2}'
+        // Header row stays on top of the sticky Parameter column when scrolling either way (dashboard.css gives every
+        // .online-table first cell z-index 3, which painted the body over the header)
+        document.head.insertAdjacentHTML('beforeend', '<style>#reformingReactorTable td.sticky-col{position:sticky;left:0;background:var(--paper,#fbf5e9);z-index:2;white-space:nowrap}'
+            + '#reformingReactorTable thead th{position:sticky;top:0;z-index:4;background:#000;color:#fff}'
+            + '#reformingReactorTable thead th.sticky-col{left:0;z-index:6;white-space:nowrap}'
+            + '#reformingReactorTable tr.reforming-reactor-section td{position:static}'
+            + '.rf-not-calc{color:#9a8f80!important;font-weight:400}'
             + '.reforming-reactor-table .reforming-reactor-section td{background:#f1e7d6}.reforming-reactor-table .error-cell{color:#8b2d22;font-weight:700}'
             + '.reforming-yield-start{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}</style>');
         refresh();
