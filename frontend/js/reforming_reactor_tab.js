@@ -107,13 +107,33 @@
             `H2 / N2 vol% from the GC areas: (Area − ${k.calibration?.H2?.intercept}) / ${k.calibration?.H2?.slope} and (Area − ${k.calibration?.N2?.intercept}) / ${k.calibration?.N2?.slope}`,
             `Yields from ${n(k.yield_start_h)} h after cut-in (before: wof% = wt%, yields "—")`,
             ...(lines.some(l => l.reactor_source && l.reactor_source !== 'export') ? [`<b>*</b> ${lines.filter(l => l.reactor_source && l.reactor_source !== 'export').length} lines exported with Sampled_reactor 0 but holding naphtha: reactor taken from the GC sampling cycle`] : []),
+            ...(lines.some(l => l.gas_source && l.gas_source !== 'Area') ? [`<b>e</b> ${lines.filter(l => l.gas_source && l.gas_source !== 'Area').length} lines without GC areas: H2 / N2 vol% from ESTD ÷ GC response factor (H2 ${Number(calc.response_factors?.H2).toPrecision(6)}, N2 ${Number(calc.response_factors?.N2).toPrecision(6)}), the same values`] : []),
+            ...(lines.some(l => l.condition_note) ? [`<b>c</b> ${lines.filter(l => l.condition_note).length} lines after the planned end of the last DOE condition: that condition is kept`] : []),
             ...(calc.missing?.length ? [`<span style="color:#8b2d22"><b>Missing in the Run Plan:</b> ${esc(calc.missing.join(', '))}</span>`] : []),
         ].join(' · ');
+        // Data checks of the operating file (6.11.3): what the sheets could not use as written, nothing is stopped by it
+        let checks = $('#reformingReactorChecks');
+        if (!checks) {
+            $('#reformingReactorInfo').insertAdjacentHTML('afterend', '<div id="reformingReactorChecks" class="rf-checks"></div>');
+            checks = $('#reformingReactorChecks');
+        }
+        const items = calc.data_checks || [];
+        checks.hidden = !items.length;
+        checks.innerHTML = items.length ? `<b>Data checks of the operating data (${items.length})</b><ul>${items.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
         const section = $('#reformingReactorSection')?.value || '';
         const rows = RR.SHEET_ROWS.filter(([, , , sec]) => !section || sec === section);
         if (thead) {
-            thead.innerHTML = `<tr><th class="sticky-col">Parameter</th><th>Unit</th><th>Carbon, wt%</th>${lines.map((line, i) =>
-                `<th title="${esc(line.date_time)} · GC ${esc(line.gc_date_time)}${line.reactor_source && line.reactor_source !== 'export' ? ` · reactor from the ${esc(line.reactor_source)}` : ''}">#${i + 1}${line.reactor_source && line.reactor_source !== 'export' ? '<sup>*</sup>' : ''}<br><small>${esc(line.date)} ${esc(line.time.slice(0, 5))}</small></th>`).join('')}</tr>`;
+            const marks = line => {
+                const notes = [], sup = [];
+                if (line.reactor_source && line.reactor_source !== 'export') { notes.push(`reactor from the ${line.reactor_source}`); sup.push('*'); }
+                if (line.gas_source && line.gas_source !== 'Area') { notes.push(`H2 / N2 from ${line.gas_source}`); sup.push('e'); }
+                if (line.condition_note) { notes.push(`condition ${line.condition} ${line.condition_note}`); sup.push('c'); }
+                return { title: notes.map(n => ` · ${n}`).join(''), sup: sup.length ? `<sup>${sup.join('')}</sup>` : '' };
+            };
+            thead.innerHTML = `<tr><th class="sticky-col">Parameter</th><th>Unit</th><th>Carbon, wt%</th>${lines.map((line, i) => {
+                const m = marks(line);
+                return `<th title="${esc(line.date_time)} · GC ${esc(line.gc_date_time)}${esc(m.title)}">#${i + 1}${m.sup}<br><small>${esc(line.date)} ${esc(line.time.slice(0, 5))}</small></th>`;
+            }).join('')}</tr>`;
         }
         if (tbody) {
             let lastSection = null;
@@ -193,6 +213,8 @@
             + '#reformingReactorTable thead th.sticky-col{left:0;z-index:6;white-space:nowrap}'
             + '#reformingReactorTable tr.reforming-reactor-section td{position:static}'
             + '.rf-not-calc{color:#9a8f80!important;font-weight:400}'
+            + '.rf-checks{margin:0 0 10px;padding:8px 12px;border:1px solid #e0b35a;border-left:4px solid #c98a1b;background:#fdf3df;border-radius:6px;font-size:12.5px;color:#5b4210}'
+            + '.rf-checks ul{margin:4px 0 0 18px;padding:0}.rf-checks li{margin:2px 0}'
             + '.reforming-reactor-table .reforming-reactor-section td{background:#f1e7d6}.reforming-reactor-table .error-cell{color:#8b2d22;font-weight:700}'
             + '.reforming-yield-start{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}</style>');
         refresh();

@@ -1,3 +1,24 @@
+## 6.11.3 (2026-11-27) — Reforming: running experiment, hand-completed operating data
+Isomerization and General_MB are not changed (Reforming files only; shared files only get cache-buster bumps).
+- **No GC areas needed**: the GC writes ESTD = Area × response factor (H2 5.63044e-6, N2 2.09541e-7, identical on every
+  line to 1e-6), so a line without Area_H2 / Area_N2 takes its H2 / N2 vol% from ESTD ÷ factor with the workbook's
+  calibration — the same values as from the areas (factor taken from the file's own lines, else the default). Before,
+  these lines gave "ERROR: no Area_H2" and a chain of errors (naphtha out / feed / LHSV / yields).
+- **Rows without Date/Time** (GC values pasted as a row of their own) are not operating lines: they no longer take a DHA
+  sample from the real line (23.11 08:28 "GC line without Sampled_reactor").
+- **The last DOE condition carries on** after its planned End for a reactor (the DOE is updated when a condition changes,
+  not for every new line); marked "c" on the reactor sheet. Before: "no DOE 'N2 dilution flow'" on new lines.
+- **DHA samples after the end of the operating data** show "Waiting for operating data (the .txt ends …)" (own Reactor
+  filter group, "—" in the calculated columns) instead of a red ERROR; they are calculated as soon as a newer .txt is loaded.
+- **Same file name, new content** (a newer export saved over the old one, Sampled_reactor filled in): the cached GC
+  lines and reactor calculation are keyed on the content of the loaded Online Analysis state, so they are read again
+  (the Summary showed "Bypass" for lines the Base table already had as R2 / R6).
+- **Data checks** box on the Reactor calculations tab: rows without Date/Time, a GC Date/Time on two lines, GC times
+  before their Date/Time, lines from ESTD, lines after the last condition, non-numeric T / P values, DHA samples after
+  the operating data. Naphtha feed names the real missing input (it said "feed Carbon missing" when the GC was missing).
+- Reforming DHA folder scan accepts `.XLS` on Linux / Docker (Windows already did).
+- Tests (66).
+
 ## 6.11.2 (2026-11-23) — Reforming: fixes from a full run (Result_34.txt)
 Isomerization and General_MB are not changed (Reforming files only; shared files only get cache-buster bumps).
 - **Lines exported with Sampled_reactor 0**: from 20.11.2026 08:00 the operating export labels every line 0 although the GC

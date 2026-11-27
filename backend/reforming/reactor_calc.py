@@ -58,6 +58,12 @@ GAS_CELLS = [("Paraffins", n) for n in (1, 2, 3, 4)] + [("Iso Paraffins", 4)] \
     + [("Olefins", n) for n in (2, 3, 4)] + [("Unknowns", n) for n in (1, 2, 3, 4)]
 # GC calibration (workbook "GC Calibration Data", 7 Aug 2026): Area = slope × vol% + intercept
 GC_CALIBRATION = {"H2": {"slope": 179209.0, "intercept": 180057.0}, "N2": {"slope": 4716081.0, "intercept": 5710532.0}}
+# 6.11.3: the GC writes ESTD = Area × response factor (Result_34: H2 5.63044e-6, N2 2.09541e-7, the same on every line
+# to 1e-6), so a line without Area_H2 / Area_N2 (hand-completed exports, e.g. Result_34_1 from 23.11.2026 08:30) gets
+# its area back from ESTD: vol% = (ESTD / factor − intercept) / slope, the sheet's value. The factor is taken from the
+# lines of the same file that have both (median), else these defaults.
+GC_RESPONSE_FACTOR = {"H2": 5.63044e-06, "N2": 2.09541e-07}
+GAS_SOURCE_AREA, GAS_SOURCE_ESTD = "Area", "ESTD (÷ GC response factor)"
 MOLAR_VOLUME_FACTOR = 0.0416   # mol per NL at 20 °C (the sheet's 0.0416)
 MATCH_BEFORE_S, MATCH_AFTER_S = 10 * 60, 60 * 60
 # Yields (H2 generation, Gas, C5+, wof%) start this many hours after the Feed Cut-In: both reactor sheets start at the
@@ -200,6 +206,18 @@ def condition_of(doe_rows, reactor, when):
     return rows[-1] if rows else None
 
 
+def condition_at(doe_rows, reactor, when):
+    """(DOE row, note) of a line. 6.11.3: after the end of the reactor's last condition the run is still on that
+    condition (the DOE is filled in when a condition changes, not for every new line), so the last one carries on."""
+    row = condition_of(doe_rows, reactor, when)
+    if row is not None or when is None:
+        return row, ""
+    rows = sorted((r for r in doe_rows if r["reactor"] == reactor and r["start"]), key=lambda r: r["start"])
+    if rows and rows[-1]["end"] is not None and when >= rows[-1]["end"]:
+        return rows[-1], f"after the planned end of condition {rows[-1]['condition']} – kept until a new condition is entered"
+    return None, ""
+
+
 # ---------------------------------------------------------------- reactor of each GC line (6.11.2)
 # Some exports write Sampled_reactor 0 (the bypass code) for reactor lines, e.g. Result_34.txt from 20.11.2026 08:00 on;
 # the workbook's Raw Data has them relabelled by hand. A line marked 0 / blank that holds naphtha (>= NAPHTHA_MIN_VOL
@@ -209,17 +227,52 @@ NAPHTHA_MIN_VOL = 2.0
 REACTOR_SOURCE_EXPORT, REACTOR_SOURCE_CYCLE = "export", "GC cycle (Sampled_reactor 0 in the export)"
 
 
-def naphtha_vol(raw, calibration=GC_CALIBRATION):
-    area_h2, area_n2 = number(raw.get("Area_H2")), number(raw.get("Area_N2"))
-    if area_h2 is None or area_n2 is None:
+def response_factors(rows):
+    """ESTD / Area of H2 and N2 from the lines that have both (median), else GC_RESPONSE_FACTOR."""
+    factors = {}
+    for gas, default in GC_RESPONSE_FACTOR.items():
+        ratios = sorted(e / a for e, a in ((number(r.get(f"ESTD_{gas}")), number(r.get(f"Area_{gas}"))) for r in rows)
+                        if e is not None and a and e > 0)
+        factors[gas] = ratios[len(ratios) // 2] if ratios else default
+    return factors
+
+
+def gas_area(raw, gas, factors=None):
+    """(Area of H2 / N2, source): the exported Area, else ESTD ÷ response factor, else (None, '')."""
+    area = number(raw.get(f"Area_{gas}"))
+    if area is not None:
+        return area, GAS_SOURCE_AREA
+    estd = number(raw.get(f"ESTD_{gas}"))
+    factor = (factors or GC_RESPONSE_FACTOR).get(gas)
+    if estd is not None and factor:
+        return estd / factor, GAS_SOURCE_ESTD
+    return None, ""
+
+
+def gas_vol(raw, gas, calibration=GC_CALIBRATION, factors=None):
+    area, source = gas_area(raw, gas, factors)
+    if area is None:
+        return None, ""
+    return (area - calibration[gas]["intercept"]) / calibration[gas]["slope"], source
+
+
+def naphtha_vol(raw, calibration=GC_CALIBRATION, factors=None):
+    h2, _ = gas_vol(raw, "H2", calibration, factors)
+    n2, _ = gas_vol(raw, "N2", calibration, factors)
+    if h2 is None or n2 is None:
         return None
-    h2 = (area_h2 - calibration["H2"]["intercept"]) / calibration["H2"]["slope"]
-    n2 = (area_n2 - calibration["N2"]["intercept"]) / calibration["N2"]["slope"]
     return 100 - h2 - n2
 
 
-def assign_reactors(rows, calibration=GC_CALIBRATION):
+def is_operating_line(raw):
+    """A line of the operating data has its own Date/Time; a row with only GC values (e.g. a GC result pasted under the
+    export, Result_34_1 '' / GC 23.11.2026 08:07:02) is not a line: it is left out of the pairing and the sheets."""
+    return parse_time(raw.get("Date/Time")) is not None
+
+
+def assign_reactors(rows, calibration=GC_CALIBRATION, factors=None):
     """[(reactor 'R1'…'R8' / 'R0' / '', source)] for the rows of the operating file (same order)."""
+    factors = factors or response_factors(rows)
     order = sorted(range(len(rows)), key=lambda i: (parse_time(rows[i].get("Date/Time")) or datetime.max))
     result = [("", "")] * len(rows)
     history = []
@@ -230,7 +283,10 @@ def assign_reactors(rows, calibration=GC_CALIBRATION):
             result[i] = (reactor, REACTOR_SOURCE_EXPORT)
             history.append(reactor)
             continue
-        nv = naphtha_vol(raw, calibration) if raw.get("GC Date/Time") else None
+        if not is_operating_line(raw):
+            result[i] = ("", "no Date/Time (not an operating line)")
+            continue
+        nv = naphtha_vol(raw, calibration, factors) if raw.get("GC Date/Time") else None
         predicted = None
         if nv is not None and nv >= NAPHTHA_MIN_VOL:
             for period in range(1, 9):
@@ -274,13 +330,13 @@ def _ok(*values):
     return all(isinstance(v, (int, float)) for v in values)
 
 
-def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION, yield_start_h=YIELD_START_H):
+def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION, yield_start_h=YIELD_START_H, factors=None):
     reactor = line["reactor"]
     block = block_of(reactor, ctx["doe"])
     cut_in = ctx["cut_ins"].get(block) or ctx["cut_in"]
     when = line["time"]
     feed = ctx["feed"]
-    doe = condition_of(ctx["doe"], reactor, when)
+    doe, condition_note = condition_at(ctx["doe"], reactor, when)
     flows = doe
     if flows is None and when is not None:
         # A line before the reactor's first condition (e.g. just before the Feed Cut-In) takes condition 1's flows,
@@ -292,7 +348,7 @@ def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION,
         "reactor": reactor, "block": block, "catalyst": ctx["catalyst"].get(reactor, ""),
         "date_time": line["date_time"], "gc_date_time": line["gc_date_time"],
         "date": when.strftime("%d.%m.%Y") if when else "", "time": when.strftime("%H:%M:%S") if when else "",
-        "condition": doe["condition"] if doe else "",
+        "condition": doe["condition"] if doe else "", "condition_note": condition_note,
         "dha_uid": sample.get("UID", "") if sample else "", "dha_date_time": sample.get("DateTime", "") if sample else "",
     }
     if when is None:
@@ -308,9 +364,11 @@ def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION,
                       else _err("no DOE 'N2 dilution flow (NLPH)' for this reactor and time"))
     h2_inlet = flows["h2_g_h"] if flows and flows["h2_g_h"] is not None else None
 
-    area_h2, area_n2 = number(line["raw"].get("Area_H2")), number(line["raw"].get("Area_N2"))
-    out["h2_vol"] = (area_h2 - calibration["H2"]["intercept"]) / calibration["H2"]["slope"] if area_h2 is not None else _err("no Area_H2")
-    out["n2_vol"] = (area_n2 - calibration["N2"]["intercept"]) / calibration["N2"]["slope"] if area_n2 is not None else _err("no Area_N2")
+    h2v, h2_source = gas_vol(line["raw"], "H2", calibration, factors)
+    n2v, n2_source = gas_vol(line["raw"], "N2", calibration, factors)
+    out["h2_vol"] = h2v if h2v is not None else _err("no H2 on the GC line (Area_H2 / ESTD_H2)")
+    out["n2_vol"] = n2v if n2v is not None else _err("no N2 on the GC line (Area_N2 / ESTD_N2)")
+    out["gas_source"] = h2_source if h2_source == n2_source else " / ".join(x for x in (h2_source, n2_source) if x)
     out["naphtha_vol"] = 100 - out["n2_vol"] - out["h2_vol"] if _ok(out["h2_vol"], out["n2_vol"]) else _err("H2 / N2 vol% missing")
     out["total_vol"] = out["h2_vol"] + out["n2_vol"] + out["naphtha_vol"] if _ok(out["h2_vol"], out["n2_vol"], out["naphtha_vol"]) else None
 
@@ -333,9 +391,12 @@ def calculate_line(line, sample, ctx, previous_time, calibration=GC_CALIBRATION,
     else:
         out["naphtha_out"] = ((n2 / (n2v / 100)) * (nv / 100) * MOLAR_VOLUME_FACTOR * out["mw"]
                               if gas_ok and _ok(nv, out["mw"]) else _err("N2 flow, GC or DHA MW missing"))
-        out["naphtha_feed"] = (out["naphtha_out"] * out["carbon_naphtha"] / feed["carbon"]
-                               if _ok(out["naphtha_out"], out["carbon_naphtha"], feed["carbon"]) and feed["carbon"]
-                               else _err("feed Carbon wt% missing in the Run Plan (Feed)"))
+        if not _ok(out["naphtha_out"]):
+            out["naphtha_feed"] = out["naphtha_out"]          # the reason it is missing, not the feed carbon
+        elif not (_ok(feed["carbon"]) and feed["carbon"]):
+            out["naphtha_feed"] = _err("feed Carbon wt% missing in the Run Plan (Feed)")
+        else:
+            out["naphtha_feed"] = out["naphtha_out"] * out["carbon_naphtha"] / feed["carbon"]
         out["naphtha_h2"] = (nv * out["mw"]) / (h2v * 2) if _ok(nv, out["mw"], h2v) and h2v else _err("GC H2 or DHA MW missing")
     nf = out["naphtha_feed"]
     out["lhsv"] = (nf / feed["density"] / ctx["catalyst_volume"][reactor]
@@ -384,11 +445,12 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
     'Paraffins C1' … 'Unknowns C15', Molecular Weight, RON, Specific Gravity); run_plan: the saved Run Plan payload."""
     calibration = calibration or GC_CALIBRATION
     ctx = plan_context(run_plan)
+    factors = response_factors(operating_rows)
     lines = []
-    assigned = assign_reactors(operating_rows, calibration)
+    assigned = assign_reactors(operating_rows, calibration, factors)
     for raw, (reactor, source) in zip(operating_rows, assigned):
         gc = parse_time(raw.get("GC Date/Time"))
-        if gc is None:
+        if gc is None or not is_operating_line(raw):
             continue
         lines.append({"raw": raw, "gc": gc, "time": parse_time(raw.get("Date/Time")),
                       "date_time": str(raw.get("Date/Time") or ""), "gc_date_time": str(raw.get("GC Date/Time") or ""),
@@ -408,7 +470,7 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
         cut_in = ctx["cut_ins"].get(block) or ctx["cut_in"]
         if sample is None and cut_in is not None and line_obj["time"] is not None and line_obj["time"] < cut_in:
             continue    # pre-run line (activation) without a DHA sample: not part of the reactor sheet (as the workbook)
-        result = calculate_line(line_obj, sample, ctx, previous.get(reactor), calibration, yield_start_h)
+        result = calculate_line(line_obj, sample, ctx, previous.get(reactor), calibration, yield_start_h, factors)
         result["reactor_source"] = line_obj["reactor_source"]
         previous[reactor] = line_obj["time"]
         results.append(result)
@@ -434,4 +496,53 @@ def calculate(operating_rows, samples, run_plan, calibration=None, yield_start_h
                       "yield_start_h": yield_start_h},
         "missing": [label for label, value in (("feed Carbon wt%", feed["carbon"]), ("feed Molecular Weight", feed["mw"]),
                                                 ("feed Density @ 15 °C", feed["density"])) if value is None],
+        "response_factors": factors,
+        "data_checks": data_checks(operating_rows, lines, results, dha, line_to_sample),
     }
+
+
+def _short(value):
+    when = value if isinstance(value, datetime) else parse_time(value)
+    return when.strftime("%d.%m.%Y %H:%M") if when else str(value or "")
+
+
+def data_checks(operating_rows, lines, results, dha, line_to_sample):
+    """Findings about the operating data that change what the sheets can show (6.11.3). Shown above the Reactor
+    calculations; nothing here stops the calculation."""
+    checks = []
+    undated = [r for r in operating_rows if not is_operating_line(r) and any(str(v).strip() for v in r.values())]
+    if undated:
+        checks.append(f"{len(undated)} row(s) without Date/Time left out (not an operating line): GC "
+                      + ", ".join(_short(r.get("GC Date/Time")) or "blank" for r in undated[:5]))
+    seen = {}
+    for line in lines:
+        seen.setdefault(line["gc"], []).append(line)
+    duplicates = {gc: group for gc, group in seen.items() if len(group) > 1}
+    if duplicates:
+        checks.append("GC Date/Time on more than one line (one injection, so only one of them gets the DHA sample): "
+                      + "; ".join(f"{_short(gc)} on {', '.join(_short(l['time']) for l in group)}"
+                                  for gc, group in sorted(duplicates.items())[:5]))
+    before = [l for l in lines if l["time"] and l["gc"] < l["time"]]
+    if before:
+        checks.append(f"{len(before)} line(s) with GC Date/Time before their Date/Time (the GC result comes after the "
+                      "operating record) – check the GC times: " + ", ".join(_short(l["time"]) for l in before[:5]))
+    estd = [r for r in results if r.get("gas_source") and GAS_SOURCE_ESTD in r["gas_source"]]
+    if estd:
+        checks.append(f"{len(estd)} line(s) without GC areas: H2 / N2 vol% from ESTD ÷ GC response factor (same values)")
+    carried = [r for r in results if r.get("condition_note")]
+    if carried:
+        by_reactor = sorted({f"{r['reactor']} condition {r['condition']}" for r in carried})
+        checks.append(f"{len(carried)} line(s) after the planned end of the last DOE condition ({', '.join(by_reactor)}): "
+                      "that condition is kept – add the next condition to the Run Plan DOE when it changes")
+    for tag in ("10i1TIC02", "10i2TIC02", "10i1PIC01", "10i2PIC01"):
+        bad = [l for l in lines if str(l["raw"].get(tag, "")).strip() and number(l["raw"].get(tag)) is None]
+        if bad:
+            checks.append(f"{tag} not a number on {len(bad)} line(s): "
+                          + ", ".join(f"{_short(l['time'])} '{l['raw'].get(tag)}'" for l in bad[:5]))
+    last = max((l["gc"] for l in lines), default=None)
+    paired = set(line_to_sample.values())
+    after = [s for j, s in enumerate(dha) if j not in paired and last and (parse_time(s.get("DateTime")) or datetime.min) > last]
+    if after:
+        checks.append(f"{len(after)} DHA sample(s) after the end of the operating data (last GC line {_short(last)}): "
+                      "load a newer operating export (.txt) to calculate them")
+    return checks

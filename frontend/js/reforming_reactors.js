@@ -10,8 +10,8 @@ window.ILSReformingReactors = (() => {
     const LINES_KEY = 'ils_reforming_reactor_lines';
     // 6.11.2: lines carry the server's assigned reactor (lines exported with Sampled_reactor 0 get the GC-cycle reactor);
     // caches written before (no version) are read again
-    const LINES_VERSION = 2;
-    const CALC_VERSION = 2;
+    const LINES_VERSION = 3;
+    const CALC_VERSION = 3;
     const BEFORE_MS = 10 * 60000;
     const AFTER_MS = 60 * 60000;
     const readJson = (storage, key) => { try { return JSON.parse(storage.getItem(key) || 'null'); } catch (e) { return null; } };
@@ -40,12 +40,25 @@ window.ILSReformingReactors = (() => {
     function onlineState() {
         return readJson(sessionStorage, 'dhaOnlineState') || readJson(localStorage, 'dhaOnlineState');
     }
+    // 6.11.3: signature of the loaded operating data (path + content). The file can change under the same name (a newer
+    // export, Sampled_reactor filled in by hand): the cached GC lines and calculation are then read again. FNV-1a of the
+    // stored Online Analysis state, recomputed only when that text changes.
+    let sigMemo = { raw: null, sig: '' };
+    function onlineSig() {
+        const raw = sessionStorage.getItem('dhaOnlineState') || localStorage.getItem('dhaOnlineState') || '';
+        if (raw === sigMemo.raw) return sigMemo.sig;
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < raw.length; i++) { hash ^= raw.charCodeAt(i); hash = Math.imul(hash, 0x01000193) >>> 0; }
+        sigMemo = { raw, sig: `${raw.length}:${hash.toString(16)}` };
+        return sigMemo.sig;
+    }
     // Cached GC lines [{gc, reactor}] of the loaded operating file, or null when they are not read (yet)
     function lines() {
         const cached = readJson(sessionStorage, LINES_KEY);
         if (!cached || !Array.isArray(cached.lines) || cached.v !== LINES_VERSION) return null;
         const online = onlineState();
         if (online?.path && cached.path && online.path !== cached.path) return null;
+        if (online && cached.sig && cached.sig !== onlineSig()) return null;
         return cached.lines;
     }
     let loading = null;
@@ -54,7 +67,7 @@ window.ILSReformingReactors = (() => {
         const online = onlineState();
         if (!online?.path) return Promise.resolve(false);
         const cached = readJson(sessionStorage, LINES_KEY);
-        if (cached?.path === online.path && Array.isArray(cached.lines) && cached.v === LINES_VERSION) return Promise.resolve(false);
+        if (cached?.path === online.path && Array.isArray(cached.lines) && cached.v === LINES_VERSION && cached.sig === onlineSig()) return Promise.resolve(false);
         if (loading) return loading;
         loading = (async () => {
             try {
@@ -63,11 +76,12 @@ window.ILSReformingReactors = (() => {
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || 'Could not read the operating data file.');
-                const gcLines = (data.rows || []).map(row => ({ gc: row['GC Date/Time'] || '',
+                // A row without its own Date/Time (GC values pasted under the export) is not an operating line (6.11.3)
+                const gcLines = (data.rows || []).filter(row => String(row['Date/Time'] || '').trim()).map(row => ({ gc: row['GC Date/Time'] || '',
                     reactor: norm(row['Reactor (assigned)'] !== undefined && row['Reactor (assigned)'] !== '' ? row['Reactor (assigned)'] : row.Sampled_reactor),
                     source: row['Reactor source'] || '' }))
                     .filter(line => line.gc);
-                sessionStorage.setItem(LINES_KEY, JSON.stringify({ path: online.path, v: LINES_VERSION, lines: gcLines }));
+                sessionStorage.setItem(LINES_KEY, JSON.stringify({ path: online.path, sig: onlineSig(), v: LINES_VERSION, lines: gcLines }));
                 return true;
             } catch (error) {
                 console.warn('Reforming: GC lines not read from the operating data:', error);
@@ -144,12 +158,22 @@ window.ILSReformingReactors = (() => {
         const p = plan();
         const gcLines = lines();
         const pairs = gcLines ? pair(samples.map(s => time(dateOf(s))), gcLines.map(line => time(line.gc))) : null;
+        // Last GC line of the operating data: samples after it (+60 min) wait for a newer export, they are not errors
+        const lastGc = gcLines && gcLines.length ? Math.max(...gcLines.map(line => time(line.gc) ?? -Infinity)) : null;
+        const fmt = ms => { const d = new Date(ms); const two = n => String(n).padStart(2, '0');
+            return `${two(d.getDate())}.${two(d.getMonth() + 1)}.${d.getFullYear()} ${two(d.getHours())}:${two(d.getMinutes())}`; };
         return samples.map((sample, index) => {
             const feed = !!p.feedId && String(sample.UID || '').toUpperCase().includes(p.feedId);
             if (feed) return { reactor: '', block: '', feed: true };
             if (gcLines) {
                 const line = pairs.has(index) ? gcLines[pairs.get(index)] : null;
-                if (!line) return { reactor: '', error: 'ERROR: no GC line of the operating data within -10…+60 min' };
+                if (!line) {
+                    const at = time(dateOf(sample));
+                    if (lastGc !== null && at !== null && at > lastGc + AFTER_MS) {
+                        return { reactor: '', pending: true, error: `Waiting for operating data (the .txt ends ${fmt(lastGc)})` };
+                    }
+                    return { reactor: '', error: 'ERROR: no GC line of the operating data within -10…+60 min' };
+                }
                 if (line.reactor === 'R0') return { reactor: '', bypass: true };
                 if (!isReactor(line.reactor)) return { reactor: '', error: 'ERROR: GC line without Sampled_reactor' };
                 return { reactor: line.reactor, block: blockOf(line.reactor, p.doeRows) };
@@ -187,7 +211,8 @@ window.ILSReformingReactors = (() => {
     // dhaRows: Reforming CARBON_TABULAR rows (Date + flat columns 'Paraffins C1' … 'Specific Gravity');
     // returns {top, units, opColumns, dataColumns, entries: [{op, dha, key}]} sorted by time
     function completeTable(operating, dhaRows, dataColumns) {
-        const opRows = (operating.rows || []).map(row => ({ op: row, gc: time(row['GC Date/Time']), dha: null }));
+        // rows without their own Date/Time stay in the table but take no DHA sample (6.11.3)
+        const opRows = (operating.rows || []).map(row => ({ op: row, gc: String(row['Date/Time'] || '').trim() ? time(row['GC Date/Time']) : null, dha: null }));
         const dha = dhaRows.map(row => ({ row, at: time(row.Date ?? row.DateTime), used: false }));
         pair(dha.map(d => d.at), opRows.map(o => o.gc)).forEach((i, j) => { opRows[i].dha = dha[j].row; dha[j].used = true; });
         const entries = [
@@ -230,7 +255,7 @@ window.ILSReformingReactors = (() => {
         const runPlan = readJson(sessionStorage, 'runPlanDashboardState') || readJson(localStorage, 'runPlanDashboardState') || {};
         const plan = { feedRows: runPlan.feedRows, feedTables: runPlan.feedTables, planData: runPlan.planData, doeData: runPlan.doeData };
         const options = calcOptions();
-        const sig = JSON.stringify([CALC_VERSION, online?.path || '', offline?.processed_at || '', (offline?.rows || []).length,
+        const sig = JSON.stringify([CALC_VERSION, online?.path || '', onlineSig(), offline?.processed_at || '', (offline?.rows || []).length,
             JSON.stringify(plan).length, options.yield_start_h]);
         return { path: online?.path || '', samples: offline?.rows || [], plan, options, sig };
     }
@@ -329,6 +354,14 @@ window.ILSReformingReactors = (() => {
         ['Total families (wof%)', 'family_wof_total'], ['Total incl. H2 generation (wof%)', 'total_incl_h2'],
     ];
 
-    return { LINES_KEY, norm, isReactor, time, lines, load, pair, plan, blockOf, assign, cutInOf, doeValue, fetchOperating, completeTable,
+    // 6.11.3: DOE ranges of a reactor; its last condition carries on after its planned End (the DOE is updated when a
+    // condition changes, not for every new line), as the server's reactor calculation (reactor_calc.condition_at)
+    function openLastConditions(ranges) {
+        const last = {};
+        ranges.forEach(range => { if (range.reactor && (!last[range.reactor] || range.start > last[range.reactor].start)) last[range.reactor] = range; });
+        Object.values(last).forEach(range => { range.end = new Date(8640000000000000); range.carried = true; });
+        return ranges;
+    }
+    return { LINES_KEY, norm, isReactor, time, lines, load, onlineSig, openLastConditions, pair, plan, blockOf, assign, cutInOf, doeValue, fetchOperating, completeTable,
              calc, calcCached, calcOptions, setCalcOptions, lineOfSample, fetchOperatingTable, SHEET_ROWS, SUMMARY_EXTRA, sheetValue, FAMILY_ORDER };
 })();

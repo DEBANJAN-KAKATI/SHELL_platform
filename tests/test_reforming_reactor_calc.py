@@ -152,3 +152,51 @@ def test_pre_run_lines_without_dha_are_left_out_and_early_lines_take_condition_1
     r2 = [l for l in out["lines"] if l["reactor"] == "R2"]
     assert [l["dha_uid"] for l in r2] == ["S0", "S1"]
     assert r2[0]["n2_nlph"] == N2 and isinstance(r2[0]["h2_out"], float)
+
+
+# 6.11.3: hand-completed exports (Result_34_1_1.txt): no GC areas, GC values pasted as their own row, DOE condition
+# closed before the run ended
+def estd_line(when, gc, reactor, area_h2, area_n2, keep_area=False):
+    row = line(when, gc, reactor, area_h2, area_n2)
+    row["ESTD_H2"], row["ESTD_N2"] = str(area_h2 * 5.63044e-06), str(area_n2 * 2.09541e-07)
+    if not keep_area:
+        row["Area_H2"] = row["Area_N2"] = ""
+    return row
+
+
+def test_lines_without_areas_take_h2_n2_from_estd_with_the_same_result():
+    from backend.reforming.reactor_calc import GAS_SOURCE_ESTD, response_factors
+    with_area = calculate([line("19.11.2026 05:05:22", "19.11.2026 06:46:00", 2, 4380000, 323000000)],
+                          [sample("S1", "19/11/2026 06:46", **COMPOSITION)], run_plan())["lines"][0]
+    ops = [estd_line("19.11.2026 03:00:00", "19.11.2026 04:40:00", 2, 4400000, 322000000, keep_area=True),   # both: factor
+           estd_line("19.11.2026 05:05:22", "19.11.2026 06:46:00", 2, 4380000, 323000000)]
+    assert response_factors(ops)["H2"] == pytest.approx(5.63044e-06, rel=1e-9)
+    out = calculate(ops, [sample("S1", "19/11/2026 06:46", **COMPOSITION)], run_plan())
+    x = out["lines"][1]
+    assert x["gas_source"] == GAS_SOURCE_ESTD
+    for key in ("h2_vol", "n2_vol", "naphtha_vol", "h2_out", "naphtha_out", "naphtha_feed", "h2_generation", "c5_yield"):
+        assert x[key] == pytest.approx(with_area[key], rel=1e-9), key
+    assert any("ESTD" in c for c in out["data_checks"])
+
+
+def test_rows_without_date_time_are_not_lines_and_do_not_take_the_dha_sample():
+    ops = [line("23.11.2026 06:26:08", "23.11.2026 08:07:01", 6, *REACTOR_AREAS),
+           line("", "23.11.2026 08:07:02", "", *REACTOR_AREAS)]                  # GC values pasted as a row of their own
+    out = calculate(ops, [sample("S72", "23/11/2026 08:07", **COMPOSITION)], run_plan())
+    assert [(l["reactor"], l["dha_uid"]) for l in out["lines"]] == [("R6", "S72")]
+    assert any("without Date/Time" in c for c in out["data_checks"])
+
+
+def test_the_last_condition_carries_on_after_its_planned_end():
+    plan = run_plan()
+    for row in plan["doeData"]["rows"]:
+        row["End Date"] = "2026-11-19 00:00:00"
+    ops = [line("19.11.2026 05:05:22", "19.11.2026 06:46:00", 2, *REACTOR_AREAS)]
+    x = calculate(ops, [sample("S1", "19/11/2026 06:46", **COMPOSITION)], plan)["lines"][0]
+    assert x["condition"] == "1" and x["n2_nlph"] == N2 and x["condition_note"].startswith("after the planned end")
+
+
+def test_naphtha_feed_names_the_real_reason_when_the_gc_values_are_missing():
+    row = line("19.11.2026 05:05:22", "19.11.2026 06:46:00", 2, "", "")
+    x = calculate([row], [sample("S1", "19/11/2026 06:46", **COMPOSITION)], run_plan())["lines"][0]
+    assert x["h2_vol"].startswith("ERROR: no H2") and "feed Carbon" not in x["naphtha_feed"]

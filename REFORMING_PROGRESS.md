@@ -24,6 +24,11 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   tags by block (10i1TIC02 / 10i2TIC02) as the workbook (resolves the open 10i2TIC01 item). Verified against Reactor 2 and
   Reactor 6 cell by cell. Workbook exceptions reported to the user, not copied (2 ml in LHSV from column O, typed N2 3.78
   / 4.7 in two R6 columns). Yields start 12 h after cut-in (workbook columns H / G) — adjustable on the tab.
+- **2026-11-27, v6.11.3 — running experiment (Result_34_1_1.txt, 100 DHA files to 27.11)**: ESTD instead of areas,
+  undated rows ignored, last condition carries on, waiting samples, content-keyed caches, data checks. The hand-completed
+  tail of Result_34_1_1 (from 23.11 08:07) had the ESTD values one row off and the last GC times shifted with a duplicate:
+  a realigned copy was given to the user (N2 vol% per reactor confirms it). The .txt ends 24.11 07:17: 34 DHA samples
+  (C1, C2 series) wait for a newer export.
 - **2026-11-23, v6.11.2 — full run Result_34.txt**: Sampled_reactor 0 on every line from 20.11 08:00 (GC still cycling
   R2 / R6) → reactor from the GC cycle when the line holds naphtha (56/56 equal to the workbook); pre-run lines without DHA
   left out; sticky headers (Offline Properties, Reactor calculations); "—" with tooltips instead of blank / ERROR cells.
