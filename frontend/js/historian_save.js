@@ -5,7 +5,7 @@
         'runPlanDashboardState', 'ils_feed_properties', 'dhaDashboardState', 'dhaOnlineState',
         'dhaDateTimeFilter', 'ils_base_table_state', 'ils_yield_table_state', 'ils_custom_columns',
         'ils_custom_table_state', 'ils_plot_preferences',
-        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state', 'ils_reforming_reactor_lines',
+        'ils_process', 'ils_reforming_offline', 'ils_reforming_carbon_state', 'ils_reforming_summary_state', 'ils_reforming_reactor_lines', 'ils_reforming_operating_source',
         'ils_zmb_state', 'ils_zmb_pump', 'ils_liquid_state', 'ils_mass_balance_state'
     ];
     // Existing pages also mirror these two keys in localStorage and read them as a fallback.

@@ -545,4 +545,36 @@ def data_checks(operating_rows, lines, results, dha, line_to_sample):
     if after:
         checks.append(f"{len(after)} DHA sample(s) after the end of the operating data (last GC line {_short(last)}): "
                       "load a newer operating export (.txt) to calculate them")
+    # 6.12.0: pauses in the operating data (no export covers them) and the DHA samples that fall into them
+    gcs = sorted(l["gc"] for l in lines)
+    for a, b in zip(gcs, gcs[1:]):
+        if hours(b, a) > GAP_H:
+            inside = [s for j, s in enumerate(dha) if j not in paired and a < (parse_time(s.get("DateTime")) or datetime.min) < b]
+            checks.append(f"No operating data from {_short(a)} to {_short(b)} ({hours(b, a):.1f} h)"
+                          + (f": {len(inside)} DHA sample(s) in this period cannot be calculated – add the export that covers it"
+                             if inside else ""))
+    breaks = sequence_breaks([(l["gc"], l["reactor"]) for l in lines])
+    if breaks:
+        checks.append("The reactor order breaks the GC's sampling cycle at " + ", ".join(breaks[:6])
+                      + " – check Sampled_reactor (and the GC values) of these lines")
     return checks
+
+
+GAP_H = 4.0     # a pause between GC lines longer than this is reported
+
+
+def sequence_breaks(items):
+    """GC lines whose reactor breaks the sampling cycle (e.g. R6 after R6 in an R2 / R6 alternation): the cycle is the
+    period p (2-8) that most lines repeat; a line differing from the one p lines before is a break."""
+    seq = [(gc, r) for gc, r in sorted((i for i in items if i[0]), key=lambda i: i[0]) if r and r != "R0"]
+    best = None
+    for p in range(2, 9):
+        pairs = [(seq[i], seq[i - p]) for i in range(p, len(seq))]
+        if len(pairs) < 6:
+            continue
+        agree = sum(1 for a, b in pairs if a[1] == b[1]) / len(pairs)
+        if best is None or agree > best[1] + 1e-9:
+            best = (p, agree, pairs)
+    if not best or best[1] < 0.8:
+        return []
+    return [f"{_short(a[0])} ({a[1]} after {seq[seq.index(a) - 1][1]})" for a, b in best[2] if a[1] != b[1]]

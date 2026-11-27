@@ -24,6 +24,11 @@ Isomerization code is unchanged except `app.py` (2 lines that register the refor
   tags by block (10i1TIC02 / 10i2TIC02) as the workbook (resolves the open 10i2TIC01 item). Verified against Reactor 2 and
   Reactor 6 cell by cell. Workbook exceptions reported to the user, not copied (2 ml in LHSV from column O, typed N2 3.78
   / 4.7 in two R6 columns). Yields start 12 h after cut-in (workbook columns H / G) — adjustable on the tab.
+- **2026-11-27, v6.12.0 — operating data from many exports**: the server writes new exports again and again; the Online
+  page (Reforming) merges every .txt of a folder (path box, Folder button, OneDrive sync) instead of a hand-made combined
+  file. Verified on run 19 (Result_3, _10, _24_1, _33, _34_1 → 81 lines = the hand-merged Result_34_1_2 without its
+  hand-typed 23.11 08:07 – 24.11 07:17 tail, which no export holds; reactors equal to the hand labels). Open: no export
+  covers 23.11 08:07 → 26.11 11:01; conditions C1 (24.11) and C2 (26.11, 490 / 490 °C in Result_24_1) not in the DOE yet.
 - **2026-11-27, v6.11.3 — running experiment (Result_34_1_1.txt, 100 DHA files to 27.11)**: ESTD instead of areas,
   undated rows ignored, last condition carries on, waiting samples, content-keyed caches, data checks. The hand-completed
   tail of Result_34_1_1 (from 23.11 08:07) had the ESTD values one row off and the last GC times shifted with a duplicate:

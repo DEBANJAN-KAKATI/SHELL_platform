@@ -1,3 +1,32 @@
+## 6.12.1 (2026-11-27) — Reforming: details hidden until "Show details"
+- Online Analysis: the merge panel (files, duplicates, gaps) is hidden; "Show details of the merged operating data (n
+  files)" opens it, "Hide details" closes it.
+- Reactor calculations: the information line (feed constants, calibration, markers) and the Data checks box are hidden;
+  "Show details (n checks)" next to Export CSV opens both (kept open when another reactor is chosen).
+
+## 6.12.0 (2026-11-27) — Reforming: operating data from many exports, merged automatically
+Isomerization and General_MB are not changed (Reforming files only; shared files get cache-buster bumps, one guide step
+and one saved-state key).
+- **Online Analysis takes a folder** (Reforming): the path box (or the new **Folder** button, or the OneDrive sync) gives
+  the folder with the server's operating exports (.txt); **Import** merges every export in it
+  (`backend/reforming/operating_merge.py`, `POST /api/reforming/merge-operating`) into one file under
+  `data/operating_merged/` and imports that with the page's own import. Rules: one line per operating record
+  (Date/Time); the same line in several files → the copy with readable numbers wins (exports with locale-damaged values
+  such as "18.501.102" or "699.508" barg lose), then GC areas present, Sampled_reactor 1-8, more numbers, newer file; a
+  0 / blank Sampled_reactor takes another copy's label; GC-only rows once, dropped when an operating line has the same
+  injection (±5 s); sorted by GC Date/Time; other .txt files are listed and skipped. Several files: paths separated by
+  ";". One .txt: imported as before. Importing again (or a sync) merges again, so new exports are picked up.
+- A green panel lists the files, lines used per file, duplicates left out, damaged copies, GC-only rows and every
+  period no export covers.
+- OneDrive sync (Reforming): the Online page syncs the folder of exports (signature over all of them) instead of the
+  newest .txt only; DHA scan in the synced folder accepts `.XLS` on Linux / Docker.
+- Calculation: DHA samples inside a pause of the operating data show "No operating data for this period (… → …)"
+  instead of an ERROR (Reactor filter group "No operating data yet / in a gap"); Data checks list the pauses (with the
+  DHA samples in them) and lines whose reactor breaks the GC sampling cycle (e.g. R6 after R6).
+- Checked on run 19's exports (Result_3, _10, _24_1, _33, _34_1): 81 lines, values equal to the hand-merged
+  Result_34_1_2 (only Excel's dropped trailing zeros differ), reactors equal to the hand labels on every line; Base table
+  and Summary without ERROR cells. Tests: `tests/test_reforming_operating_merge.py` (71 tests).
+
 ## 6.11.3 (2026-11-27) — Reforming: running experiment, hand-completed operating data
 Isomerization and General_MB are not changed (Reforming files only; shared files only get cache-buster bumps).
 - **No GC areas needed**: the GC writes ESTD = Area × response factor (H2 5.63044e-6, N2 2.09541e-7, identical on every

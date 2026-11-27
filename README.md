@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.11.3
+# ILS Dashboard (DHA Data Dashboard) v6.12.1
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -181,6 +181,13 @@ are left out; "—" (with a tooltip) marks yields before the yield start and lin
 **6.11.3:** lines without GC areas use ESTD ÷ the GC response factor (same H2 / N2 vol%); rows without Date/Time are
 ignored; the last DOE condition carries on after its planned end; DHA samples after the end of the .txt wait for a
 newer export ("Waiting for operating data"); a "Data checks" box lists what in the operating file needs a look.
+**6.12.0 — many operating exports:** on Online Analysis (Reforming) give the **folder** that holds the server's exports
+(.txt) — path box, **Folder** button or the OneDrive sync — and press **Import**: every export is merged into one file
+(one line per operating record, the readable copy of duplicates, sorted by GC Date/Time) and imported. No more
+copy-pasting exports into one file; importing again picks up new exports. A green panel lists the files used and any
+period no export covers; DHA samples in such a period show "No operating data for this period".
+**6.12.1:** the merge panel and, on Reactor calculations, the information line and Data checks are hidden until
+**Show details** is pressed.
 
 ## Export Complete (6.10.0)
 **Export Complete** in the header of the Calculation pages, Plots and the Summary Dashboard downloads one Excel workbook
@@ -223,6 +230,6 @@ Open http://localhost:5001. `data/` is mounted at `/app/data`; RunData is kept i
 the sources with `DASHBOARD_SOURCE_DIRECTORY`, `DASHBOARD_REACTOR_SOURCE_DIRECTORY` or `DASHBOARD_RUN_PLAN_FILE`.
 
 ## Tests
-`python -m pytest -q tests` (66 tests: Run Plan reader and molecular weights, online units and the internal standard
+`python -m pytest -q tests` (71 tests: Run Plan reader and molecular weights, online units and the internal standard
 against the MassBal workbook, R08 conditions, mass balance, synced folder and Export Complete workbook, Reforming reactor
 per GC line and the Reforming reactor sheet).

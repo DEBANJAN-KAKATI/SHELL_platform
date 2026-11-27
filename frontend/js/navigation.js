@@ -142,21 +142,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // Step-by-step guide on every page (6.9.11)
     if (!document.querySelector('script[src*="guide.js"]')) {
         const guideScript = document.createElement('script');
-        guideScript.src = '/frontend/js/guide.js?v=2';
+        guideScript.src = '/frontend/js/guide.js?v=3';
         document.head.appendChild(guideScript);
     }
 
     // Export Complete (6.10.0): one Excel workbook with every table of the run, on the Calculation pages and the plot pages
     if ((isCalculation || isCustom || isMassBalance || isPlots || isPlotDashboard) && !document.querySelector('script[src*="export_complete.js"]')) {
         const exportScript = document.createElement('script');
-        exportScript.src = '/frontend/js/export_complete.js?v=6';
+        exportScript.src = '/frontend/js/export_complete.js?v=7';
         document.head.appendChild(exportScript);
     }
 
     // Manual Historian save button (logic lives in historian_save.js)
     if (!isPlotDashboard) {
         const historianScript = document.createElement('script');
-        historianScript.src = '/frontend/js/historian_save.js?v=12';
+        historianScript.src = '/frontend/js/historian_save.js?v=13';
         historianScript.onload = () => {
             const runDataScript = document.createElement('script');
             runDataScript.src = '/frontend/js/run_data.js?v=8';
