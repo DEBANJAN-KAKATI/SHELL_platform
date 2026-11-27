@@ -114,3 +114,28 @@ def reactor_calc():
         return jsonify(calculate(table["rows"], body.get("samples") or [], body.get("run_plan") or {}, yield_start_h=start))
     except Exception as error:
         return jsonify({"error": str(error)}), 400
+
+
+@reforming_api.post("/merge-operating")
+def merge_operating():
+    """6.12.0: every operating export (.txt) of a folder, or a ';'-separated list of files, merged into one .txt
+    (data/operating_merged/…): one line per operating record, the readable copy of duplicates, sorted by GC Date/Time.
+    The Online Analysis page then imports the merged file as a single export. Body: {source}."""
+    from backend.reforming.operating_merge import merge_to_file
+    source = (request.get_json(silent=True) or {}).get("source")
+    try:
+        result = merge_to_file(source)
+        return jsonify({"path": result["report"]["merged_file"], "report": result["report"]})
+    except Exception as error:
+        return jsonify({"error": str(error)}), 400
+
+
+@reforming_api.post("/browse-operating-folder")
+def browse_operating_folder():
+    from backend.services.dialog_service import browse_directory_dialog
+    initial = (request.get_json(silent=True) or {}).get("initial_directory") or ""
+    try:
+        selected, cancelled = browse_directory_dialog(initial_dir=initial, title="Select the folder with the operating data exports (.txt)")
+        return jsonify({"path": selected, "cancelled": cancelled})
+    except Exception as error:
+        return jsonify({"error": "Native folder browser is unavailable. Enter the folder path manually.", "details": str(error)}), 503

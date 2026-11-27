@@ -59,6 +59,7 @@
             ['#onlinePhaseTabs', 'Gas | Liquid', 'General_MB: Gas is the imported export; Liquid is where the liquid samples are entered.'],
             ['#onlineFile', '1 · Export file', 'Path of the tab-delimited GC / process export (SystemTxt .txt).'],
             ['#onlineBrowse', 'Browse', 'Opens a file picker.'],
+            ['#rfOperatingFolder', 'Folder (Reforming)', 'Pick the folder that holds all the operating exports (.txt). Import merges them: one line per operating record, the readable copy of duplicates, sorted by GC Date/Time. The green panel lists the files used and any time no export covers.'],
             ['#onlineProcess', '2 · Import file', 'Reads the export: one row per GC analysis with its time, reactor and process values.'],
             ['#onlineSummary', 'Import summary', 'How many records were loaded and any notes about the file.'],
             ['#onlineIsWrap', '3 · Internal Standard', 'General_MB: choose Argon or N2. The bypass lines give the feed gas; the side panel shows it per condition.'],

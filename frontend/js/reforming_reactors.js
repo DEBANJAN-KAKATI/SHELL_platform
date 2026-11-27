@@ -10,10 +10,11 @@ window.ILSReformingReactors = (() => {
     const LINES_KEY = 'ils_reforming_reactor_lines';
     // 6.11.2: lines carry the server's assigned reactor (lines exported with Sampled_reactor 0 get the GC-cycle reactor);
     // caches written before (no version) are read again
-    const LINES_VERSION = 3;
-    const CALC_VERSION = 3;
+    const LINES_VERSION = 4;
+    const CALC_VERSION = 4;
     const BEFORE_MS = 10 * 60000;
     const AFTER_MS = 60 * 60000;
+    const GAP_MS = 4 * 3600000;        // a pause between GC lines longer than this (as reactor_calc.GAP_H)
     const readJson = (storage, key) => { try { return JSON.parse(storage.getItem(key) || 'null'); } catch (e) { return null; } };
 
     // 'R6', '6', '6.0' -> 'R6'; 0 -> 'R0' (bypass); anything else -> ''
@@ -160,6 +161,7 @@ window.ILSReformingReactors = (() => {
         const pairs = gcLines ? pair(samples.map(s => time(dateOf(s))), gcLines.map(line => time(line.gc))) : null;
         // Last GC line of the operating data: samples after it (+60 min) wait for a newer export, they are not errors
         const lastGc = gcLines && gcLines.length ? Math.max(...gcLines.map(line => time(line.gc) ?? -Infinity)) : null;
+        const gcSorted = gcLines ? gcLines.map(line => time(line.gc)).filter(t => t !== null).sort((a, b) => a - b) : [];
         const fmt = ms => { const d = new Date(ms); const two = n => String(n).padStart(2, '0');
             return `${two(d.getDate())}.${two(d.getMonth() + 1)}.${d.getFullYear()} ${two(d.getHours())}:${two(d.getMinutes())}`; };
         return samples.map((sample, index) => {
@@ -171,6 +173,12 @@ window.ILSReformingReactors = (() => {
                     const at = time(dateOf(sample));
                     if (lastGc !== null && at !== null && at > lastGc + AFTER_MS) {
                         return { reactor: '', pending: true, error: `Waiting for operating data (the .txt ends ${fmt(lastGc)})` };
+                    }
+                    // 6.12.0: inside a pause of the operating data (no export covers it)
+                    const before = at === null ? null : gcSorted.filter(t => t <= at).pop();
+                    const after = at === null ? null : gcSorted.find(t => t > at);
+                    if (before !== undefined && before !== null && after !== undefined && after - before > GAP_MS) {
+                        return { reactor: '', pending: true, error: `No operating data for this period (${fmt(before)} → ${fmt(after)})` };
                     }
                     return { reactor: '', error: 'ERROR: no GC line of the operating data within -10…+60 min' };
                 }

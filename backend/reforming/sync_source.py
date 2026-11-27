@@ -16,7 +16,6 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parents[2]
 CONFIG_FILE = BASE / "config" / "reforming_sync.json"
 FOLDER_SUFFIX = "Online DHA Results"
-OPERATING_FILE = "Operating Data.txt"
 
 
 def _read_config():
@@ -51,7 +50,8 @@ def _detect_folder():
 
 
 def _xls_files(folder):
-    return [p for p in folder.glob("*.xls") if not p.name.startswith("~$")]
+    # .xls / .XLS (Windows matches either; Linux / Docker only the exact case)
+    return [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".xls" and not p.name.startswith("~$")]
 
 
 def _dha_folder(folder):
@@ -66,12 +66,22 @@ def _dha_folder(folder):
     return best
 
 
-def _operating_file(folder):
-    exact = folder / OPERATING_FILE
-    if exact.is_file():
-        return exact
-    texts = sorted(folder.glob("*.txt"), key=lambda p: p.stat().st_mtime, reverse=True)
-    return texts[0] if texts else None
+def _txt_files(folder):
+    return [p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".txt"]
+
+
+def _operating_source(folder):
+    """6.12.0: the folder holding the operating exports (.txt): the synced folder itself, else its sub-folder with the
+    most .txt files. The Online Analysis page merges every export in it (backend/reforming/operating_merge.py), so a
+    new export from the server is picked up without copy-pasting it into one file."""
+    if _txt_files(folder):
+        return folder
+    best, count = None, 0
+    for child in sorted(p for p in folder.iterdir() if p.is_dir()):
+        n = len(_txt_files(child))
+        if n > count:
+            best, count = child, n
+    return best
 
 
 def _run_plan_file(folder):
@@ -108,7 +118,9 @@ def sync_status():
     dha_folder = _dha_folder(folder)
     dha_files = sorted(_xls_files(dha_folder), key=lambda p: p.name)
     latest = dha_files[-1] if dha_files else None  # file names start with UID + injection time
-    operating = _operating_file(folder)
+    operating = _operating_source(folder)
+    texts = sorted(_txt_files(operating), key=lambda p: p.name) if operating else []
+    newest = max(texts, key=lambda p: p.stat().st_mtime) if texts else None
     status.update({
         "found": True,
         "dha_folder": str(dha_folder),
@@ -116,9 +128,10 @@ def sync_status():
         "dha_latest_file": latest.name if latest else "",
         "dha_latest_modified": _stamp(latest) if latest else "",
         "dha_signature": _signature(dha_files),
-        "operating_file": str(operating) if operating else "",
-        "operating_modified": _stamp(operating) if operating else "",
-        "operating_signature": _signature([operating]) if operating else "",
+        "operating_file": str(operating) if texts else "",          # a folder: all its exports are merged
+        "operating_count": len(texts),
+        "operating_modified": _stamp(newest) if newest else "",
+        "operating_signature": _signature(texts) if texts else "",
     })
     run_plan = _run_plan_file(folder)
     status.update({

@@ -186,7 +186,7 @@ window.ILSReformingCarbon = (() => {
             // Why the calculated columns are blank (shown as "—" with a tooltip; the stored values stay blank for Plots)
             const startH = calc?.constants?.yield_start_h;
             Object.defineProperty(summary, '__calcNote', { enumerable: false, value: !calc ? 'Not calculated yet (Reactor calculations)'
-                : !line && String(row.Reactor || '').startsWith('Waiting') ? `${row.Reactor}: load a newer operating export on Online Analysis`
+                : !line && /^(Waiting for|No operating data)/.test(String(row.Reactor || '')) ? `${row.Reactor}: load the operating export (.txt) that covers this time on Online Analysis`
                 : !line ? 'No GC line of a reactor for this DHA sample (feed, bypass or outside −10..+60 min)'
                 : typeof line.run_length_h === 'number' && line.run_length_h < startH ? `Yields start ${startH} h after the Feed Cut-In (as the sheet): run length ${line.run_length_h.toFixed(2)} h` : '' });
             return summary;
@@ -203,7 +203,7 @@ window.ILSReformingCarbon = (() => {
     function reactorKey(row) {
         if (RR.isReactor(row.Reactor)) return row.Reactor;
         if (String(row.Reactor || '').startsWith('ERROR')) return '__error__';
-        if (String(row.Reactor || '').startsWith('Waiting')) return '__pending__';
+        if (/^(Waiting for|No operating data)/.test(String(row.Reactor || ''))) return '__pending__';
         return '__feed__';
     }
     function fillReactorFilter(selector, source) {
@@ -216,7 +216,7 @@ window.ILSReformingCarbon = (() => {
         const reactors = Object.keys(counts).filter(RR.isReactor).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const options = [['', `All reactors (${source.length})`], ...reactors.map(r => [r, `${r} (${counts[r]})`])];
         if (counts.__feed__) options.push(['__feed__', `Feed / bypass (${counts.__feed__})`]);
-        if (counts.__pending__) options.push(['__pending__', `Waiting for operating data (${counts.__pending__})`]);
+        if (counts.__pending__) options.push(['__pending__', `No operating data yet / in a gap (${counts.__pending__})`]);
         if (counts.__error__) options.push(['__error__', `No reactor – ERROR (${counts.__error__})`]);
         select.innerHTML = options.map(([value, label]) => `<option value="${value}">${esc(label)}</option>`).join('');
         select.value = options.some(([value]) => value === current) ? current : '';
