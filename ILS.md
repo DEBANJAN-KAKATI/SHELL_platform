@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.11.2). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.11.3). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -33,7 +33,7 @@ General_MB.
   Run Plan file (paths point at `C:\Users\...\ILS_App\Data\...`).
 - Env vars: `DASHBOARD_USER` + `DASHBOARD_PASS` (both set → login required, for sharing over a tunnel;
   `stop_sharing.bat`), `DASHBOARD_SECRET_KEY`, `DASHBOARD_DATA_INTEGRITY=0` hides Data Integrity.
-- Tests: `python -m pytest -q tests` (62 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
+- Tests: `python -m pytest -q tests` (66 tests: Run Plan reader / molecular weights, online units vs the MassBal workbook, R08
   conditions, mass balance, synced folder + Export Complete workbook, Reforming reactor per GC line, Reforming reactor sheet). Data files (`*.xls/xlsx/csv`, `DHA/`, `RunData/*`,
   `Historian/*.sqlite`, `backups/`) are git-ignored.
 - Native file/folder pickers: `backend/services/dialog_service.py` (tkinter via `picker.py`, PowerShell fallback).
@@ -223,6 +223,12 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   the cut-in without DHA are skipped; a line before the reactor's first DOE start uses condition 1's flows. Reforming-only
   CSS: Offline `#dataTable thead th` sticky (from reforming_offline.js), reactor tab header z-index above the sticky column;
   "—" + tooltip for yields before the yield start and for lines without DHA.
+  **6.11.3:** `gas_area` / `gas_vol` — Area, else ESTD ÷ `response_factors(rows)` (median ESTD/Area of the file, default
+  `GC_RESPONSE_FACTOR` H2 5.63044e-6, N2 2.09541e-7); `is_operating_line` (rows without Date/Time are skipped);
+  `condition_at` (last DOE condition of a reactor carries on after its End, `condition_note`); result `data_checks`,
+  `response_factors`, line `gas_source`. Frontend: `RR.onlineSig()` (content hash of dhaOnlineState) in the lines cache
+  (v3) and calc sig (v3); `assign` → `pending` "Waiting for operating data (the .txt ends …)" after the last GC line + 60
+  min; `RR.openLastConditions` for Summary / Base-table conditions of known reactors.
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

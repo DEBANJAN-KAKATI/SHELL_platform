@@ -70,7 +70,7 @@ window.ILSReformingOffline = (() => {
         try { offline = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); } catch (error) {}
         const samples = offline?.rows || [];
         const lines = RR.lines();
-        const sig = `${offline?.processed_at || ''}|${samples.length}|${lines ? lines.length : 'none'}|${sessionStorage.getItem('runPlanDashboardState')?.length || 0}`;
+        const sig = `${offline?.processed_at || ''}|${samples.length}|${lines ? lines.length : 'none'}|${RR.onlineSig ? RR.onlineSig() : ''}|${sessionStorage.getItem('runPlanDashboardState')?.length || 0}`;
         if (sig !== memo.sig) {
             const found = RR.assign(samples, sample => sample.DateTime);
             const byDate = new Map();

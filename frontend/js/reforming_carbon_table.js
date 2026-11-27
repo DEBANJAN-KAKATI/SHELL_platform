@@ -52,10 +52,12 @@ window.ILSReformingCarbon = (() => {
             start: parseDoeBoundary(doeValue(row, 'Start Date'), false),
             end: parseDoeBoundary(doeValue(row, 'End Date'), true),
         })).filter(range => range.condition && range.start && range.end && range.start <= range.end);
+        // A sample of a known reactor after the planned end of its last condition stays on that condition (6.11.3)
+        const open = RR.openLastConditions ? RR.openLastConditions(ranges.map(range => ({ ...range }))) : ranges;
         sorted.forEach(row => {
             const date = parseCalcDateTime(row.DateTime);
             const reactor = RR.isReactor(row.Reactor) ? row.Reactor : '';
-            const hits = date ? ranges.filter(range => date >= range.start && date < range.end
+            const hits = date ? (reactor ? open : ranges).filter(range => date >= range.start && date < range.end
                 && (!reactor || !range.reactor || range.reactor === reactor)) : [];
             const matches = [...new Set(hits.map(range => range.condition))];
             row.Condition = row._bypass ? 'Bypass' : matches.length === 1 ? matches[0]
@@ -78,6 +80,7 @@ window.ILSReformingCarbon = (() => {
                 end: parseDoeBoundary(doeValue(row, 'End Date'), true),
             })).filter(range => range.condition && range.reactor && range.start && range.end && range.start <= range.end);
             if (!ranges.length) return result;
+            if (RR.openLastConditions) RR.openLastConditions(ranges);     // last condition carries on (6.11.3)
             (result.rows || rows).forEach(row => {
                 const reactor = RR.norm(row.Reactor ?? row.Sampled_reactor);
                 if (!RR.isReactor(reactor)) return;
@@ -183,6 +186,7 @@ window.ILSReformingCarbon = (() => {
             // Why the calculated columns are blank (shown as "—" with a tooltip; the stored values stay blank for Plots)
             const startH = calc?.constants?.yield_start_h;
             Object.defineProperty(summary, '__calcNote', { enumerable: false, value: !calc ? 'Not calculated yet (Reactor calculations)'
+                : !line && String(row.Reactor || '').startsWith('Waiting') ? `${row.Reactor}: load a newer operating export on Online Analysis`
                 : !line ? 'No GC line of a reactor for this DHA sample (feed, bypass or outside −10..+60 min)'
                 : typeof line.run_length_h === 'number' && line.run_length_h < startH ? `Yields start ${startH} h after the Feed Cut-In (as the sheet): run length ${line.run_length_h.toFixed(2)} h` : '' });
             return summary;
@@ -199,6 +203,7 @@ window.ILSReformingCarbon = (() => {
     function reactorKey(row) {
         if (RR.isReactor(row.Reactor)) return row.Reactor;
         if (String(row.Reactor || '').startsWith('ERROR')) return '__error__';
+        if (String(row.Reactor || '').startsWith('Waiting')) return '__pending__';
         return '__feed__';
     }
     function fillReactorFilter(selector, source) {
@@ -211,6 +216,7 @@ window.ILSReformingCarbon = (() => {
         const reactors = Object.keys(counts).filter(RR.isReactor).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const options = [['', `All reactors (${source.length})`], ...reactors.map(r => [r, `${r} (${counts[r]})`])];
         if (counts.__feed__) options.push(['__feed__', `Feed / bypass (${counts.__feed__})`]);
+        if (counts.__pending__) options.push(['__pending__', `Waiting for operating data (${counts.__pending__})`]);
         if (counts.__error__) options.push(['__error__', `No reactor – ERROR (${counts.__error__})`]);
         select.innerHTML = options.map(([value, label]) => `<option value="${value}">${esc(label)}</option>`).join('');
         select.value = options.some(([value]) => value === current) ? current : '';

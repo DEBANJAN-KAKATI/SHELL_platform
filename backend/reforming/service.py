@@ -44,7 +44,8 @@ def process_reforming_directory(folder):
     path = Path(folder)
     if not path.exists() or not path.is_dir():
         raise ValueError("Selected folder does not exist or is not a directory.")
-    files = sorted(x for x in path.glob("*.xls") if not x.name.startswith("~$"))
+    # .xls / .XLS (the GC writes upper case; Windows matches either, Linux / Docker only the exact case)
+    files = sorted(x for x in path.iterdir() if x.is_file() and x.suffix.lower() == ".xls" and not x.name.startswith("~$"))
 
     samples, log = [], []
     for file in files:
