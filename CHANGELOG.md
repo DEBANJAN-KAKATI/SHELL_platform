@@ -1,3 +1,9 @@
+## 6.12.1 (2026-11-27) — Reforming: details hidden until "Show details"
+- Online Analysis: the merge panel (files, duplicates, gaps) is hidden; "Show details of the merged operating data (n
+  files)" opens it, "Hide details" closes it.
+- Reactor calculations: the information line (feed constants, calibration, markers) and the Data checks box are hidden;
+  "Show details (n checks)" next to Export CSV opens both (kept open when another reactor is chosen).
+
 ## 6.12.0 (2026-11-27) — Reforming: operating data from many exports, merged automatically
 Isomerization and General_MB are not changed (Reforming files only; shared files get cache-buster bumps, one guide step
 and one saved-state key).

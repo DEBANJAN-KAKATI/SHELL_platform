@@ -1,4 +1,4 @@
-# ILS Dashboard (DHA Data Dashboard) v6.12.0
+# ILS Dashboard (DHA Data Dashboard) v6.12.1
 
 Local web dashboard for the ILS multi-reactor test unit. It reads the Run Plan workbook, the offline DHA reports, the
 online GC / process export and the liquid product data, joins them by time and reactor, and calculates base and yield
@@ -186,6 +186,8 @@ newer export ("Waiting for operating data"); a "Data checks" box lists what in t
 (one line per operating record, the readable copy of duplicates, sorted by GC Date/Time) and imported. No more
 copy-pasting exports into one file; importing again picks up new exports. A green panel lists the files used and any
 period no export covers; DHA samples in such a period show "No operating data for this period".
+**6.12.1:** the merge panel and, on Reactor calculations, the information line and Data checks are hidden until
+**Show details** is pressed.
 
 ## Export Complete (6.10.0)
 **Export Complete** in the header of the Calculation pages, Plots and the Summary Dashboard downloads one Excel workbook

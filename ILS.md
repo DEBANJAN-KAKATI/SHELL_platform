@@ -1,7 +1,7 @@
 # ILS — platform reference
 
 "ILS" is the name for this application: the **ILS Dashboard** (README title "DHA Data Dashboard"), version
-in `VERSION` (6.12.0). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
+in `VERSION` (6.12.1). It is a local Flask web app for a pilot-plant test rig: it loads gas-chromatography DHA
 (Detailed Hydrocarbon Analysis) results, online process/historian data and the Run Plan workbook, joins them by
 timestamp and reactor, calculates yields, and offers plots, a printable summary dashboard and saved runs.
 **Three processes (v6.9), chosen with the process tabs on the Run Plan page:** **Isomerization** (default),
@@ -236,7 +236,8 @@ Static JS/CSS use `?v=N` cache-busters — bump them when changing a file.
   Import button's `onclick` — a folder / ';' list is merged first, then the page's own import runs on the merged file, which
   stays in the box so the stored `dhaOnlineState.path` is always a .txt). Reforming sync: `operating_file` = the folder of
   exports, `operating_signature` over all of them. `reactor_calc.sequence_breaks`, gap checks (`GAP_H` 4 h);
-  `RR.assign` → "No operating data for this period (… → …)" inside a gap.
+  `RR.assign` → "No operating data for this period (… → …)" inside a gap. 6.12.1: merge panel, reactor info line and Data checks
+  hidden until "Show details" (`#reformingReactorDetails`, `.rf-merge-toggle`; open state per page view).
 - SharePoint/OneDrive sync: reads a locally synced "Online DHA Results" folder (`config/reforming_sync.json`),
   auto-syncs every 5 min when file signatures change.
 - Open items: "Sync from Online Analysis" fallback still uses isomerization temperature mapping; reforming wof%

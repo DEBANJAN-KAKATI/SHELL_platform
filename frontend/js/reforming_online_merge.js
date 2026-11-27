@@ -19,6 +19,8 @@
     const clearSource = () => { try { sessionStorage.removeItem(SOURCE_KEY); localStorage.removeItem(SOURCE_KEY); } catch (e) { } };
     const isSingleTxt = value => /\.txt"?$/i.test(value) && !value.includes(';');
 
+    // 6.12.1: the details of the merge are hidden until "Show details" is pressed
+    let reportOpen = false;
     function renderReport() {
         const box = $('#rfMergeReport');
         if (!box) return;
@@ -36,13 +38,23 @@
             ...(r.gc_only_same_injection?.length ? [`${r.gc_only_same_injection.length} GC-only row(s) left out: the same injection as an operating line (${esc(r.gc_only_same_injection.join(', '))})`] : []),
             ...(r.damaged_only?.length ? [`${r.damaged_only.length} line(s) exist only with an unreadable value in some column (e.g. ${esc(r.damaged_only[0])})`] : []),
         ];
-        box.innerHTML = `<div><b>Operating data merged from ${r.files_used} of ${(r.files || []).length} file(s)</b> · ${r.lines} lines `
+        const count = (r.files || []).length;
+        box.classList.toggle('closed', !reportOpen);
+        const toggle = `<button type="button" class="btn secondary rf-merge-toggle" aria-expanded="${reportOpen}">`
+            + `${reportOpen ? 'Hide details' : `Show details of the merged operating data (${count} file${count > 1 ? 's' : ''})`}</button>`;
+        if (!reportOpen) {
+            box.innerHTML = toggle;
+            box.querySelector('.rf-merge-toggle').onclick = () => { reportOpen = true; renderReport(); };
+            return;
+        }
+        box.innerHTML = toggle + `<div><b>Operating data merged from ${r.files_used} of ${(r.files || []).length} file(s)</b> · ${r.lines} lines `
             + `(${esc(r.first)} → ${esc(r.last)}) · ${r.duplicates_removed} duplicate copies left out`
             + `${r.labels_copied ? ` · ${r.labels_copied} Sampled_reactor label(s) taken from another copy` : ''}`
             + ` · <span title="${esc(saved.merged)}">source: ${esc(saved.source)}</span></div>`
             + (notes.length ? `<ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul>` : '')
             + `<details><summary>Files (${(r.files || []).length})</summary><table class="rf-merge-files"><thead><tr><th>File</th><th>Modified</th>`
             + `<th>Lines</th><th>Period (GC)</th><th>Lines used</th><th>Note</th></tr></thead><tbody>${files}</tbody></table></details>`;
+        box.querySelector('.rf-merge-toggle').onclick = () => { reportOpen = false; renderReport(); };
     }
 
     async function merge(source) {
@@ -67,6 +79,7 @@
         $('.online-source-row')?.insertAdjacentHTML('afterend', '<div class="rf-merge-report" id="rfMergeReport" hidden></div>');
         document.head.insertAdjacentHTML('beforeend', '<style>.rf-merge-report{margin:8px 0 12px;padding:8px 12px;border:1px solid #c9d8c5;border-left:4px solid #4f7d43;'
             + 'background:#f2f7ef;border-radius:6px;font-size:12.5px;color:#22381c}.rf-merge-report ul{margin:4px 0 0 18px;padding:0}'
+            + '.rf-merge-report.closed{padding:0;border:0;background:none}.rf-merge-toggle{margin-bottom:6px}'
             + '.rf-merge-report details{margin-top:4px}.rf-merge-files{border-collapse:collapse;margin-top:4px;font-size:12px}'
             + '.rf-merge-files th,.rf-merge-files td{padding:2px 8px;border-bottom:1px solid #dbe5d7;text-align:left;white-space:nowrap}</style>');
 

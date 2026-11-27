@@ -12,6 +12,19 @@
     let decimals = 4;
     try { const d = Number(localStorage.getItem(DECIMALS_KEY)); if (Number.isInteger(d) && d >= 0 && d <= 8 && localStorage.getItem(DECIMALS_KEY) !== null) decimals = d; } catch (e) { }
     let lastError = '';
+    // 6.12.1: the information line and the data checks are hidden until "Show details" is pressed
+    let detailsOpen = false;
+    function showDetails(count) {
+        const info = $('#reformingReactorInfo');
+        const checks = $('#reformingReactorChecks');
+        if (info) info.style.display = detailsOpen ? '' : 'none';
+        if (checks) checks.style.display = detailsOpen && count ? '' : 'none';
+        const button = $('#reformingReactorDetails');
+        if (button) {
+            button.textContent = detailsOpen ? 'Hide details' : `Show details${count ? ` (${count} check${count > 1 ? 's' : ''})` : ''}`;
+            button.setAttribute('aria-expanded', String(detailsOpen));
+        }
+    }
 
     // ------------------------------------------------------------ Base table = the sheet's rows 21-38 per GC line
     const BASE_COLUMNS = [
@@ -93,6 +106,7 @@
             if (thead) thead.innerHTML = ''; if (tbody) tbody.innerHTML = '';
             if (empty) empty.style.display = 'block';
             if ($('#reformingReactorInfo')) $('#reformingReactorInfo').textContent = '';
+            showDetails(0);
             return;
         }
         if (empty) empty.style.display = 'none';
@@ -118,8 +132,8 @@
             checks = $('#reformingReactorChecks');
         }
         const items = calc.data_checks || [];
-        checks.hidden = !items.length;
         checks.innerHTML = items.length ? `<b>Data checks of the operating data (${items.length})</b><ul>${items.map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
+        showDetails(items.length);
         const section = $('#reformingReactorSection')?.value || '';
         const rows = RR.SHEET_ROWS.filter(([, , , sec]) => !section || sec === section);
         if (thead) {
@@ -197,6 +211,10 @@
         $('#reformingReactorSelect')?.addEventListener('change', renderTab);
         $('#reformingReactorSection')?.addEventListener('change', renderTab);
         $('#reformingReactorExportCsv')?.addEventListener('click', exportCsv);
+        $('#reformingReactorExportCsv')?.insertAdjacentHTML('beforebegin', '<button type="button" class="btn secondary" id="reformingReactorDetails" aria-expanded="false" '
+            + 'title="Feed constants, calibration, markers and the data checks of the operating data">Show details</button>');
+        $('#reformingReactorDetails')?.addEventListener('click', () => { detailsOpen = !detailsOpen; renderTab(); });
+        showDetails(0);
         $('#reformingYieldStart')?.addEventListener('change', () => {
             const value = Number($('#reformingYieldStart').value);
             if (!Number.isFinite(value) || value < 0) return;
